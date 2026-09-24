@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -67,6 +68,12 @@ class _DeckListPageState extends State<DeckListPage> {
     }
   }
 
+  void _openDeck(DeckNode deck) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => DeckOverviewPage(deck: deck)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -129,7 +136,8 @@ class _DeckListPageState extends State<DeckListPage> {
                 child: const Text('Retry'),
               ),
             ),
-          DeckListReady(:final decks) => _DeckTree(decks: decks),
+          DeckListReady(:final decks) =>
+            _DeckTree(decks: decks, onDeckTap: _openDeck),
         };
       },
     );
@@ -137,9 +145,10 @@ class _DeckListPageState extends State<DeckListPage> {
 }
 
 class _DeckTree extends StatelessWidget {
-  const _DeckTree({required this.decks});
+  const _DeckTree({required this.decks, required this.onDeckTap});
 
   final List<DeckNode> decks;
+  final ValueChanged<DeckNode> onDeckTap;
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +186,7 @@ class _DeckTree extends StatelessWidget {
           key: ValueKey('deck-row-${node.id}'),
           padding: EdgeInsets.only(left: 8 + depth * 24.0),
           child: ListTile(
+            onTap: () => onDeckTap(node),
             title: Text(node.name),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
