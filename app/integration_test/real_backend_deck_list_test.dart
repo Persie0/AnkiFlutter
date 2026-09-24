@@ -1,7 +1,5 @@
 import 'dart:ffi';
 import 'dart:io';
-import 'dart:typed_data';
-import 'dart:ui';
 
 import 'package:anki_flutter/app/anki_flutter_app.dart';
 import 'package:anki_flutter/core/backend/anki_backend_client.dart';
