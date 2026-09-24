@@ -8,6 +8,11 @@ build = "build.rs"
 [lib]
 crate-type = ["cdylib", "rlib"]
 
+[dependencies]
+anki = { path = "../../third_party/anki/rslib", features = ["rustls"] }
+anki_proto = { path = "../../third_party/anki/rslib/proto" }
+prost = "0.13"
+
 [build-dependencies]
 anki_proto = { path = "../../third_party/anki/rslib/proto" }
 anki_proto_gen = { path = "../../third_party/anki/rslib/proto_gen" }
