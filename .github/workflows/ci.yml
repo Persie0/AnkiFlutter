@@ -35,3 +35,16 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: flutter analyze
+
+  rust_bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - name: Use Rust 1.80
+        run: |
+          rustup toolchain install 1.80.0 --profile minimal
+          rustup override set 1.80.0
+      - name: Test bridge operation mapping
+        run: cargo test --manifest-path native/anki_bridge/Cargo.toml --test operation_indices
