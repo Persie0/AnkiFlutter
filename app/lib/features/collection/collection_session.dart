@@ -6,9 +6,9 @@ import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
 import 'package:anki_flutter/features/collection/collection_location.dart';
 
 class CollectionSession {
-  CollectionSession({required BackendInvoker backend}) : _backend = backend;
+  CollectionSession({required this.backend});
 
-  final BackendInvoker _backend;
+  final BackendInvoker backend;
   bool _isOpen = false;
 
   bool get isOpen => _isOpen;
@@ -19,7 +19,7 @@ class CollectionSession {
       mediaFolderPath: location.mediaFolderPath,
       mediaDbPath: location.mediaDbPath,
     );
-    await _backend.invoke(
+    await backend.invoke(
       BackendOperation.openCollection,
       Uint8List.fromList(request.writeToBuffer()),
     );
@@ -31,7 +31,7 @@ class CollectionSession {
       return;
     }
     final request = CloseCollectionRequest(downgradeToSchema11: false);
-    await _backend.invoke(
+    await backend.invoke(
       BackendOperation.closeCollection,
       Uint8List.fromList(request.writeToBuffer()),
     );
