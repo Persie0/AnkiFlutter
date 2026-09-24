@@ -3,6 +3,12 @@ name = "anki_flutter_bridge"
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.80"
+build = "build.rs"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[build-dependencies]
+anki_proto = { path = "../../third_party/anki/rslib/proto" }
+anki_proto_gen = { path = "../../third_party/anki/rslib/proto_gen" }
+prost-reflect = "0.14.7"
