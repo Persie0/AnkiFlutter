@@ -4,7 +4,7 @@ on:
   pull_request:
   push:
     branches:
-      - feat/first-desktop-vertical-slice
+      - main
 
 jobs:
   flutter:
