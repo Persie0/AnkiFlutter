@@ -24,7 +24,7 @@ jobs:
       - name: Install Linux desktop and protoc dependencies
         run: >-
           sudo apt-get update && sudo apt-get install -y
-          clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+          clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb
           protobuf-compiler
         working-directory: .
       - name: Install Dart protoc plugin
@@ -39,7 +39,7 @@ jobs:
       - run: flutter test
       - run: flutter analyze
       - name: Real backend integration RED
-        run: flutter test integration_test/real_backend_deck_list_test.dart
+        run: xvfb-run -a flutter test integration_test/real_backend_deck_list_test.dart -d linux -r github
 
   rust_bridge:
     runs-on: ubuntu-latest
