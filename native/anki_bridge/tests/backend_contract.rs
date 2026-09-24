@@ -1,116 +1,179 @@
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::ptr;
+use std::slice;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use anki_flutter_bridge::backend::BridgeBackend;
-use anki_flutter_bridge::operations::{CLOSE_COLLECTION, DECK_TREE, OPEN_COLLECTION};
+use anki_flutter_bridge::ffi::{
+    anki_bridge_create, anki_bridge_destroy, anki_bridge_free_buffer, anki_bridge_invoke,
+    ByteBuffer, STATUS_BACKEND_ERROR, STATUS_SUCCESS,
+};
 use anki_proto::backend::{BackendError, BackendInit};
 use anki_proto::collection::{CloseCollectionRequest, OpenCollectionRequest};
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use prost::Message;
+use tempfile::TempDir;
 
-#[test]
-fn real_collection_opens_exposes_default_deck_and_reopens() {
-    let temp = unique_temp_dir("real_collection");
-    fs::create_dir_all(&temp).unwrap();
+// Stable AnkiFlutter bridge ABI operation IDs, not upstream Anki service indices.
+const OPEN_COLLECTION: u32 = 1;
+const CLOSE_COLLECTION: u32 = 2;
+const DECK_TREE: u32 = 3;
 
-    let collection = temp.join("collection.anki2");
-    let media = temp.join("collection.media");
-    let media_db = temp.join("collection.media.db2");
-    fs::create_dir_all(&media).unwrap();
-
-    let backend = new_backend();
-    open_collection(&backend, &collection, &media, &media_db).unwrap();
-
-    let first_tree = deck_tree(&backend).unwrap();
-    let default = first_tree
-        .children
-        .iter()
-        .find(|deck| deck.name == "Default")
-        .expect("new Anki collection should contain Default deck");
-    assert_eq!(default.new_count, 0);
-    assert_eq!(default.learn_count, 0);
-    assert_eq!(default.review_count, 0);
-
-    close_collection(&backend).unwrap();
-    open_collection(&backend, &collection, &media, &media_db).unwrap();
-
-    let reopened_tree = deck_tree(&backend).unwrap();
-    assert!(reopened_tree.children.iter().any(|deck| deck.name == "Default"));
-
-    close_collection(&backend).unwrap();
-    fs::remove_dir_all(temp).unwrap();
+struct TestBackend {
+    handle: *mut BridgeBackend,
 }
 
-#[test]
-fn invalid_collection_parent_returns_decodable_anki_error() {
-    let temp = unique_temp_dir("invalid_parent");
-    fs::create_dir_all(&temp).unwrap();
-    let not_a_directory = temp.join("not_a_directory");
-    fs::write(&not_a_directory, b"regular file").unwrap();
+impl TestBackend {
+    fn new() -> Self {
+        let init = BackendInit {
+            preferred_langs: vec!["en-US".to_string()],
+            locale_folder_path: String::new(),
+            server: false,
+        };
+        let bytes = init.encode_to_vec();
+        let result = unsafe { anki_bridge_create(bytes.as_ptr(), bytes.len()) };
+        let error = take_buffer(result.data);
+        assert_eq!(
+            result.status,
+            STATUS_SUCCESS,
+            "backend init failed: {}",
+            String::from_utf8_lossy(&error)
+        );
+        assert!(!result.handle.is_null());
+        Self {
+            handle: result.handle,
+        }
+    }
 
-    let collection = not_a_directory.join("collection.anki2");
-    let media = not_a_directory.join("collection.media");
-    let media_db = not_a_directory.join("collection.media.db2");
-    let backend = new_backend();
-
-    let error = open_collection(&backend, &collection, &media, &media_db)
-        .expect_err("regular-file parent must fail deterministically");
-    let decoded = BackendError::decode(error.as_slice()).expect("upstream error protobuf");
-    assert!(!decoded.message.is_empty());
-
-    fs::remove_dir_all(temp).unwrap();
+    fn invoke<M: Message>(&self, operation: u32, message: &M) -> (u32, Vec<u8>) {
+        let input = message.encode_to_vec();
+        let result = unsafe {
+            anki_bridge_invoke(self.handle, operation, input.as_ptr(), input.len())
+        };
+        (result.status, take_buffer(result.data))
+    }
 }
 
-fn new_backend() -> BridgeBackend {
-    let init = BackendInit {
-        preferred_langs: vec!["en-US".to_string()],
-        locale_folder_path: String::new(),
-        server: false,
+impl Drop for TestBackend {
+    fn drop(&mut self) {
+        unsafe { anki_bridge_destroy(self.handle) };
+        self.handle = ptr::null_mut();
+    }
+}
+
+fn take_buffer(buffer: ByteBuffer) -> Vec<u8> {
+    let bytes = if buffer.ptr.is_null() || buffer.len == 0 {
+        Vec::new()
+    } else {
+        unsafe { slice::from_raw_parts(buffer.ptr, buffer.len).to_vec() }
     };
-    BridgeBackend::from_init_bytes(&init.encode_to_vec()).unwrap()
+    unsafe { anki_bridge_free_buffer(buffer) };
+    bytes
 }
 
-fn open_collection(
-    backend: &BridgeBackend,
-    collection: &Path,
-    media: &Path,
-    media_db: &Path,
-) -> Result<Vec<u8>, Vec<u8>> {
-    let request = OpenCollectionRequest {
-        collection_path: collection.to_string_lossy().into_owned(),
-        media_folder_path: media.to_string_lossy().into_owned(),
-        media_db_path: media_db.to_string_lossy().into_owned(),
-    };
-    backend.invoke(OPEN_COLLECTION, &request.encode_to_vec())
+fn collection_request(temp: &TempDir) -> OpenCollectionRequest {
+    let collection_path = temp.path().join("collection.anki2");
+    let media_folder_path = temp.path().join("collection.media");
+    fs::create_dir_all(&media_folder_path).unwrap();
+    let media_db_path = temp.path().join("collection.media.db2");
+
+    OpenCollectionRequest {
+        collection_path: collection_path.to_string_lossy().into_owned(),
+        media_folder_path: media_folder_path.to_string_lossy().into_owned(),
+        media_db_path: media_db_path.to_string_lossy().into_owned(),
+    }
 }
 
-fn close_collection(backend: &BridgeBackend) -> Result<Vec<u8>, Vec<u8>> {
-    let request = CloseCollectionRequest {
-        downgrade_to_schema11: false,
-    };
-    backend.invoke(CLOSE_COLLECTION, &request.encode_to_vec())
-}
-
-fn deck_tree(backend: &BridgeBackend) -> Result<DeckTreeNode, Vec<u8>> {
+fn fetch_tree(backend: &TestBackend) -> DeckTreeNode {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .unwrap()
         .as_secs() as i64;
-    let request = DeckTreeRequest { now };
-    backend
-        .invoke(DECK_TREE, &request.encode_to_vec())
-        .and_then(|bytes| DeckTreeNode::decode(bytes.as_slice()).map_err(|_| Vec::new()))
+    let (status, bytes) = backend.invoke(DECK_TREE, &DeckTreeRequest { now });
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "deck tree failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    DeckTreeNode::decode(bytes.as_slice()).unwrap()
 }
 
-fn unique_temp_dir(label: &str) -> PathBuf {
-    let nanos = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    std::env::temp_dir().join(format!(
-        "anki_flutter_{label}_{}_{}",
-        std::process::id(),
-        nanos
-    ))
+fn assert_empty_default_deck(tree: &DeckTreeNode) {
+    let default = tree
+        .children
+        .iter()
+        .find(|node| node.deck_id == 1)
+        .expect("default deck should exist");
+    assert_eq!(default.new_count, 0);
+    assert_eq!(default.learn_count, 0);
+    assert_eq!(default.review_count, 0);
+}
+
+#[test]
+fn real_collection_opens_exposes_default_deck_and_reopens_through_ffi() {
+    let temp = TempDir::new().unwrap();
+    let backend = TestBackend::new();
+    let open = collection_request(&temp);
+
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert_empty_default_deck(&fetch_tree(&backend));
+
+    let (status, bytes) = backend.invoke(
+        CLOSE_COLLECTION,
+        &CloseCollectionRequest {
+            downgrade_to_schema11: false,
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "close failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "reopen failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert_empty_default_deck(&fetch_tree(&backend));
+}
+
+#[test]
+fn invalid_collection_parent_returns_status_one_with_decodable_anki_error() {
+    let temp = TempDir::new().unwrap();
+    let backend = TestBackend::new();
+    let not_a_directory = temp.path().join("not_a_directory");
+    fs::write(&not_a_directory, b"regular file").unwrap();
+
+    let request = OpenCollectionRequest {
+        collection_path: not_a_directory
+            .join("collection.anki2")
+            .to_string_lossy()
+            .into_owned(),
+        media_folder_path: temp
+            .path()
+            .join("collection.media")
+            .to_string_lossy()
+            .into_owned(),
+        media_db_path: temp
+            .path()
+            .join("collection.media.db2")
+            .to_string_lossy()
+            .into_owned(),
+    };
+
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &request);
+    assert_eq!(status, STATUS_BACKEND_ERROR);
+    let error = BackendError::decode(bytes.as_slice()).expect("upstream error protobuf");
+    assert!(!error.message.is_empty());
 }
