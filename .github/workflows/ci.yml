@@ -46,6 +46,13 @@ jobs:
         run: |
           rustup toolchain install 1.88.0 --profile minimal
           rustup override set 1.88.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            native/anki_bridge/target
+          key: rust-1.88-${{ runner.os }}-${{ hashFiles('third_party/anki/Cargo.lock', 'native/anki_bridge/Cargo.toml') }}
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Seed bridge lockfile from pinned Anki
