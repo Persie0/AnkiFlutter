@@ -35,6 +35,8 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: flutter analyze
+      - name: Real backend integration RED
+        run: flutter test integration_test/real_backend_deck_list_test.dart
 
   rust_bridge:
     runs-on: ubuntu-latest
