@@ -1,7 +1,7 @@
 # AnkiFlutter Frontend Architecture Design
 
 Date: 2026-09-24
-Status: Approved design, implementation not started
+Status: Pending written-spec review; implementation not started
 
 ## 1. Purpose
 
@@ -75,14 +75,14 @@ The Flutter layer must not directly depend on upstream protobuf objects in widge
 
 ## 6. Upstream pinning strategy
 
-AnkiFlutter will track an explicit upstream Anki revision.
+AnkiFlutter will include the official `ankitects/anki` repository as a git submodule at `third_party/anki`, pinned to an exact commit.
 
-The supported revision must be recorded in the repository in one machine-readable place. Possible implementations include a git submodule, a pinned source checkout used by build tooling, or a lock/metadata file consumed by scripts. The implementation plan will choose the simplest reproducible option compatible with CI and local builds.
+The submodule commit recorded by the AnkiFlutter repository is the single source of truth for the supported upstream Anki revision. Local builds and CI must use that checked-out revision and must fail clearly if the submodule is missing or at the wrong revision.
 
 Rules:
 
 - Never build releases against a floating upstream branch.
-- Upgrade upstream Anki deliberately in its own change.
+- Upgrade the Anki submodule deliberately in its own change.
 - Run bridge contract tests before accepting an upstream bump.
 - Keep adaptation for protobuf/service changes inside `native/anki_bridge`, generated bindings, or backend adapters.
 - Do not spread upstream type changes through feature widgets.
@@ -91,18 +91,20 @@ Rules:
 
 `native/anki_bridge` is intentionally thin. It exists to make the official Rust backend safely callable from Dart and to shield Flutter from Rust ABI details.
 
-The bridge should expose a small C-compatible API or an equivalent narrow FFI surface. Conceptually:
+The bridge exposes a small handle-based C-compatible FFI surface. The first implementation must support lifecycle operations plus one generic serialized command request/response path rather than defining a separate FFI function for every Anki method.
+
+Conceptually:
 
 ```text
-backend_create
-backend_open_collection
-backend_command
-backend_abort
-backend_close_collection
-backend_destroy
+backend_create -> backend handle
+backend_open_collection(handle, path)
+backend_command(handle, command id/name, protobuf bytes) -> result bytes/error
+backend_abort(handle)
+backend_close_collection(handle)
+backend_destroy(handle)
 ```
 
-Exact signatures will be established from tests and the capabilities of the pinned upstream Anki revision.
+The exact ABI data types are established by tests, but the architectural contract is fixed: opaque backend handle, owned byte buffers, explicit release functions, no Rust objects crossing FFI, and no panic unwinding across the boundary.
 
 The preferred command path is serialized protobuf input/output, avoiding a large hand-maintained FFI API for every backend method.
 
@@ -174,12 +176,12 @@ AnkiFlutter/
 │   ├── anki/
 │   └── generated/
 ├── third_party/
-│   └── anki/
+│   └── anki/        # git submodule pinned to an exact commit
 ├── integration_test/
 └── docs/
 ```
 
-The exact generated/upstream directories may change during the implementation plan if build tooling favors another layout, but the architectural boundaries must stay the same.
+The exact generated directories may change during implementation if tool requirements demand it, but the architectural boundaries must stay the same.
 
 ## 10. Strict TDD rule
 
@@ -376,20 +378,21 @@ Rules:
 - integration tests use temporary copies/fixtures, never the user's real collection;
 - destructive operations need clear UI confirmation where appropriate;
 - the app must close/flush backend resources correctly;
-- crash recovery and backup behavior should reuse upstream mechanisms where practical instead of inventing incompatible ones.
+- crash recovery and backup behavior should reuse upstream mechanisms when the pinned backend exposes them; otherwise those features stay disabled until a compatible implementation is designed.
 
 ## 16. Protobuf and generated code
 
-Where feasible, Dart protobuf types should be generated from the protobuf definitions associated with the pinned Anki revision.
+Dart protobuf types should be generated from the protobuf definitions associated with the pinned Anki submodule revision when those definitions are used by the bridge contract.
+
+Generated Dart protobuf/binding output is checked into the repository so contributors and release builds do not depend on implicit regeneration. A deterministic generation command and CI consistency check must verify that committed generated files match their source definitions.
 
 Generated code:
 
 - is not manually edited;
-- is reproducible from source definitions;
-- is versioned only if that materially improves developer/release reproducibility;
+- is reproducible from the pinned upstream definitions and repository tooling;
 - is treated as an integration representation rather than the app's domain model.
 
-If direct Dart generation proves impractical for some upstream service shapes, the Rust bridge may expose a smaller AnkiFlutter-owned protobuf schema, but this should be a compatibility shim, not a parallel implementation of Anki business rules.
+If a specific upstream service cannot be represented safely through direct generated Dart protobufs, the Rust bridge may expose a smaller AnkiFlutter-owned protobuf message for that service. Such messages are compatibility shims only; they must not reimplement Anki business rules.
 
 ## 17. State management
 
@@ -419,15 +422,16 @@ Python/PyQt add-ons depend heavily on the existing desktop frontend/runtime. Add
 
 ## 19. CI and quality gates
 
-CI should eventually enforce:
+CI should enforce for the first vertical slice:
 
 - Dart formatting and static analysis;
 - Flutter unit/widget tests;
 - Rust formatting/lints/tests;
 - bridge contract tests;
 - generated-code consistency checks;
-- supported desktop builds where CI capacity allows;
-- license/attribution checks for releases.
+- at least one Linux desktop build/smoke path.
+
+Windows and macOS build jobs must be added before those platforms are advertised as supported distributable targets. License/attribution checks must be present before the first distributable release.
 
 A change that alters feature behavior must include the TDD test that drove it.
 
@@ -439,14 +443,15 @@ The first target is:
 
 1. bootstrap Flutter desktop shell;
 2. bootstrap native Rust bridge;
-3. pin and compile a supported upstream Anki revision;
-4. prove one request can cross Dart -> FFI -> Rust/Anki -> FFI -> Dart;
-5. open/create a temporary/selected collection;
-6. expose deck data through a Dart repository;
-7. render the real deck hierarchy and New/Learn/Review counts;
-8. select a deck and show a minimal deck overview;
-9. cover each handwritten behavior with strict Red-Green-Refactor TDD;
-10. add one end-to-end smoke test for the entire path.
+3. add the official Anki repository as a submodule at `third_party/anki` pinned to an exact commit;
+4. compile the bridge against that pinned Anki source;
+5. prove one request can cross Dart -> FFI -> Rust/Anki -> FFI -> Dart;
+6. open/create a temporary or user-selected collection;
+7. expose deck data through a Dart repository;
+8. render the real deck hierarchy and New/Learn/Review counts;
+9. select a deck and show a minimal deck overview;
+10. cover each handwritten behavior with strict Red-Green-Refactor TDD;
+11. add one end-to-end smoke test for the entire path.
 
 The reviewer and other features begin only after this slice is green and structurally sound.
 
@@ -457,9 +462,10 @@ The implementation must preserve these decisions:
 - Flutter is the frontend.
 - Official Anki backend code is reused as extensively as practical.
 - No separate scheduler or collection engine is created.
-- Upstream Anki is pinned to an explicit revision.
+- Official Anki source is a git submodule at `third_party/anki`, pinned to an explicit commit.
 - Upstream instability is isolated behind the native bridge and Dart repository layer.
 - Generated protobuf types do not leak into widgets.
+- Generated Dart integration bindings are reproducible and checked in.
 - Strict TDD precedes handwritten production behavior.
 - The first deliverable is the real-collection deck-list vertical slice.
 - Existing Python/PyQt add-ons are not an initial compatibility goal.
