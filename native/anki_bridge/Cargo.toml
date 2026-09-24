@@ -17,3 +17,6 @@ prost = "0.13"
 anki_proto = { path = "../../third_party/anki/rslib/proto" }
 anki_proto_gen = { path = "../../third_party/anki/rslib/proto_gen" }
 prost-reflect = "0.14.7"
+
+[dev-dependencies]
+tempfile = "3"
