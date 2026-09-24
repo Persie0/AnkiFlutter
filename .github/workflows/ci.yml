@@ -21,6 +21,11 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
           cache: true
+      - name: Use Rust 1.88
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup override set 1.88.0
+        working-directory: .
       - name: Install Linux desktop and protoc dependencies
         run: >-
           sudo apt-get update && sudo apt-get install -y
@@ -38,8 +43,9 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: flutter analyze
-      - name: Real backend integration RED
-        run: xvfb-run -a flutter test integration_test/real_backend_deck_list_test.dart -d linux -r github
+      - name: Real backend integration
+        run: xvfb-run -a python3 tool/run_desktop_dev.py --test
+        working-directory: .
 
   rust_bridge:
     runs-on: ubuntu-latest
