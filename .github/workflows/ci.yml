@@ -42,10 +42,10 @@ jobs:
       - uses: actions/checkout@v6
         with:
           submodules: recursive
-      - name: Use Rust 1.80
+      - name: Use Rust 1.88
         run: |
-          rustup toolchain install 1.80.0 --profile minimal
-          rustup override set 1.80.0
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup override set 1.88.0
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Seed bridge lockfile from pinned Anki
