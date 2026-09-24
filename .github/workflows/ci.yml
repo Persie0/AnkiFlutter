@@ -48,5 +48,7 @@ jobs:
           rustup override set 1.80.0
       - name: Install protoc
         run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+      - name: Seed bridge lockfile from pinned Anki
+        run: python3 tool/prepare_bridge_lock.py
       - name: Test bridge operation mapping
         run: cargo test --manifest-path native/anki_bridge/Cargo.toml --test operation_indices
