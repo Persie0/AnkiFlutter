@@ -2,11 +2,12 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/anki_backend_exception.dart';
+import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/backend.pb.dart';
 import 'package:anki_flutter/core/backend/native/native_anki_bindings.dart';
 
-class AnkiBackendClient {
+class AnkiBackendClient implements BackendInvoker {
   AnkiBackendClient._(this._bindings, this._handle);
 
   factory AnkiBackendClient.create({
@@ -31,6 +32,7 @@ class AnkiBackendClient {
 
   bool get isDisposed => _handle == null;
 
+  @override
   Future<Uint8List> invoke(
     BackendOperation operation,
     Uint8List request,
