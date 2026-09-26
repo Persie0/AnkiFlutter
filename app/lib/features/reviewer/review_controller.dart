@@ -8,9 +8,9 @@ class ReviewController extends ChangeNotifier {
   ReviewController({
     required this._repository,
     required this._renderer,
-    required int Function() wallClockMillis,
+    required this._wallClockMillis,
     required this._stopwatchFactory,
-  }) : _wallClockMillis = wallClockMillis;
+  });
 
   final ReviewRepository _repository;
   final CardRenderRepository _renderer;
