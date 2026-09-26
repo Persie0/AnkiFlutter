@@ -66,6 +66,53 @@ void main() {
     expect(question.settings, same(settings));
     expect(question.generationId, greaterThan(0));
   });
+
+  test('start enters finished state when Anki queue is empty', () async {
+    const settings = ReviewDeckSettings(
+      autoplay: true,
+      showTimer: true,
+      stopTimerOnAnswer: false,
+      answerTimeLimitSeconds: 60,
+      secondsToShowQuestion: 0,
+      secondsToShowAnswer: 0,
+      waitForAudio: true,
+      skipQuestionWhenReplayingAnswer: false,
+      questionAction: ReviewQuestionAction.showAnswer,
+      answerAction: ReviewAnswerAction.answerGood,
+    );
+    final repository = _FakeReviewRepository(
+      nextCards: [null],
+      settings: settings,
+    );
+    final renderer = _FakeCardRenderRepository(
+      ReviewCardContent(
+        questionHtml: '<div>unused</div>',
+        answerHtml: '<div>unused</div>',
+        css: '',
+        questionAudio: const [],
+        answerAudio: const [],
+      ),
+    );
+    var stopwatchFactoryCalls = 0;
+    final controller = ReviewController(
+      repository: repository,
+      renderer: renderer,
+      wallClockMillis: () => 123456789,
+      stopwatchFactory: () {
+        stopwatchFactoryCalls += 1;
+        return Stopwatch();
+      },
+    );
+
+    await controller.start(42);
+
+    expect(controller.state, isA<ReviewFinished>());
+    expect(repository.selectedDecks, [42]);
+    expect(repository.nextCardCalls, 1);
+    expect(repository.settingsDecks, isEmpty);
+    expect(renderer.renderedCardIds, isEmpty);
+    expect(stopwatchFactoryCalls, 0);
+  });
 }
 
 ReviewCard _card() {
