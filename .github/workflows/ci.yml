@@ -21,6 +21,18 @@ jobs:
           flutter-version: 3.47.5
           channel: stable
           cache: true
+      - name: Generate exact desktop platform scaffolds
+        run: >-
+          flutter create --platforms=linux,macos,windows --org dev.persie0
+          --project-name anki_flutter /tmp/anki_flutter_scaffold
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-platform-scaffolds
+          path: |
+            /tmp/anki_flutter_scaffold/linux
+            /tmp/anki_flutter_scaffold/macos
+            /tmp/anki_flutter_scaffold/windows
+          include-hidden-files: true
       - name: Use Rust 1.88
         run: |
           rustup toolchain install 1.88.0 --profile minimal
