@@ -2,12 +2,14 @@ import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
+import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart' as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
 import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
+import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -109,5 +111,69 @@ class AnkiReviewRepository {
       BackendOperation.answerCard,
       Uint8List.fromList(request.writeToBuffer()),
     );
+  }
+
+  Future<ReviewDeckSettings> settingsForDeck(int deckId) async {
+    final request = decks_pb.DeckId(did: Int64(deckId));
+    final bytes = await backend.invoke(
+      BackendOperation.getDeckConfigsForUpdate,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    final response = deck_config_pb.DeckConfigsForUpdate.fromBuffer(bytes);
+
+    var config = response.defaults.config;
+    final currentConfigId = response.currentDeck.configId.toInt();
+    for (final entry in response.allConfig) {
+      if (entry.config.id.toInt() == currentConfigId) {
+        config = entry.config.config;
+        break;
+      }
+    }
+
+    return ReviewDeckSettings(
+      autoplay: !config.disableAutoplay,
+      showTimer: config.showTimer,
+      stopTimerOnAnswer: config.stopTimerOnAnswer,
+      answerTimeLimitSeconds: config.capAnswerTimeToSecs,
+      secondsToShowQuestion: config.secondsToShowQuestion,
+      secondsToShowAnswer: config.secondsToShowAnswer,
+      waitForAudio: config.waitForAudio,
+      skipQuestionWhenReplayingAnswer: config.skipQuestionWhenReplayingAnswer,
+      questionAction: _questionAction(config.questionAction),
+      answerAction: _answerAction(config.answerAction),
+    );
+  }
+
+  ReviewQuestionAction _questionAction(
+    deck_config_pb.DeckConfig_Config_QuestionAction action,
+  ) {
+    if (action ==
+        deck_config_pb.DeckConfig_Config_QuestionAction
+            .QUESTION_ACTION_SHOW_REMINDER) {
+      return ReviewQuestionAction.showReminder;
+    }
+    return ReviewQuestionAction.showAnswer;
+  }
+
+  ReviewAnswerAction _answerAction(
+    deck_config_pb.DeckConfig_Config_AnswerAction action,
+  ) {
+    if (action ==
+        deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_ANSWER_AGAIN) {
+      return ReviewAnswerAction.answerAgain;
+    }
+    if (action ==
+        deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_ANSWER_GOOD) {
+      return ReviewAnswerAction.answerGood;
+    }
+    if (action ==
+        deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_ANSWER_HARD) {
+      return ReviewAnswerAction.answerHard;
+    }
+    if (action ==
+        deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_SHOW_REMINDER) {
+      return ReviewAnswerAction.showReminder;
+    }
+    return ReviewAnswerAction.buryCard;
   }
 }
