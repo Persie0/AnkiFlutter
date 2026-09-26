@@ -46,7 +46,7 @@ class ReviewMediaServer {
     try {
       if (request.method != 'GET' && request.method != 'HEAD') {
         request.response.statusCode = HttpStatus.methodNotAllowed;
-        request.response.headers.set(HttpHeaders.allowHeader, 'GET, HEAD');
+        request.response.headers.set('allow', 'GET, HEAD');
         await request.response.close();
         return;
       }
@@ -81,10 +81,12 @@ class ReviewMediaServer {
       }
       await request.response.close();
     } catch (_) {
-      if (!request.response.headersSent) {
+      try {
         request.response.statusCode = HttpStatus.internalServerError;
+        await request.response.close();
+      } catch (_) {
+        // The response may already have started; there is nothing left to send.
       }
-      await request.response.close();
     }
   }
 
