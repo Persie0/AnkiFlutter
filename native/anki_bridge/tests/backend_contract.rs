@@ -182,9 +182,7 @@ fn reviewer_render_uses_real_anki_frontside_back_and_css() {
     note.set_field(0, "reviewer-front").unwrap();
     note.set_field(1, "reviewer-back").unwrap();
     collection.add_note(&mut note, DeckId(1)).unwrap();
-    let card_ids = collection
-        .search_cards(format!("nid:{}", note.id.0), SortMode::NoOrder)
-        .unwrap();
+    let card_ids = collection.search_cards(note.id, SortMode::NoOrder).unwrap();
     assert_eq!(card_ids.len(), 1);
     let card_id = card_ids[0].0;
     collection.close(None).unwrap();
