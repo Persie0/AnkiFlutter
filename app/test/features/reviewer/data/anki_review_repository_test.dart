@@ -151,6 +151,63 @@ void main() {
     );
   });
 
+  test('answer serializes exact queued states rating and timing', () async {
+    final current = scheduler_pb.SchedulingState(customData: 'ignored-by-queue');
+    final again = scheduler_pb.SchedulingState(customData: 'again-state');
+    final hard = scheduler_pb.SchedulingState(customData: 'hard-state');
+    final good = scheduler_pb.SchedulingState(customData: 'good-state');
+    final easy = scheduler_pb.SchedulingState(customData: 'easy-state');
+    final states = scheduler_pb.SchedulingStates(
+      current: current,
+      again: again,
+      hard: hard,
+      good: good,
+      easy: easy,
+    );
+    final queue = scheduler_pb.QueuedCards(
+      cards: [
+        scheduler_pb.QueuedCards_QueuedCard(
+          card: cards_pb.Card(
+            id: Int64(404),
+            customData: 'card-custom-data',
+          ),
+          states: states,
+        ),
+      ],
+    );
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getQueuedCards: Uint8List.fromList(queue.writeToBuffer()),
+        BackendOperation.describeNextStates: Uint8List.fromList(
+          generic_pb.StringList(vals: ['10m', '1d', '3d', '5d']).writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = await repository.nextCard();
+    backend.calls.clear();
+
+    await repository.answer(
+      card!,
+      ReviewRating.good,
+      answeredAtMillis: 1800000000123,
+      millisecondsTaken: 4321,
+    );
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.answerCard);
+    final answer = scheduler_pb.CardAnswer.fromBuffer(backend.calls.single.request);
+    expect(answer.cardId.toInt(), 404);
+    expect(
+      answer.currentState.writeToBuffer(),
+      orderedEquals(card.currentStateBytes),
+    );
+    expect(answer.newState.writeToBuffer(), orderedEquals(good.writeToBuffer()));
+    expect(answer.rating, scheduler_pb.CardAnswer_Rating.GOOD);
+    expect(answer.answeredAtMillis.toInt(), 1800000000123);
+    expect(answer.millisecondsTaken, 4321);
+  });
+
   test('returns null when Anki has no queued cards', () async {
     final backend = _FakeBackend(
       responses: {
