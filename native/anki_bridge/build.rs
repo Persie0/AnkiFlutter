@@ -16,11 +16,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let deck_tree = operation(&services, "BackendDecksService", "deck_tree")?;
     let set_current_deck = operation(&services, "BackendDecksService", "set_current_deck")?;
     let get_queued_cards = operation(&services, "BackendSchedulerService", "get_queued_cards")?;
-    let describe_next_states = operation(
-        &services,
-        "BackendSchedulerService",
-        "describe_next_states",
-    )?;
+    let describe_next_states =
+        operation(&services, "BackendSchedulerService", "describe_next_states")?;
     let answer_card = operation(&services, "BackendSchedulerService", "answer_card")?;
     let state_is_leech = operation(&services, "BackendSchedulerService", "state_is_leech")?;
     let bury_or_suspend_cards = operation(
@@ -35,31 +32,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         "BackendCardRenderingService",
         "render_existing_card",
     )?;
-    let extract_av_tags = operation(
-        &services,
-        "BackendCardRenderingService",
-        "extract_av_tags",
-    )?;
-    let all_tts_voices = operation(
-        &services,
-        "BackendCardRenderingService",
-        "all_tts_voices",
-    )?;
-    let write_tts_stream = operation(
-        &services,
-        "BackendCardRenderingService",
-        "write_tts_stream",
-    )?;
+    let extract_av_tags = operation(&services, "BackendCardRenderingService", "extract_av_tags")?;
+    let all_tts_voices = operation(&services, "BackendCardRenderingService", "all_tts_voices")?;
+    let write_tts_stream = operation(&services, "BackendCardRenderingService", "write_tts_stream")?;
     let get_deck_configs_for_update = operation(
         &services,
         "BackendDeckConfigService",
         "get_deck_configs_for_update",
     )?;
-    let encode_iri_paths = operation(
-        &services,
-        "BackendCardRenderingService",
-        "encode_iri_paths",
-    )?;
+    let encode_iri_paths = operation(&services, "BackendCardRenderingService", "encode_iri_paths")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
