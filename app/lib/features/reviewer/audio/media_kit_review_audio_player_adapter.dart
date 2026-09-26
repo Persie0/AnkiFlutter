@@ -21,8 +21,7 @@ abstract interface class MediaKitPlayerPort {
 }
 
 class MediaKitReviewAudioPlayerAdapter implements ReviewAudioPlayerAdapter {
-  MediaKitReviewAudioPlayerAdapter({required MediaKitPlayerPort player})
-      : _player = player;
+  MediaKitReviewAudioPlayerAdapter({required this._player});
 
   final MediaKitPlayerPort _player;
 
