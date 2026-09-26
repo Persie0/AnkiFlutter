@@ -34,6 +34,22 @@ final class ReviewAnswer extends ReviewSessionState {
     required this.content,
     required this.settings,
     required this.generationId,
+    this.error,
+  });
+
+  final ReviewCard card;
+  final ReviewCardContent content;
+  final ReviewDeckSettings settings;
+  final int generationId;
+  final Object? error;
+}
+
+final class ReviewTransition extends ReviewSessionState {
+  const ReviewTransition({
+    required this.card,
+    required this.content,
+    required this.settings,
+    required this.generationId,
   });
 
   final ReviewCard card;
