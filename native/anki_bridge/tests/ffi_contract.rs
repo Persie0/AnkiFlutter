@@ -128,7 +128,7 @@ fn successful_nonempty_buffer_is_decodable_and_freeable() {
     assert_eq!(tree_result.status, STATUS_SUCCESS);
     let tree_bytes = unsafe { copy_and_free(tree_result.data) };
     assert!(!tree_bytes.is_empty());
-    DeckTreeNode::decode(tree_bytes.as_slice()).unwrap();
+    let _ = DeckTreeNode::decode(tree_bytes.as_slice()).unwrap();
 
     let close = CloseCollectionRequest {
         downgrade_to_schema11: false,
