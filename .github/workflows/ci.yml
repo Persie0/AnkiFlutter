@@ -6,6 +6,9 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write
+
 jobs:
   quality:
     runs-on: ubuntu-latest
@@ -25,6 +28,13 @@ jobs:
         run: >-
           flutter create --platforms=linux,macos,windows --org dev.persie0
           --project-name anki_flutter /tmp/anki_flutter_scaffold
+      - name: Stage pinned desktop project scaffolds
+        run: |
+          rm -rf app/macos app/windows
+          cp -R /tmp/anki_flutter_scaffold/macos app/macos
+          cp -R /tmp/anki_flutter_scaffold/windows app/windows
+          cp /tmp/anki_flutter_scaffold/.metadata app/.metadata
+          cp /tmp/anki_flutter_scaffold/.gitignore app/.gitignore
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-platform-scaffolds
@@ -69,6 +79,23 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
         working-directory: app
+      - name: Commit pinned generated Flutter inputs
+        if: github.event_name == 'pull_request' && github.head_ref != ''
+        run: |
+          git fetch origin "$GITHUB_HEAD_REF"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git read-tree "origin/$GITHUB_HEAD_REF"
+          git add app/.metadata app/.gitignore app/macos app/windows \
+            app/lib/core/backend/generated app/pubspec.lock app/analysis_options.yaml
+          if git diff --cached --quiet; then
+            echo "Pinned generated project files are already committed."
+            exit 0
+          fi
+          tree="$(git write-tree)"
+          parent="$(git rev-parse "origin/$GITHUB_HEAD_REF")"
+          commit="$(printf '%s\n' 'chore: commit pinned generated project files' | git commit-tree "$tree" -p "$parent")"
+          git push origin "$commit:refs/heads/$GITHUB_HEAD_REF"
       - name: Analyze Flutter app
         run: flutter analyze
         working-directory: app
