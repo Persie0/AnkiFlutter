@@ -128,7 +128,10 @@ class AnkiReviewTtsService implements ReviewTtsService {
       }
     }
 
-    return availableForLanguage.firstOrNull;
+    if (availableForLanguage.isEmpty) {
+      return null;
+    }
+    return availableForLanguage.first;
   }
 
   String _nextPath(Directory directory) {
