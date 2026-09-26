@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
@@ -15,28 +16,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('start selects deck loads one card and enters question state', () async {
     final card = _card();
-    final content = ReviewCardContent(
-      questionHtml: '<div>question</div>',
-      answerHtml: '<div>answer</div>',
-      css: '.card { font-size: 20px; }',
-      questionAudio: const [],
-      answerAudio: const [],
-    );
-    const settings = ReviewDeckSettings(
-      autoplay: true,
-      showTimer: true,
-      stopTimerOnAnswer: false,
-      answerTimeLimitSeconds: 60,
-      secondsToShowQuestion: 0,
-      secondsToShowAnswer: 0,
-      waitForAudio: true,
-      skipQuestionWhenReplayingAnswer: false,
-      questionAction: ReviewQuestionAction.showAnswer,
-      answerAction: ReviewAnswerAction.answerGood,
-    );
+    final content = _content();
     final repository = _FakeReviewRepository(
       nextCards: [card],
-      settings: settings,
+      settings: _settings,
     );
     final renderer = _FakeCardRenderRepository(content);
     var stopwatchFactoryCalls = 0;
@@ -63,36 +46,16 @@ void main() {
     final question = state as ReviewQuestion;
     expect(question.card, same(card));
     expect(question.content, same(content));
-    expect(question.settings, same(settings));
+    expect(question.settings, same(_settings));
     expect(question.generationId, greaterThan(0));
   });
 
   test('start enters finished state when Anki queue is empty', () async {
-    const settings = ReviewDeckSettings(
-      autoplay: true,
-      showTimer: true,
-      stopTimerOnAnswer: false,
-      answerTimeLimitSeconds: 60,
-      secondsToShowQuestion: 0,
-      secondsToShowAnswer: 0,
-      waitForAudio: true,
-      skipQuestionWhenReplayingAnswer: false,
-      questionAction: ReviewQuestionAction.showAnswer,
-      answerAction: ReviewAnswerAction.answerGood,
-    );
     final repository = _FakeReviewRepository(
       nextCards: [null],
-      settings: settings,
+      settings: _settings,
     );
-    final renderer = _FakeCardRenderRepository(
-      ReviewCardContent(
-        questionHtml: '<div>unused</div>',
-        answerHtml: '<div>unused</div>',
-        css: '',
-        questionAudio: const [],
-        answerAudio: const [],
-      ),
-    );
+    final renderer = _FakeCardRenderRepository(_content());
     var stopwatchFactoryCalls = 0;
     final controller = ReviewController(
       repository: repository,
@@ -116,28 +79,10 @@ void main() {
 
   test('showAnswer preserves current review data without refetching', () async {
     final card = _card();
-    final content = ReviewCardContent(
-      questionHtml: '<div>question</div>',
-      answerHtml: '<div>answer</div>',
-      css: '.card { font-size: 20px; }',
-      questionAudio: const [],
-      answerAudio: const [],
-    );
-    const settings = ReviewDeckSettings(
-      autoplay: true,
-      showTimer: true,
-      stopTimerOnAnswer: false,
-      answerTimeLimitSeconds: 60,
-      secondsToShowQuestion: 0,
-      secondsToShowAnswer: 0,
-      waitForAudio: true,
-      skipQuestionWhenReplayingAnswer: false,
-      questionAction: ReviewQuestionAction.showAnswer,
-      answerAction: ReviewAnswerAction.answerGood,
-    );
+    final content = _content();
     final repository = _FakeReviewRepository(
       nextCards: [card],
-      settings: settings,
+      settings: _settings,
     );
     final renderer = _FakeCardRenderRepository(content);
     final controller = ReviewController(
@@ -168,6 +113,122 @@ void main() {
     expect(repository.settingsDecks.length, callsBeforeReveal.settings);
     expect(renderer.renderedCardIds.length, callsBeforeReveal.render);
   });
+
+  test('rating is ignored while question is showing', () async {
+    final card = _card();
+    final repository = _FakeReviewRepository(
+      nextCards: [card],
+      settings: _settings,
+    );
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _FakeCardRenderRepository(_content()),
+      wallClockMillis: () => 123456789,
+      stopwatchFactory: () => _FakeStopwatch(milliseconds: 3210),
+    );
+
+    await controller.start(42);
+    await controller.rate(ReviewRating.good);
+
+    expect(controller.state, isA<ReviewQuestion>());
+    expect(repository.answerCalls, isEmpty);
+    expect(repository.nextCardCalls, 1);
+  });
+
+  test('rating transitions immediately and submits exact timing once', () async {
+    final card = _card();
+    final answerCompleter = Completer<void>();
+    final repository = _FakeReviewRepository(
+      nextCards: [card, null],
+      settings: _settings,
+      answerCompleter: answerCompleter,
+    );
+    final stopwatch = _FakeStopwatch(milliseconds: 3210);
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _FakeCardRenderRepository(_content()),
+      wallClockMillis: () => 123456789,
+      stopwatchFactory: () => stopwatch,
+    );
+
+    await controller.start(42);
+    await controller.showAnswer();
+
+    final firstRating = controller.rate(ReviewRating.good);
+    final duplicateRating = controller.rate(ReviewRating.easy);
+    await Future<void>.delayed(Duration.zero);
+
+    expect(controller.state, isA<ReviewTransition>());
+    expect(repository.answerCalls, hasLength(1));
+    final call = repository.answerCalls.single;
+    expect(call.card, same(card));
+    expect(call.rating, ReviewRating.good);
+    expect(call.answeredAtMillis, 123456789);
+    expect(call.millisecondsTaken, 3210);
+    expect(repository.nextCardCalls, 1);
+
+    answerCompleter.complete();
+    await Future.wait([firstRating, duplicateRating]);
+
+    expect(repository.answerCalls, hasLength(1));
+    expect(repository.nextCardCalls, 2);
+    expect(controller.state, isA<ReviewFinished>());
+  });
+
+  test('backend answer failure restores same answer with error', () async {
+    final card = _card();
+    final content = _content();
+    final error = StateError('answer failed');
+    final repository = _FakeReviewRepository(
+      nextCards: [card],
+      settings: _settings,
+      answerError: error,
+    );
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _FakeCardRenderRepository(content),
+      wallClockMillis: () => 123456789,
+      stopwatchFactory: () => _FakeStopwatch(milliseconds: 3210),
+    );
+
+    await controller.start(42);
+    await controller.showAnswer();
+    final before = controller.state as ReviewAnswer;
+
+    await controller.rate(ReviewRating.good);
+
+    expect(repository.nextCardCalls, 1);
+    expect(controller.state, isA<ReviewAnswer>());
+    final recovered = controller.state as ReviewAnswer;
+    expect(recovered.card, same(before.card));
+    expect(recovered.content, same(before.content));
+    expect(recovered.settings, same(before.settings));
+    expect(recovered.generationId, before.generationId);
+    expect(recovered.error, same(error));
+  });
+}
+
+const _settings = ReviewDeckSettings(
+  autoplay: true,
+  showTimer: true,
+  stopTimerOnAnswer: false,
+  answerTimeLimitSeconds: 60,
+  secondsToShowQuestion: 0,
+  secondsToShowAnswer: 0,
+  waitForAudio: true,
+  skipQuestionWhenReplayingAnswer: false,
+  questionAction: ReviewQuestionAction.showAnswer,
+  answerAction: ReviewAnswerAction.answerGood,
+);
+
+ReviewCardContent _content() {
+  return ReviewCardContent(
+    questionHtml: '<div>question</div>',
+    answerHtml: '<div>answer</div>',
+    css: '.card { font-size: 20px; }',
+    questionAudio: const [],
+    answerAudio: const [],
+  );
 }
 
 ReviewCard _card() {
@@ -207,16 +268,35 @@ ReviewCard _card() {
   );
 }
 
+class _AnswerCall {
+  const _AnswerCall({
+    required this.card,
+    required this.rating,
+    required this.answeredAtMillis,
+    required this.millisecondsTaken,
+  });
+
+  final ReviewCard card;
+  final ReviewRating rating;
+  final int answeredAtMillis;
+  final int millisecondsTaken;
+}
+
 class _FakeReviewRepository implements ReviewRepository {
   _FakeReviewRepository({
     required List<ReviewCard?> nextCards,
     required this.settings,
+    this.answerCompleter,
+    this.answerError,
   }) : _nextCards = List<ReviewCard?>.of(nextCards);
 
   final List<ReviewCard?> _nextCards;
   final ReviewDeckSettings settings;
+  final Completer<void>? answerCompleter;
+  final Object? answerError;
   final List<int> selectedDecks = [];
   final List<int> settingsDecks = [];
+  final List<_AnswerCall> answerCalls = [];
   int nextCardCalls = 0;
 
   @override
@@ -242,7 +322,22 @@ class _FakeReviewRepository implements ReviewRepository {
     ReviewRating rating, {
     required int answeredAtMillis,
     required int millisecondsTaken,
-  }) async {}
+  }) async {
+    answerCalls.add(
+      _AnswerCall(
+        card: card,
+        rating: rating,
+        answeredAtMillis: answeredAtMillis,
+        millisecondsTaken: millisecondsTaken,
+      ),
+    );
+    if (answerCompleter != null) {
+      await answerCompleter!.future;
+    }
+    if (answerError != null) {
+      throw answerError!;
+    }
+  }
 
   @override
   Future<bool> stateIsLeech(ReviewAnswerChoice choice) async => false;
@@ -258,5 +353,45 @@ class _FakeCardRenderRepository implements CardRenderRepository {
   Future<ReviewCardContent> render(int cardId) async {
     renderedCardIds.add(cardId);
     return content;
+  }
+}
+
+class _FakeStopwatch implements Stopwatch {
+  _FakeStopwatch({required this.milliseconds});
+
+  int milliseconds;
+  bool _isRunning = false;
+
+  @override
+  Duration get elapsed => Duration(milliseconds: milliseconds);
+
+  @override
+  int get elapsedMicroseconds => milliseconds * 1000;
+
+  @override
+  int get elapsedMilliseconds => milliseconds;
+
+  @override
+  int get elapsedTicks => milliseconds;
+
+  @override
+  int get frequency => 1000;
+
+  @override
+  bool get isRunning => _isRunning;
+
+  @override
+  void reset() {
+    milliseconds = 0;
+  }
+
+  @override
+  void start() {
+    _isRunning = true;
+  }
+
+  @override
+  void stop() {
+    _isRunning = false;
   }
 }
