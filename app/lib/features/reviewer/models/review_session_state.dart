@@ -28,6 +28,20 @@ final class ReviewQuestion extends ReviewSessionState {
   final int generationId;
 }
 
+final class ReviewAnswer extends ReviewSessionState {
+  const ReviewAnswer({
+    required this.card,
+    required this.content,
+    required this.settings,
+    required this.generationId,
+  });
+
+  final ReviewCard card;
+  final ReviewCardContent content;
+  final ReviewDeckSettings settings;
+  final int generationId;
+}
+
 final class ReviewFinished extends ReviewSessionState {
   const ReviewFinished();
 }
