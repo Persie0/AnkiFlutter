@@ -80,4 +80,34 @@ class AnkiReviewRepository {
       deckName: queued.context.deckName,
     );
   }
+
+  Future<void> answer(
+    ReviewCard card,
+    ReviewRating rating, {
+    required int answeredAtMillis,
+    required int millisecondsTaken,
+  }) async {
+    final choice = card.choices.singleWhere((choice) => choice.rating == rating);
+    final request = scheduler_pb.CardAnswer(
+      cardId: Int64(card.cardId),
+      currentState: scheduler_pb.SchedulingState.fromBuffer(
+        card.currentStateBytes,
+      ),
+      newState: scheduler_pb.SchedulingState.fromBuffer(
+        choice.schedulingStateBytes,
+      ),
+      rating: switch (rating) {
+        ReviewRating.again => scheduler_pb.CardAnswer_Rating.AGAIN,
+        ReviewRating.hard => scheduler_pb.CardAnswer_Rating.HARD,
+        ReviewRating.good => scheduler_pb.CardAnswer_Rating.GOOD,
+        ReviewRating.easy => scheduler_pb.CardAnswer_Rating.EASY,
+      },
+      answeredAtMillis: Int64(answeredAtMillis),
+      millisecondsTaken: millisecondsTaken,
+    );
+    await backend.invoke(
+      BackendOperation.answerCard,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
 }
