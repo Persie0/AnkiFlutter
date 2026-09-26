@@ -27,3 +27,7 @@ final class ReviewQuestion extends ReviewSessionState {
   final ReviewDeckSettings settings;
   final int generationId;
 }
+
+final class ReviewFinished extends ReviewSessionState {
+  const ReviewFinished();
+}
