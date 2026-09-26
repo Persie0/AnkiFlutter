@@ -113,6 +113,61 @@ void main() {
     expect(renderer.renderedCardIds, isEmpty);
     expect(stopwatchFactoryCalls, 0);
   });
+
+  test('showAnswer preserves current review data without refetching', () async {
+    final card = _card();
+    final content = ReviewCardContent(
+      questionHtml: '<div>question</div>',
+      answerHtml: '<div>answer</div>',
+      css: '.card { font-size: 20px; }',
+      questionAudio: const [],
+      answerAudio: const [],
+    );
+    const settings = ReviewDeckSettings(
+      autoplay: true,
+      showTimer: true,
+      stopTimerOnAnswer: false,
+      answerTimeLimitSeconds: 60,
+      secondsToShowQuestion: 0,
+      secondsToShowAnswer: 0,
+      waitForAudio: true,
+      skipQuestionWhenReplayingAnswer: false,
+      questionAction: ReviewQuestionAction.showAnswer,
+      answerAction: ReviewAnswerAction.answerGood,
+    );
+    final repository = _FakeReviewRepository(
+      nextCards: [card],
+      settings: settings,
+    );
+    final renderer = _FakeCardRenderRepository(content);
+    final controller = ReviewController(
+      repository: repository,
+      renderer: renderer,
+      wallClockMillis: () => 123456789,
+      stopwatchFactory: Stopwatch.new,
+    );
+
+    await controller.start(42);
+    final question = controller.state as ReviewQuestion;
+    final callsBeforeReveal = (
+      nextCard: repository.nextCardCalls,
+      settings: repository.settingsDecks.length,
+      render: renderer.renderedCardIds.length,
+    );
+
+    await controller.showAnswer();
+
+    final state = controller.state;
+    expect(state, isA<ReviewAnswer>());
+    final answer = state as ReviewAnswer;
+    expect(answer.card, same(question.card));
+    expect(answer.content, same(question.content));
+    expect(answer.settings, same(question.settings));
+    expect(answer.generationId, question.generationId);
+    expect(repository.nextCardCalls, callsBeforeReveal.nextCard);
+    expect(repository.settingsDecks.length, callsBeforeReveal.settings);
+    expect(renderer.renderedCardIds.length, callsBeforeReveal.render);
+  });
 }
 
 ReviewCard _card() {
