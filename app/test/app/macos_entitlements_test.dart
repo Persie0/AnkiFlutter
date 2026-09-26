@@ -20,11 +20,12 @@ void main() {
       );
     });
 
-    test('macOS $fileName allows reviewer loopback client connections', () {
+    test('macOS $fileName allows reviewer loopback networking', () {
       final entitlements = File('macos/Runner/$fileName').readAsStringSync();
 
       expect(entitlements, contains('com.apple.security.app-sandbox'));
       expect(entitlements, contains('com.apple.security.network.client'));
+      expect(entitlements, contains('com.apple.security.network.server'));
     });
   }
 }
