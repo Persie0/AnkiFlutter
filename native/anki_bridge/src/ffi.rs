@@ -5,7 +5,12 @@ use std::ptr;
 use std::slice;
 
 use crate::backend::BridgeBackend;
-use crate::operations::{OperationIndex, CLOSE_COLLECTION, DECK_TREE, OPEN_COLLECTION};
+use crate::operations::{
+    OperationIndex, ALL_TTS_VOICES, ANSWER_CARD, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION,
+    DECK_TREE, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXTRACT_AV_TAGS,
+    GET_DECK_CONFIGS_FOR_UPDATE, GET_QUEUED_CARDS, GET_UNDO_STATUS, OPEN_COLLECTION,
+    RENDER_EXISTING_CARD, SET_CURRENT_DECK, STATE_IS_LEECH, UNDO, WRITE_TTS_STREAM,
+};
 
 pub const STATUS_SUCCESS: u32 = 0;
 pub const STATUS_BACKEND_ERROR: u32 = 1;
@@ -98,6 +103,20 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
         1 => Ok(OPEN_COLLECTION),
         2 => Ok(CLOSE_COLLECTION),
         3 => Ok(DECK_TREE),
+        4 => Ok(SET_CURRENT_DECK),
+        5 => Ok(GET_QUEUED_CARDS),
+        6 => Ok(DESCRIBE_NEXT_STATES),
+        7 => Ok(ANSWER_CARD),
+        8 => Ok(STATE_IS_LEECH),
+        9 => Ok(BURY_OR_SUSPEND_CARDS),
+        10 => Ok(GET_UNDO_STATUS),
+        11 => Ok(UNDO),
+        12 => Ok(RENDER_EXISTING_CARD),
+        13 => Ok(EXTRACT_AV_TAGS),
+        14 => Ok(ALL_TTS_VOICES),
+        15 => Ok(WRITE_TTS_STREAM),
+        16 => Ok(GET_DECK_CONFIGS_FOR_UPDATE),
+        17 => Ok(ENCODE_IRI_PATHS),
         _ => Err(format!("Unknown Anki bridge operation {operation}")),
     }
 }
