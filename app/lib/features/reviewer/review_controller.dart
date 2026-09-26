@@ -5,13 +5,11 @@ import 'package:flutter/foundation.dart';
 
 class ReviewController extends ChangeNotifier {
   ReviewController({
-    required ReviewRepository repository,
-    required CardRenderRepository renderer,
+    required this._repository,
+    required this._renderer,
     required int Function() wallClockMillis,
-    required Stopwatch Function() stopwatchFactory,
-  })  : _repository = repository,
-        _renderer = renderer,
-        _stopwatchFactory = stopwatchFactory;
+    required this._stopwatchFactory,
+  });
 
   final ReviewRepository _repository;
   final CardRenderRepository _renderer;
