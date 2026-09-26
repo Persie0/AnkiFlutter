@@ -18,10 +18,9 @@ abstract interface class ReviewTtsService {
 
 class AnkiReviewTtsService implements ReviewTtsService {
   AnkiReviewTtsService({
-    required BackendInvoker backend,
-    required ReviewTtsTempDirectoryProvider tempDirectoryProvider,
-  })  : _backend = backend,
-        _tempDirectoryProvider = tempDirectoryProvider;
+    required this._backend,
+    required this._tempDirectoryProvider,
+  });
 
   final BackendInvoker _backend;
   final ReviewTtsTempDirectoryProvider _tempDirectoryProvider;
