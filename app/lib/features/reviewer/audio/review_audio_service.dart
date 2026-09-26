@@ -35,8 +35,7 @@ abstract interface class ReviewAudioService {
 }
 
 class PlayerBackedReviewAudioService implements ReviewAudioService {
-  PlayerBackedReviewAudioService({required ReviewAudioPlayerAdapter player})
-      : _player = player;
+  PlayerBackedReviewAudioService({required this._player});
 
   final ReviewAudioPlayerAdapter _player;
   List<Uri> _currentQueue = const [];
