@@ -4,6 +4,7 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
+import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
@@ -29,6 +30,13 @@ void main() {
     final hard = scheduler_pb.SchedulingState(customData: 'hard-state');
     final good = scheduler_pb.SchedulingState(customData: 'good-state');
     final easy = scheduler_pb.SchedulingState(customData: 'easy-state');
+    final states = scheduler_pb.SchedulingStates(
+      current: current,
+      again: again,
+      hard: hard,
+      good: good,
+      easy: easy,
+    );
     final queue = scheduler_pb.QueuedCards(
       cards: [
         scheduler_pb.QueuedCards_QueuedCard(
@@ -38,13 +46,7 @@ void main() {
             deckId: Int64(303),
             customData: 'persist-me',
           ),
-          states: scheduler_pb.SchedulingStates(
-            current: current,
-            again: again,
-            hard: hard,
-            good: good,
-            easy: easy,
-          ),
+          states: states,
           context: scheduler_pb.SchedulingContext(deckName: 'Languages::Norwegian'),
         ),
       ],
@@ -55,6 +57,9 @@ void main() {
     final backend = _FakeBackend(
       responses: {
         BackendOperation.getQueuedCards: Uint8List.fromList(queue.writeToBuffer()),
+        BackendOperation.describeNextStates: Uint8List.fromList(
+          generic_pb.StringList(vals: ['10m', '1d', '3d', '5d']).writeToBuffer(),
+        ),
       },
     );
     final repository = AnkiReviewRepository(backend: backend);
@@ -94,13 +99,56 @@ void main() {
       orderedEquals(easy.writeToBuffer()),
     );
 
-    expect(backend.calls, hasLength(1));
-    expect(backend.calls.single.operation, BackendOperation.getQueuedCards);
+    expect(backend.calls, hasLength(2));
+    expect(backend.calls.first.operation, BackendOperation.getQueuedCards);
     final request = scheduler_pb.GetQueuedCardsRequest.fromBuffer(
-      backend.calls.single.request,
+      backend.calls.first.request,
     );
     expect(request.fetchLimit, 1);
     expect(request.intradayLearningOnly, isFalse);
+    expect(backend.calls.last.operation, BackendOperation.describeNextStates);
+    expect(backend.calls.last.request, orderedEquals(states.writeToBuffer()));
+  });
+
+  test('uses Anki interval descriptions in Again Hard Good Easy order', () async {
+    final states = scheduler_pb.SchedulingStates(
+      current: scheduler_pb.SchedulingState(),
+      again: scheduler_pb.SchedulingState(customData: 'again'),
+      hard: scheduler_pb.SchedulingState(customData: 'hard'),
+      good: scheduler_pb.SchedulingState(customData: 'good'),
+      easy: scheduler_pb.SchedulingState(customData: 'easy'),
+    );
+    final queue = scheduler_pb.QueuedCards(
+      cards: [
+        scheduler_pb.QueuedCards_QueuedCard(
+          card: cards_pb.Card(id: Int64(1)),
+          states: states,
+        ),
+      ],
+    );
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getQueuedCards: Uint8List.fromList(queue.writeToBuffer()),
+        BackendOperation.describeNextStates: Uint8List.fromList(
+          generic_pb.StringList(
+            vals: ['Again upstream', 'Hard upstream', 'Good upstream', 'Easy upstream'],
+          ).writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    final card = await repository.nextCard();
+
+    expect(
+      card!.choices.map((choice) => choice.intervalLabel),
+      orderedEquals([
+        'Again upstream',
+        'Hard upstream',
+        'Good upstream',
+        'Easy upstream',
+      ]),
+    );
   });
 
   test('returns null when Anki has no queued cards', () async {
