@@ -141,15 +141,11 @@ NativeAnkiBindings _loadNativeBindings() {
 }
 
 Future<String?> _pickAnkiCollection() async {
-  final result = await FilePicker.platform.pickFiles(
+  final file = await FilePicker.pickFile(
     type: FileType.custom,
     allowedExtensions: const ['anki2'],
-    allowMultiple: false,
   );
-  if (result == null || result.files.isEmpty) {
-    return null;
-  }
-  return result.files.single.path;
+  return file?.path;
 }
 
 Future<void> _closeSessionAndDisposeClient(
