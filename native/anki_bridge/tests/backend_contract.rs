@@ -3,12 +3,19 @@ use std::ptr;
 use std::slice;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use anki::collection::CollectionBuilder;
+use anki::decks::DeckId;
+use anki::search::SortMode;
 use anki_flutter_bridge::backend::BridgeBackend;
 use anki_flutter_bridge::ffi::{
     anki_bridge_create, anki_bridge_destroy, anki_bridge_free_buffer, anki_bridge_invoke,
     ByteBuffer, STATUS_BACKEND_ERROR, STATUS_SUCCESS,
 };
 use anki_proto::backend::{BackendError, BackendInit};
+use anki_proto::card_rendering::{
+    rendered_template_node::Value, RenderCardResponse, RenderExistingCardRequest,
+    RenderedTemplateNode,
+};
 use anki_proto::collection::{CloseCollectionRequest, OpenCollectionRequest};
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use prost::Message;
@@ -18,6 +25,7 @@ use tempfile::TempDir;
 const OPEN_COLLECTION: u32 = 1;
 const CLOSE_COLLECTION: u32 = 2;
 const DECK_TREE: u32 = 3;
+const RENDER_EXISTING_CARD: u32 = 12;
 
 struct TestBackend {
     handle: *mut BridgeBackend,
@@ -109,6 +117,17 @@ fn assert_empty_default_deck(tree: &DeckTreeNode) {
     assert_eq!(default.review_count, 0);
 }
 
+fn rendered_text(nodes: &[RenderedTemplateNode]) -> String {
+    nodes
+        .iter()
+        .map(|node| match node.value.as_ref() {
+            Some(Value::Text(text)) => text.as_str(),
+            Some(Value::Replacement(_)) => panic!("full rendering returned replacement node"),
+            None => panic!("rendered node missing value"),
+        })
+        .collect()
+}
+
 #[test]
 fn real_collection_opens_exposes_default_deck_and_reopens_through_ffi() {
     let temp = TempDir::new().unwrap();
@@ -145,6 +164,65 @@ fn real_collection_opens_exposes_default_deck_and_reopens_through_ffi() {
         String::from_utf8_lossy(&bytes)
     );
     assert_empty_default_deck(&fetch_tree(&backend));
+}
+
+#[test]
+fn reviewer_render_uses_real_anki_frontside_back_and_css() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(
+        open.media_folder_path.clone(),
+        open.media_db_path.clone(),
+    );
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype should exist");
+    let mut note = notetype.new_note();
+    note.set_field(0, "reviewer-front").unwrap();
+    note.set_field(1, "reviewer-back").unwrap();
+    collection.add_note(&mut note, DeckId(1)).unwrap();
+    let card_ids = collection
+        .search_cards(format!("nid:{}", note.id.0), SortMode::NoOrder)
+        .unwrap();
+    assert_eq!(card_ids.len(), 1);
+    let card_id = card_ids[0].0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(
+        RENDER_EXISTING_CARD,
+        &RenderExistingCardRequest {
+            card_id,
+            browser: false,
+            partial_render: false,
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "render failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let rendered = RenderCardResponse::decode(bytes.as_slice()).unwrap();
+    let question = rendered_text(&rendered.question_nodes);
+    let answer = rendered_text(&rendered.answer_nodes);
+
+    assert!(question.contains("reviewer-front"));
+    assert!(answer.contains("reviewer-front"));
+    assert!(answer.contains("reviewer-back"));
+    assert!(!rendered.css.trim().is_empty());
 }
 
 #[test]
