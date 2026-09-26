@@ -14,17 +14,105 @@ fn main() -> Result<(), Box<dyn Error>> {
     let open_collection = operation(&services, "BackendCollectionService", "open_collection")?;
     let close_collection = operation(&services, "BackendCollectionService", "close_collection")?;
     let deck_tree = operation(&services, "BackendDecksService", "deck_tree")?;
+    let set_current_deck = operation(&services, "BackendDecksService", "set_current_deck")?;
+    let get_queued_cards = operation(&services, "BackendSchedulerService", "get_queued_cards")?;
+    let describe_next_states = operation(
+        &services,
+        "BackendSchedulerService",
+        "describe_next_states",
+    )?;
+    let answer_card = operation(&services, "BackendSchedulerService", "answer_card")?;
+    let state_is_leech = operation(&services, "BackendSchedulerService", "state_is_leech")?;
+    let bury_or_suspend_cards = operation(
+        &services,
+        "BackendSchedulerService",
+        "bury_or_suspend_cards",
+    )?;
+    let get_undo_status = operation(&services, "BackendCollectionService", "get_undo_status")?;
+    let undo = operation(&services, "BackendCollectionService", "undo")?;
+    let render_existing_card = operation(
+        &services,
+        "BackendCardRenderingService",
+        "render_existing_card",
+    )?;
+    let extract_av_tags = operation(
+        &services,
+        "BackendCardRenderingService",
+        "extract_av_tags",
+    )?;
+    let all_tts_voices = operation(
+        &services,
+        "BackendCardRenderingService",
+        "all_tts_voices",
+    )?;
+    let write_tts_stream = operation(
+        &services,
+        "BackendCardRenderingService",
+        "write_tts_stream",
+    )?;
+    let get_deck_configs_for_update = operation(
+        &services,
+        "BackendDeckConfigService",
+        "get_deck_configs_for_update",
+    )?;
+    let encode_iri_paths = operation(
+        &services,
+        "BackendCardRenderingService",
+        "encode_iri_paths",
+    )?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const CLOSE_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const DECK_TREE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const DECK_TREE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const SET_CURRENT_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_QUEUED_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const DESCRIBE_NEXT_STATES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ANSWER_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const STATE_IS_LEECH: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const BURY_OR_SUSPEND_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_UNDO_STATUS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const UNDO: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const RENDER_EXISTING_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const EXTRACT_AV_TAGS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ALL_TTS_VOICES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const WRITE_TTS_STREAM: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_DECK_CONFIGS_FOR_UPDATE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ENCODE_IRI_PATHS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
         close_collection.1,
         deck_tree.0,
         deck_tree.1,
+        set_current_deck.0,
+        set_current_deck.1,
+        get_queued_cards.0,
+        get_queued_cards.1,
+        describe_next_states.0,
+        describe_next_states.1,
+        answer_card.0,
+        answer_card.1,
+        state_is_leech.0,
+        state_is_leech.1,
+        bury_or_suspend_cards.0,
+        bury_or_suspend_cards.1,
+        get_undo_status.0,
+        get_undo_status.1,
+        undo.0,
+        undo.1,
+        render_existing_card.0,
+        render_existing_card.1,
+        extract_av_tags.0,
+        extract_av_tags.1,
+        all_tts_voices.0,
+        all_tts_voices.1,
+        write_tts_stream.0,
+        write_tts_stream.1,
+        get_deck_configs_for_update.0,
+        get_deck_configs_for_update.1,
+        encode_iri_paths.0,
+        encode_iri_paths.1,
     );
 
     fs::write(
