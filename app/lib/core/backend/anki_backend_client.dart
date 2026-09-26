@@ -16,6 +16,7 @@ class AnkiBackendClient implements BackendInvoker {
   }) {
     final result = bindings.create(init);
     if (result.status == 0 && result.handle != null) {
+      bindings.freeBuffer(result.buffer);
       return AnkiBackendClient._(bindings, result.handle!);
     }
 
