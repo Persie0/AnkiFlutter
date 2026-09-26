@@ -3,10 +3,12 @@ import 'dart:typed_data';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
+import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart' as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -206,6 +208,118 @@ void main() {
     expect(answer.rating, scheduler_pb.CardAnswer_Rating.GOOD);
     expect(answer.answeredAtMillis.toInt(), 1800000000123);
     expect(answer.millisecondsTaken, 4321);
+  });
+
+  test('settingsForDeck maps matching Anki deck config exactly', () async {
+    final config = deck_config_pb.DeckConfig_Config(
+      disableAutoplay: true,
+      capAnswerTimeToSecs: 17,
+      showTimer: true,
+      skipQuestionWhenReplayingAnswer: true,
+      questionAction:
+          deck_config_pb.DeckConfig_Config_QuestionAction.QUESTION_ACTION_SHOW_REMINDER,
+      stopTimerOnAnswer: true,
+      secondsToShowQuestion: 3.5,
+      secondsToShowAnswer: 4.25,
+      answerAction:
+          deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_ANSWER_GOOD,
+      waitForAudio: true,
+    );
+    final response = deck_config_pb.DeckConfigsForUpdate(
+      allConfig: [
+        deck_config_pb.DeckConfigsForUpdate_ConfigWithExtra(
+          config: deck_config_pb.DeckConfig(
+            id: Int64(11),
+            config: deck_config_pb.DeckConfig_Config(),
+          ),
+        ),
+        deck_config_pb.DeckConfigsForUpdate_ConfigWithExtra(
+          config: deck_config_pb.DeckConfig(id: Int64(22), config: config),
+        ),
+      ],
+      currentDeck:
+          deck_config_pb.DeckConfigsForUpdate_CurrentDeck(configId: Int64(22)),
+      defaults: deck_config_pb.DeckConfig(
+        config: deck_config_pb.DeckConfig_Config(disableAutoplay: false),
+      ),
+    );
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getDeckConfigsForUpdate:
+            Uint8List.fromList(response.writeToBuffer()),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    final settings = await repository.settingsForDeck(303);
+
+    expect(backend.calls, hasLength(1));
+    expect(
+      backend.calls.single.operation,
+      BackendOperation.getDeckConfigsForUpdate,
+    );
+    final request = decks_pb.DeckId.fromBuffer(backend.calls.single.request);
+    expect(request.did.toInt(), 303);
+    expect(settings.autoplay, isFalse);
+    expect(settings.showTimer, isTrue);
+    expect(settings.stopTimerOnAnswer, isTrue);
+    expect(settings.answerTimeLimitSeconds, 17);
+    expect(settings.secondsToShowQuestion, 3.5);
+    expect(settings.secondsToShowAnswer, 4.25);
+    expect(settings.waitForAudio, isTrue);
+    expect(settings.skipQuestionWhenReplayingAnswer, isTrue);
+    expect(settings.questionAction, ReviewQuestionAction.showReminder);
+    expect(settings.answerAction, ReviewAnswerAction.answerGood);
+  });
+
+  test('settingsForDeck falls back to Anki returned defaults', () async {
+    final defaults = deck_config_pb.DeckConfig_Config(
+      disableAutoplay: false,
+      capAnswerTimeToSecs: 42,
+      showTimer: false,
+      skipQuestionWhenReplayingAnswer: false,
+      questionAction:
+          deck_config_pb.DeckConfig_Config_QuestionAction.QUESTION_ACTION_SHOW_ANSWER,
+      stopTimerOnAnswer: false,
+      secondsToShowQuestion: 1.25,
+      secondsToShowAnswer: 6.5,
+      answerAction:
+          deck_config_pb.DeckConfig_Config_AnswerAction.ANSWER_ACTION_BURY_CARD,
+      waitForAudio: false,
+    );
+    final response = deck_config_pb.DeckConfigsForUpdate(
+      allConfig: [
+        deck_config_pb.DeckConfigsForUpdate_ConfigWithExtra(
+          config: deck_config_pb.DeckConfig(
+            id: Int64(11),
+            config: deck_config_pb.DeckConfig_Config(disableAutoplay: true),
+          ),
+        ),
+      ],
+      currentDeck:
+          deck_config_pb.DeckConfigsForUpdate_CurrentDeck(configId: Int64(99)),
+      defaults: deck_config_pb.DeckConfig(config: defaults),
+    );
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getDeckConfigsForUpdate:
+            Uint8List.fromList(response.writeToBuffer()),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    final settings = await repository.settingsForDeck(404);
+
+    expect(settings.autoplay, isTrue);
+    expect(settings.showTimer, isFalse);
+    expect(settings.stopTimerOnAnswer, isFalse);
+    expect(settings.answerTimeLimitSeconds, 42);
+    expect(settings.secondsToShowQuestion, 1.25);
+    expect(settings.secondsToShowAnswer, 6.5);
+    expect(settings.waitForAudio, isFalse);
+    expect(settings.skipQuestionWhenReplayingAnswer, isFalse);
+    expect(settings.questionAction, ReviewQuestionAction.showAnswer);
+    expect(settings.answerAction, ReviewAnswerAction.buryCard);
   });
 
   test('returns null when Anki has no queued cards', () async {
