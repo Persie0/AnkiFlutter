@@ -172,10 +172,7 @@ fn reviewer_render_uses_real_anki_frontside_back_and_css() {
     let open = collection_request(&temp);
 
     let mut builder = CollectionBuilder::new(&open.collection_path);
-    builder.set_media_paths(
-        open.media_folder_path.clone(),
-        open.media_db_path.clone(),
-    );
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
     let mut collection = builder.build().unwrap();
     let notetype = collection
         .get_notetype_by_name("Basic")
