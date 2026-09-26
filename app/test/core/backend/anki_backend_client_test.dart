@@ -42,6 +42,20 @@ void main() {
     expect(bindings.events, containsAllInOrder(['copy', 'free']));
   });
 
+  test('copy failure still frees returned buffer exactly once', () async {
+    bindings.nextCall = FakeCallResult(0, Uint8List.fromList([4, 5, 6]));
+    bindings.throwOnCopy = true;
+    final freeCountBeforeInvoke = bindings.freeCount;
+
+    await expectLater(
+      client.invoke(BackendOperation.deckTree, Uint8List(0)),
+      throwsA(isA<StateError>()),
+    );
+
+    expect(bindings.freeCount, freeCountBeforeInvoke + 1);
+    expect(bindings.events, containsAllInOrder(['copy', 'free']));
+  });
+
   test('status 1 frees once and throws stable AnkiBackendException', () async {
     final backendError = BackendError(
       message: 'cannot open collection',
@@ -139,6 +153,7 @@ final class FakeCreateResult implements NativeAnkiCreateResult {
 final class FakeNativeAnkiBindings implements NativeAnkiBindings {
   final FakeNativeHandle handle = FakeNativeHandle();
   FakeCallResult nextCall = FakeCallResult(0, Uint8List(0));
+  bool throwOnCopy = false;
   int copyCount = 0;
   int freeCount = 0;
   int destroyCount = 0;
@@ -159,6 +174,9 @@ final class FakeNativeAnkiBindings implements NativeAnkiBindings {
   Uint8List copyBuffer(NativeAnkiBuffer buffer) {
     copyCount++;
     events.add('copy');
+    if (throwOnCopy) {
+      throw StateError('copy failed');
+    }
     return Uint8List.fromList((buffer as FakeNativeBuffer).bytes);
   }
 
