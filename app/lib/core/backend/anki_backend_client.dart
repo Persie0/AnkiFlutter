@@ -20,8 +20,7 @@ class AnkiBackendClient implements BackendInvoker {
       return AnkiBackendClient._(bindings, result.handle!);
     }
 
-    final bytes = bindings.copyBuffer(result.buffer);
-    bindings.freeBuffer(result.buffer);
+    final bytes = _copyAndFree(bindings, result.buffer);
     if (result.status == 1) {
       throw _backendException(bytes);
     }
@@ -44,8 +43,7 @@ class AnkiBackendClient implements BackendInvoker {
     }
 
     final result = _bindings.invoke(handle, operation.nativeId, request);
-    final bytes = _bindings.copyBuffer(result.buffer);
-    _bindings.freeBuffer(result.buffer);
+    final bytes = _copyAndFree(_bindings, result.buffer);
 
     switch (result.status) {
       case 0:
@@ -66,6 +64,17 @@ class AnkiBackendClient implements BackendInvoker {
     }
     _handle = null;
     _bindings.destroy(handle);
+  }
+}
+
+Uint8List _copyAndFree(
+  NativeAnkiBindings bindings,
+  NativeAnkiBuffer buffer,
+) {
+  try {
+    return bindings.copyBuffer(buffer);
+  } finally {
+    bindings.freeBuffer(buffer);
   }
 }
 
