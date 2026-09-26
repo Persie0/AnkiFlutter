@@ -60,8 +60,7 @@ class PlayerBackedReviewAudioService implements ReviewAudioService {
 
   @override
   Future<void> replay() async {
-    _ensureUsable();
-    if (_currentQueue.isEmpty) {
+    if (_disposed || _currentQueue.isEmpty) {
       return;
     }
     await _player.openQueue(_currentQueue);
