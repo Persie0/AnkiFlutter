@@ -58,7 +58,9 @@ jobs:
         run: flutter pub get --enforce-lockfile
         working-directory: app
       - name: Verify Flutter generated config is clean
-        run: git diff --exit-code -- app/pubspec.lock app/analysis_options.yaml
+        run: >-
+          git diff --exit-code -- app/.metadata app/pubspec.lock
+          app/analysis_options.yaml app/linux app/macos app/windows
       - name: Analyze Flutter app
         run: flutter analyze
         working-directory: app
