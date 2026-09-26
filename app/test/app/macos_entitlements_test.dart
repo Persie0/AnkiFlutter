@@ -19,5 +19,12 @@ void main() {
         isNot(contains('com.apple.security.files.user-selected.read-only')),
       );
     });
+
+    test('macOS $fileName allows reviewer loopback client connections', () {
+      final entitlements = File('macos/Runner/$fileName').readAsStringSync();
+
+      expect(entitlements, contains('com.apple.security.app-sandbox'));
+      expect(entitlements, contains('com.apple.security.network.client'));
+    });
   }
 }
