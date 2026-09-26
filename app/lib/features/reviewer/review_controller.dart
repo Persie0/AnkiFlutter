@@ -45,6 +45,22 @@ class ReviewController extends ChangeNotifier {
     );
   }
 
+  Future<void> showAnswer() async {
+    final current = _state;
+    if (current is! ReviewQuestion) {
+      return;
+    }
+
+    _setState(
+      ReviewAnswer(
+        card: current.card,
+        content: current.content,
+        settings: current.settings,
+        generationId: current.generationId,
+      ),
+    );
+  }
+
   void _setState(ReviewSessionState state) {
     _state = state;
     notifyListeners();
