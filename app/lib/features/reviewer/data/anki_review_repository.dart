@@ -6,6 +6,7 @@ import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart' as
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
+import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
@@ -13,11 +14,12 @@ import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart'
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:fixnum/fixnum.dart';
 
-class AnkiReviewRepository {
+class AnkiReviewRepository implements ReviewRepository {
   AnkiReviewRepository({required this.backend});
 
   final BackendInvoker backend;
 
+  @override
   Future<void> selectDeck(int deckId) async {
     final request = decks_pb.DeckId(did: Int64(deckId));
     await backend.invoke(
@@ -26,6 +28,7 @@ class AnkiReviewRepository {
     );
   }
 
+  @override
   Future<ReviewCard?> nextCard() async {
     final request = scheduler_pb.GetQueuedCardsRequest(
       fetchLimit: 1,
@@ -83,6 +86,7 @@ class AnkiReviewRepository {
     );
   }
 
+  @override
   Future<void> answer(
     ReviewCard card,
     ReviewRating rating, {
@@ -113,6 +117,19 @@ class AnkiReviewRepository {
     );
   }
 
+  @override
+  Future<bool> stateIsLeech(ReviewAnswerChoice choice) async {
+    final state = scheduler_pb.SchedulingState.fromBuffer(
+      choice.schedulingStateBytes,
+    );
+    final response = await backend.invoke(
+      BackendOperation.stateIsLeech,
+      Uint8List.fromList(state.writeToBuffer()),
+    );
+    return generic_pb.Bool.fromBuffer(response).val;
+  }
+
+  @override
   Future<ReviewDeckSettings> settingsForDeck(int deckId) async {
     final request = decks_pb.DeckId(did: Int64(deckId));
     final bytes = await backend.invoke(
