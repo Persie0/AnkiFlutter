@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/anki_backend_client.dart';
 import 'package:anki_flutter/core/backend/generated/anki/backend.pb.dart';
