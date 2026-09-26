@@ -27,7 +27,8 @@ class ReviewController extends ChangeNotifier {
     await _repository.selectDeck(deckId);
     final card = await _repository.nextCard();
     if (card == null) {
-      throw StateError('Anki returned no queued card');
+      _setState(const ReviewFinished());
+      return;
     }
 
     final settings = await _repository.settingsForDeck(card.deckId);
