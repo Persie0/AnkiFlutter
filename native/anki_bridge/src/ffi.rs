@@ -102,6 +102,13 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
     }
 }
 
+/// Creates a bridge backend from the protobuf bytes at `init_ptr`.
+///
+/// # Safety
+///
+/// When `init_len` is non-zero, `init_ptr` must point to at least `init_len`
+/// readable bytes for the duration of this call. The returned handle, when
+/// non-null, must later be released exactly once with `anki_bridge_destroy`.
 #[no_mangle]
 pub unsafe extern "C" fn anki_bridge_create(
     init_ptr: *const u8,
@@ -122,6 +129,15 @@ pub unsafe extern "C" fn anki_bridge_create(
     }
 }
 
+/// Invokes a stable bridge operation on an existing backend handle.
+///
+/// # Safety
+///
+/// `handle`, when non-null, must be a live handle returned by
+/// `anki_bridge_create` that has not been destroyed. When `input_len` is
+/// non-zero, `input_ptr` must point to at least `input_len` readable bytes for
+/// the duration of this call. Any non-empty returned buffer must be released
+/// exactly once with `anki_bridge_free_buffer`.
 #[no_mangle]
 pub unsafe extern "C" fn anki_bridge_invoke(
     handle: *mut BridgeBackend,
@@ -151,6 +167,13 @@ pub unsafe extern "C" fn anki_bridge_invoke(
     }
 }
 
+/// Releases a buffer returned by this bridge.
+///
+/// # Safety
+///
+/// `buffer` must either be the empty/null buffer or a buffer returned by this
+/// bridge that has not already been freed. Passing forged pointer/length/capacity
+/// values or freeing the same non-empty buffer twice is undefined behavior.
 #[no_mangle]
 pub unsafe extern "C" fn anki_bridge_free_buffer(buffer: ByteBuffer) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
@@ -166,6 +189,13 @@ pub unsafe extern "C" fn anki_bridge_free_buffer(buffer: ByteBuffer) {
     }));
 }
 
+/// Destroys a bridge backend handle.
+///
+/// # Safety
+///
+/// `handle` must either be null or a live handle returned by
+/// `anki_bridge_create` that has not already been destroyed. A non-null handle
+/// must be destroyed exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
