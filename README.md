@@ -69,7 +69,7 @@ cargo fmt --manifest-path native/anki_bridge/Cargo.toml --check
 cargo clippy --manifest-path native/anki_bridge/Cargo.toml --all-targets -- -D warnings
 cargo test --manifest-path native/anki_bridge/Cargo.toml
 cd app
-flutter pub get
+flutter pub get --enforce-lockfile
 flutter analyze
 flutter test
 flutter build linux
