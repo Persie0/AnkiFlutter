@@ -16,11 +16,12 @@ class ReviewMediaServer {
     if (!await root.exists()) {
       throw FileSystemException('Review media root does not exist.', root.path);
     }
+    final canonicalRoot = await root.resolveSymbolicLinks();
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final token = _newSessionToken();
     _server = server;
-    _mediaRoot = root.path;
+    _mediaRoot = canonicalRoot;
     _sessionToken = token;
     server.listen(_handleRequest);
 
@@ -63,7 +64,14 @@ class ReviewMediaServer {
         return;
       }
 
-      final relativePath = segments.skip(1).join(Platform.pathSeparator);
+      final mediaSegments = segments.skip(1).toList(growable: false);
+      if (mediaSegments.any(_isUnsafePathSegment)) {
+        request.response.statusCode = HttpStatus.forbidden;
+        await request.response.close();
+        return;
+      }
+
+      final relativePath = mediaSegments.join(Platform.pathSeparator);
       final file = File('$mediaRoot${Platform.pathSeparator}$relativePath');
       if (!await file.exists()) {
         request.response.statusCode = HttpStatus.notFound;
@@ -71,13 +79,21 @@ class ReviewMediaServer {
         return;
       }
 
-      final length = await file.length();
+      final canonicalFile = await file.resolveSymbolicLinks();
+      if (!_isInsideRoot(canonicalFile, mediaRoot)) {
+        request.response.statusCode = HttpStatus.forbidden;
+        await request.response.close();
+        return;
+      }
+
+      final resolvedFile = File(canonicalFile);
+      final length = await resolvedFile.length();
       request.response.statusCode = HttpStatus.ok;
       request.response.contentLength = length;
-      request.response.headers.contentType = _contentTypeFor(file.path);
+      request.response.headers.contentType = _contentTypeFor(resolvedFile.path);
 
       if (request.method == 'GET') {
-        await request.response.addStream(file.openRead());
+        await request.response.addStream(resolvedFile.openRead());
       }
       await request.response.close();
     } catch (_) {
@@ -88,6 +104,27 @@ class ReviewMediaServer {
         // The response may already have started; there is nothing left to send.
       }
     }
+  }
+
+  bool _isUnsafePathSegment(String segment) {
+    return segment.isEmpty ||
+        segment == '.' ||
+        segment == '..' ||
+        segment.contains('/') ||
+        segment.contains(r'\');
+  }
+
+  bool _isInsideRoot(String candidate, String root) {
+    var normalizedCandidate = candidate;
+    var normalizedRoot = root;
+    if (Platform.isWindows) {
+      normalizedCandidate = normalizedCandidate.toLowerCase();
+      normalizedRoot = normalizedRoot.toLowerCase();
+    }
+    return normalizedCandidate == normalizedRoot ||
+        normalizedCandidate.startsWith(
+          '$normalizedRoot${Platform.pathSeparator}',
+        );
   }
 
   String _newSessionToken() {
