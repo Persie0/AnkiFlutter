@@ -138,6 +138,42 @@ void main() {
     expect(tts.speed, closeTo(1.25, 0.0001));
     expect(tts.otherArgs, orderedEquals(['cloze_blank=...']));
   });
+
+  test('render stays neutral when referenced media does not exist', () async {
+    const questionHtml = '<img src="definitely-missing-reviewer-image.png">';
+    const answerHtml = '<div>answer with missing media</div>';
+    final rendered = card_rendering_pb.RenderCardResponse(
+      questionNodes: [card_rendering_pb.RenderedTemplateNode(text: questionHtml)],
+      answerNodes: [card_rendering_pb.RenderedTemplateNode(text: answerHtml)],
+      css: '.card {}',
+    );
+    final backend = _FakeBackend((operation, request) {
+      switch (operation) {
+        case BackendOperation.renderExistingCard:
+          return Uint8List.fromList(rendered.writeToBuffer());
+        case BackendOperation.extractAvTags:
+          final input = card_rendering_pb.ExtractAvTagsRequest.fromBuffer(request);
+          return Uint8List.fromList(
+            card_rendering_pb.ExtractAvTagsResponse(text: input.text).writeToBuffer(),
+          );
+        case BackendOperation.encodeIriPaths:
+          final input = generic_pb.String.fromBuffer(request);
+          return Uint8List.fromList(
+            generic_pb.String(val: input.val).writeToBuffer(),
+          );
+        default:
+          fail('unexpected operation $operation');
+      }
+    });
+    final repository = AnkiCardRenderRepository(backend: backend);
+
+    final content = await repository.render(42);
+
+    expect(content.questionHtml, questionHtml);
+    expect(content.answerHtml, answerHtml);
+    expect(content.questionAudio, isEmpty);
+    expect(content.answerAudio, isEmpty);
+  });
 }
 
 class _BackendCall {
