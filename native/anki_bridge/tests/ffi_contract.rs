@@ -87,9 +87,7 @@ fn backend_error_bytes_are_preserved() {
     let expected = direct.invoke(DECK_TREE, &request).unwrap_err();
 
     let created = unsafe { anki_bridge_create(init.as_ptr(), init.len()) };
-    let result = unsafe {
-        anki_bridge_invoke(created.handle, 3, request.as_ptr(), request.len())
-    };
+    let result = unsafe { anki_bridge_invoke(created.handle, 3, request.as_ptr(), request.len()) };
     assert_eq!(result.status, STATUS_BACKEND_ERROR);
     let actual = unsafe { copy_and_free(result.data) };
     assert_eq!(actual, expected);
@@ -125,9 +123,8 @@ fn successful_nonempty_buffer_is_decodable_and_freeable() {
     assert!(opened.data.ptr.is_null());
 
     let tree_request = DeckTreeRequest { now: 1_800_000_000 }.encode_to_vec();
-    let tree_result = unsafe {
-        anki_bridge_invoke(created.handle, 3, tree_request.as_ptr(), tree_request.len())
-    };
+    let tree_result =
+        unsafe { anki_bridge_invoke(created.handle, 3, tree_request.as_ptr(), tree_request.len()) };
     assert_eq!(tree_result.status, STATUS_SUCCESS);
     let tree_bytes = unsafe { copy_and_free(tree_result.data) };
     assert!(!tree_bytes.is_empty());

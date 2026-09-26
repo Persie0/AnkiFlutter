@@ -47,9 +47,8 @@ impl TestBackend {
 
     fn invoke<M: Message>(&self, operation: u32, message: &M) -> (u32, Vec<u8>) {
         let input = message.encode_to_vec();
-        let result = unsafe {
-            anki_bridge_invoke(self.handle, operation, input.as_ptr(), input.len())
-        };
+        let result =
+            unsafe { anki_bridge_invoke(self.handle, operation, input.as_ptr(), input.len()) };
         (result.status, take_buffer(result.data))
     }
 }

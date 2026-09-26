@@ -5,7 +5,7 @@ use std::ptr;
 use std::slice;
 
 use crate::backend::BridgeBackend;
-use crate::operations::{CLOSE_COLLECTION, DECK_TREE, OPEN_COLLECTION, OperationIndex};
+use crate::operations::{OperationIndex, CLOSE_COLLECTION, DECK_TREE, OPEN_COLLECTION};
 
 pub const STATUS_SUCCESS: u32 = 0;
 pub const STATUS_BACKEND_ERROR: u32 = 1;
@@ -130,8 +130,8 @@ pub unsafe extern "C" fn anki_bridge_invoke(
     input_len: usize,
 ) -> BridgeCallResult {
     match catch_unwind(AssertUnwindSafe(|| {
-        let backend = unsafe { handle.as_ref() }
-            .ok_or_else(|| "Anki bridge handle is null".to_string())?;
+        let backend =
+            unsafe { handle.as_ref() }.ok_or_else(|| "Anki bridge handle is null".to_string())?;
         let input = unsafe { input_bytes(input_ptr, input_len) }?;
         let operation = operation_from_id(operation)?;
         Ok::<_, String>(match backend.invoke(operation, input) {

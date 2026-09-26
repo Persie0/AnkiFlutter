@@ -11,11 +11,7 @@ impl BridgeBackend {
         backend::init_backend(input).map(|backend| Self { backend })
     }
 
-    pub fn invoke(
-        &self,
-        operation: OperationIndex,
-        input: &[u8],
-    ) -> Result<Vec<u8>, Vec<u8>> {
+    pub fn invoke(&self, operation: OperationIndex, input: &[u8]) -> Result<Vec<u8>, Vec<u8>> {
         self.backend
             .run_service_method(operation.service, operation.method, input)
     }
