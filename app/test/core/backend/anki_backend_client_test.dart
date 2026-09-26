@@ -26,14 +26,19 @@ void main() {
     }
   });
 
+  test('successful create releases returned native buffer exactly once', () {
+    expect(bindings.freeCount, 1);
+  });
+
   test('status 0 copies result bytes before freeing exactly once', () async {
     bindings.nextCall = FakeCallResult(0, Uint8List.fromList([4, 5, 6]));
+    final freeCountBeforeInvoke = bindings.freeCount;
 
     final bytes = await client.invoke(BackendOperation.deckTree, Uint8List(0));
 
     expect(bytes, [4, 5, 6]);
     expect(bindings.copyCount, 1);
-    expect(bindings.freeCount, 1);
+    expect(bindings.freeCount, freeCountBeforeInvoke + 1);
     expect(bindings.events, containsAllInOrder(['copy', 'free']));
   });
 
@@ -47,6 +52,7 @@ void main() {
       1,
       Uint8List.fromList(backendError.writeToBuffer()),
     );
+    final freeCountBeforeInvoke = bindings.freeCount;
 
     await expectLater(
       client.invoke(BackendOperation.openCollection, Uint8List(0)),
@@ -57,7 +63,7 @@ void main() {
             .having((e) => e.context, 'context', 'collection.anki2'),
       ),
     );
-    expect(bindings.freeCount, 1);
+    expect(bindings.freeCount, freeCountBeforeInvoke + 1);
   });
 
   test('status 2 frees once and throws UTF-8 AnkiBridgeException', () async {
@@ -65,6 +71,7 @@ void main() {
       2,
       Uint8List.fromList(utf8.encode('native bridge failed')),
     );
+    final freeCountBeforeInvoke = bindings.freeCount;
 
     await expectLater(
       client.invoke(BackendOperation.deckTree, Uint8List(0)),
@@ -76,7 +83,7 @@ void main() {
         ),
       ),
     );
-    expect(bindings.freeCount, 1);
+    expect(bindings.freeCount, freeCountBeforeInvoke + 1);
   });
 
   test('dispose destroys native handle exactly once', () {
