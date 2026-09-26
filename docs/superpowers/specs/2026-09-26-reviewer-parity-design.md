@@ -3,127 +3,114 @@
 Date: 2026-09-26
 Status: Approved in chat; pending written-spec review
 
-## 1. Purpose
+## 1. Goal
 
-Build the next AnkiFlutter milestone as a near-behavioral port of the official Anki Desktop Reviewer, while keeping Flutter as the application shell and the official Anki Rust backend (`rslib`) as the source of truth for scheduling and card data.
+Build the next AnkiFlutter milestone as a near-behavioral port of the official Anki Desktop Reviewer. Flutter remains the application shell; official Anki `rslib` remains authoritative for queueing, rendering, scheduling/FSRS, answering, undo, bury/suspend, and TTS support.
 
-The goal is not to redesign studying. The goal is to make AnkiFlutter capable of real day-to-day reviewing with behavior that closely matches the pinned official Anki Desktop implementation.
+This is not a redesign of studying. The target is: **official Anki Reviewer behavior inside the Flutter desktop shell**, using one shared Flutter/Dart implementation on Windows, macOS, and Linux.
 
-The Reviewer must use one shared Flutter/Dart implementation across Windows, macOS, and Linux. Small platform runner/bootstrap code is acceptable where required by an embedded browser engine, but there must not be three separate reviewer implementations.
+## 2. Upstream reference
 
-## 2. Reference implementation
+Use the already-pinned official Anki revision:
 
-The behavioral and UX reference is the official Anki Desktop code at the pinned upstream revision already used by AnkiFlutter:
+- commit `a5a0e444677a6b58cf784a9c2b7c2d5167f20df0`;
+- `qt/aqt/reviewer.py` as the behavioral reference;
+- official reviewer HTML/CSS/JS assets at that revision as the web-layer reference;
+- `proto/anki/scheduler.proto` for queueing/answering;
+- `proto/anki/card_rendering.proto` for rendering, AV extraction, and TTS;
+- `proto/anki/collection.proto` for undo;
+- `proto/anki/decks.proto` for selected/current deck behavior.
 
-- upstream commit: `a5a0e444677a6b58cf784a9c2b7c2d5167f20df0`
-- reviewer behavior: `qt/aqt/reviewer.py`
-- reviewer browser content and scripts: official reviewer HTML/CSS/JS assets at the same revision
-- scheduler service: `proto/anki/scheduler.proto`
-- card rendering service: `proto/anki/card_rendering.proto`
-- collection undo service: `proto/anki/collection.proto`
-- deck selection service: `proto/anki/decks.proto`
+When official Anki behavior is PyQt-specific, reproduce the visible behavior rather than the PyQt mechanism. When `rslib` already owns a rule, call it rather than reimplementing it in Dart.
 
-Where the PyQt implementation contains UI-framework-specific code, AnkiFlutter should reproduce the user-visible behavior rather than copy PyQt mechanics.
+## 3. Milestone success criteria
 
-Where official Anki already exposes the behavior through `rslib`, AnkiFlutter must call that backend instead of reimplementing it in Dart.
+A user can:
 
-## 3. Success criteria
+1. select a real deck and start review;
+2. receive the real next card from Anki's scheduler;
+3. view the real card template HTML/CSS/JS;
+4. load collection media referenced by the template;
+5. use question/answer audio and TTS, including autoplay and replay;
+6. reveal the answer with the same core controls as Anki;
+7. see Again / Hard / Good / Easy and their real next-state interval text;
+8. submit a rating to the official scheduler and immediately receive the next card;
+9. undo a review;
+10. bury or suspend the current card or note;
+11. use the main official Reviewer keyboard shortcuts;
+12. use official-style auto-advance/wait-for-audio behavior;
+13. finish a queue and return cleanly to deck overview/congratulations;
+14. get equivalent Reviewer behavior on Windows, macOS, and Linux from one Dart codebase.
 
-This milestone is complete when a user can:
+## 4. Explicit non-goals
 
-1. open a real collection and choose a deck;
-2. start studying that deck;
-3. receive the real queued card from Anki's scheduler;
-4. see the card rendered with its real Anki template HTML/CSS/JavaScript;
-5. have embedded images and media resolve from the collection media folder;
-6. hear autoplayed card audio and TTS according to Anki behavior;
-7. replay, pause, and seek audio using Anki-compatible controls;
-8. reveal the answer with Space/Enter or the UI;
-9. see Again / Hard / Good / Easy with real next-state interval text from Anki;
-10. rate the card with the UI or standard answer keys;
-11. have the official backend persist the scheduling result;
-12. immediately receive the next real card;
-13. undo the previous review;
-14. bury or suspend the current card/note;
-15. use the primary official Reviewer keyboard shortcuts;
-16. complete a queue and return to the deck overview/congratulations state;
-17. get equivalent reviewer behavior on Windows, macOS, and Linux from the same Flutter codebase.
+This milestone does not add arbitrary Python/PyQt add-ons, Python reviewer hooks, custom add-on field filters, note-editor parity, browser parity, template editing, mobile support, or unrelated Reviewer actions whose owning feature does not yet exist.
 
-## 4. Non-goals
+Examples intentionally deferred until their feature modules exist: edit current note, full card-info dialogs, record-your-own-voice workflow, delete note, forget card, set due date, copy card, and full deck-options UI.
 
-This milestone does not attempt to support:
-
-- arbitrary Python/PyQt add-ons;
-- arbitrary reviewer hook compatibility;
-- Python custom field filters supplied by add-ons;
-- full note editor parity;
-- full browser parity;
-- card-template editing;
-- custom-study UI beyond what is necessary for normal reviewing;
-- every obscure Reviewer context-menu action if it depends on a later feature module;
-- mobile reviewer support.
-
-The milestone should preserve extension points so later work can add missing actions without changing the core reviewer architecture.
-
-## 5. High-level architecture
+## 5. Architecture
 
 ```text
-Deck overview
-   |
-   | Study
-   v
+DeckOverview
+    |
+    | Study
+    v
 ReviewController
-   |
-   +--> StudyRepository
-   |      +--> SetCurrentDeck
-   |      +--> GetQueuedCards
-   |      +--> DescribeNextStates
-   |      +--> AnswerCard
-   |      +--> BuryOrSuspendCards
-   |      +--> GetUndoStatus / Undo
-   |
-   +--> CardRenderRepository
-   |      +--> RenderExistingCard
-   |      +--> ExtractAvTags
-   |      +--> AllTtsVoices / WriteTtsStream
-   |
-   +--> ReviewAudioService
-   |
-   +--> ReviewMediaServer
-   |
-   v
+    |
+    +--> StudyRepository
+    |      +--> SetCurrentDeck
+    |      +--> GetQueuedCards
+    |      +--> DescribeNextStates
+    |      +--> StateIsLeech
+    |      +--> AnswerCard
+    |      +--> BuryOrSuspendCards
+    |      +--> GetUndoStatus / Undo
+    |
+    +--> CardRenderRepository
+    |      +--> RenderExistingCard
+    |      +--> ExtractAvTags
+    |      +--> AllTtsVoices / WriteTtsStream
+    |
+    +--> ReviewAudioService
+    +--> ReviewMediaServer
+    v
 CardSurface
-   |
-   v
-embedded Chromium/CEF widget
-   |
-   +-- official-style reviewer HTML/CSS/JS
-   +-- rendered Anki question/answer HTML
-   +-- media URLs served from collection.media
+    v
+webview_cef / Chromium
+    +-- ported official reviewer HTML/CSS/JS
+    +-- rendered Anki question/answer HTML
+    +-- media served from collection.media
 
-All backend requests continue through:
-Flutter repositories -> existing BackendInvoker -> FFI -> anki_bridge -> official rslib
+Flutter repositories
+    -> existing BackendInvoker
+    -> FFI
+    -> anki_bridge
+    -> official rslib
 ```
 
-Generated protobuf types remain behind repositories/adapters and do not leak into feature widgets.
+Generated protobuf types remain behind repositories/mappers and never become widget state.
 
-## 6. One-codebase requirement
+## 6. One-codebase renderer decision
 
-The Reviewer implementation is shared Dart code.
+Use `webview_cef` **0.6.2** as the desktop card surface implementation for this milestone. It provides one Flutter API backed by the same CEF/Chromium engine on Windows, macOS, and Linux and supports JS<->Dart bridging and injected scripts.
 
-The same classes, controller, state model, repositories, card surface abstraction, keyboard command handling, audio orchestration, and tests are used on Windows, macOS, and Linux.
+The project must pin the dependency version in `pubspec.lock`; do not float to arbitrary plugin releases.
 
-A browser/runtime package may require minimal platform-specific build/bootstrap configuration, but platform conditionals must not contain Reviewer business rules.
+Known platform consequences accepted by this design:
 
-The preferred embedded browser strategy is one Chromium/CEF-based renderer on all three desktop platforms so card HTML/JS behavior stays as consistent as practical.
+- Windows minimum: Windows 10;
+- macOS minimum: macOS 12;
+- Linux uses the plugin's software rendering path while Windows/macOS can use GPU texture paths;
+- native runner/bootstrap changes required by CEF are allowed;
+- C++20-capable native toolchains are required.
 
-The browser implementation must sit behind a small `CardSurface` interface so it can be replaced without changing `ReviewController` or scheduler logic.
+Those platform hooks must contain no Reviewer business logic.
 
-## 7. Official Anki behavior to port
+Wrap the plugin behind a small project-owned `CardSurface` interface. `ReviewController`, scheduler logic, audio orchestration, and tests must not depend directly on `webview_cef`, so the renderer can be replaced later without redesigning Review state.
 
-The Flutter controller should mirror the meaningful state transitions in official `Reviewer` rather than inventing a new state model.
+## 7. Reviewer state machine
 
-Core states:
+Mirror the meaningful official Reviewer states:
 
 ```text
 loading
@@ -135,150 +122,101 @@ loading
 or
 
   -> finished
-  -> error
+  -> recoverable error
 ```
 
-The official behavior to preserve includes:
+Behavior:
 
-- fetch next queued card;
-- start the card timer when the card becomes current;
-- show question;
-- autoplay question audio when enabled;
-- reveal answer;
-- autoplay answer audio when enabled;
-- expose four scheduler answer choices;
-- ignore rating input while not on the answer side;
-- transition while the answer operation is running;
-- fetch/show the next card after a successful answer;
-- update queue counts;
-- return to overview when no card remains;
-- replay the correct side's audio;
-- support configured auto-advance behavior;
-- wait for audio where Anki's setting requires it;
-- preserve undo semantics through the official backend.
+- fetching a card enters `question` only after the card and render data are ready;
+- revealing enters `answer`;
+- answering enters `transition` before the backend call;
+- rating input is ignored unless on `answer`;
+- the UI does not optimistically advance before `AnswerCard` succeeds;
+- successful answer fetches the next card;
+- an empty queue ends the Reviewer and returns to overview;
+- stale async work from an older card/session is ignored.
 
 ## 8. Scheduler integration
 
-The Reviewer must not calculate scheduling or FSRS results in Dart.
+Do not calculate scheduling or FSRS results in Dart.
 
-For each queued card, use the official scheduler response from `GetQueuedCards`:
+`GetQueuedCards` provides the current card, queue type, counts, scheduling context, current state, and candidate Again/Hard/Good/Easy states. Preserve the card's `custom_data` on the current state exactly as official Anki does.
 
-- current card;
-- queue type;
-- current scheduling state;
-- Again state;
-- Hard state;
-- Good state;
-- Easy state;
-- scheduling context;
-- queue counts.
+Displayed answer intervals come from upstream scheduling-state descriptions, not frontend interval math.
 
-Before answering, preserve Anki's required `custom_data` behavior by carrying the card custom data into the current scheduling state exactly as the official Reviewer does.
+When answering:
 
-Answer interval labels must come from official backend scheduling-state description APIs, not frontend math.
-
-When the user selects a rating:
-
-1. map 1/2/3/4 to Again/Hard/Good/Easy;
+1. map key/button 1/2/3/4 to Again/Hard/Good/Easy;
 2. select the corresponding scheduler-provided new state;
-3. provide card id, current state, new state, rating, answer timestamp, and elapsed answer time;
+3. send card id, current state, new state, rating, wall-clock `answered_at_millis`, and monotonic elapsed `milliseconds_taken`;
 4. call `AnswerCard`;
-5. only advance after success.
+5. advance only after success;
+6. use upstream leech/state checks for post-answer feedback rather than duplicating leech rules.
 
-If Anki reports that the resulting state is a leech/suspended state, surface the corresponding user feedback without reproducing leech rules in Dart.
+## 9. Card rendering and official web content
 
-## 9. Card rendering
+Use official Anki card rendering APIs. For existing review cards call `RenderExistingCard` with `browser=false` and full rendering (`partial_render=false`) because arbitrary Python add-on filters are not supported in this milestone.
 
-Card templates must be rendered through official Anki rendering APIs.
+The backend owns built-in template parsing, cloze behavior, special fields, built-in filters, `FrontSide`, and CSS extraction. Flutter must not duplicate those rules.
 
-For an existing review card, use `RenderExistingCard` with `browser=false` and full rendering enabled (`partial_render=false`) wherever possible.
+Port/reuse the official Reviewer DOM/CSS/JS where practical and license-compatible, including question/answer switching and card-side classes. Replace Qt bridge calls with explicit typed messages over the Flutter/CEF JS bridge.
 
-The returned CSS and rendered card content become the document content shown in the embedded browser.
+Flutter owns application chrome, navigation, focus/shortcut routing, dialogs, and controls outside the card document.
 
-Anki's Rust renderer already owns built-in template logic, cloze handling, special fields, and standard filters. Flutter must not implement those template rules itself.
+Unknown Python add-on filters may be skipped according to upstream full-render behavior; they must never crash the review session.
 
-Unknown Python add-on field filters are not supported in this milestone. Their absence must not crash the reviewer.
+## 10. Collection media serving
 
-The answer rendering must preserve `FrontSide` behavior and other official built-in rendering semantics supplied by the backend.
-
-## 10. Reviewer web content
-
-Reuse/port the official Anki Reviewer web content where practical and license-compatible:
-
-- reviewer DOM structure;
-- question/answer presentation behavior;
-- reviewer CSS;
-- reviewer JavaScript behavior;
-- answer-button behavior where it belongs in the web layer;
-- card-side switching behavior;
-- body/card classes expected by common Anki templates.
-
-Do not embed PyQt assumptions in the web content. Replace the Qt bridge with a small Flutter/CEF JavaScript bridge whose messages are explicit and typed on the Dart side.
-
-Flutter remains responsible for application chrome, navigation, focus management, command routing, dialogs, and non-card controls.
-
-## 11. Media serving
-
-Anki card HTML frequently refers to media with relative paths. To keep one implementation across desktop platforms, expose collection media through a local loopback HTTP server owned by the current collection session.
+Serve relative card media through a project-owned loopback server so the same URL behavior works on all three operating systems.
 
 Requirements:
 
 - bind only to `127.0.0.1`;
 - choose an ephemeral port;
-- generate an unguessable per-session token in the URL path;
-- expose only the active collection's media directory;
-- reject `..`, encoded traversal, absolute paths, symlink escapes, and paths outside the media root;
-- return correct MIME types where practical;
-- support GET/HEAD only;
-- shut down when the collection closes;
-- never expose arbitrary local files.
+- use an unguessable per-session path token;
+- expose only the current collection's media root;
+- support only GET/HEAD;
+- reject `..`, encoded traversal, absolute paths, symlink escapes, and any resolved path outside the media root;
+- return sensible MIME types;
+- stop when the collection closes.
 
-The card document uses the media server URL as its base so `<img>`, CSS `url(...)`, `<audio>`, `<video>`, and other relative resources resolve consistently on all three desktop operating systems.
+The Reviewer document receives this URL as its media/base URL so relative images, CSS resources, audio, and video resolve consistently.
 
-## 12. Audio and TTS
+## 11. Audio and TTS
 
-Audio/TTS is included in this milestone.
+Audio/TTS is part of this milestone.
 
-### 12.1 AV extraction
+Use upstream `ExtractAvTags`; do not independently parse Anki sound/TTS syntax in Dart when the backend can provide the structured tags.
 
-Use official Anki `ExtractAvTags` behavior to separate card display text from sound/TTS directives. Do not parse `[sound:...]` or TTS syntax independently in Dart if upstream can provide the parsed representation.
+`ReviewAudioService` must preserve official-style behavior:
 
-### 12.2 Media audio
-
-Sound/video AV tags referencing collection media are resolved through the collection media root and played by `ReviewAudioService`.
-
-Playback behavior should mirror official Anki:
-
-- question audio on question side;
-- answer audio on answer side;
-- replay question audio on answer side when the card/deck setting requests it;
+- question-side audio on question;
+- answer-side audio on answer;
+- replay question audio on answer when the card/deck setting requires it;
 - autoplay only when configured;
-- queue multiple AV tags in order;
-- replay current side with `r` or F5;
-- pause/resume with `5`;
-- seek backward 5 seconds with `6`;
-- seek forward 5 seconds with `7` where the active media backend supports seeking.
+- queue multiple tags in order;
+- `r`/F5 replay;
+- `5` pause/resume;
+- `6` seek back 5 seconds;
+- `7` seek forward 5 seconds when the playback backend supports seeking.
 
-### 12.3 TTS
+For TTS:
 
-Use official backend TTS APIs where available:
+- obtain voices through `AllTtsVoices`;
+- generate streams with `WriteTtsStream`;
+- write only to app-owned temporary/cache locations;
+- play generated streams through the same audio queue;
+- safely delete temporary files;
+- report unavailable voices without crashing the Reviewer.
 
-- query voices through `AllTtsVoices`;
-- ask upstream to generate audio through `WriteTtsStream`;
-- store generated streams only in an application-owned temporary/cache directory;
-- play the resulting file through the same `ReviewAudioService` queue;
-- clean up temporary TTS files safely.
+The implementation plan must choose one cross-platform Dart audio backend that supports the required desktop targets; audio playback remains behind `ReviewAudioService` so package choice does not leak into Reviewer state.
 
-If a requested voice is unavailable, skip/fail that tag with user-visible diagnostic behavior comparable to Anki rather than crashing the review session.
+## 12. Keyboard and controls
 
-## 13. Keyboard behavior
+Required official-style shortcuts:
 
-Primary official Reviewer shortcuts should be preserved unless the target OS reserves the key combination.
-
-Required for this milestone:
-
-- Space / Return / Enter: show answer; when configured, rate with selected/default answer on answer side;
-- answer keys 1, 2, 3, 4: Again, Hard, Good, Easy on answer side;
+- Space / Return / Enter: show answer; on answer side rate according to configured/default selection behavior;
+- `1` `2` `3` `4`: Again / Hard / Good / Easy on answer side;
 - `r` and F5: replay audio;
 - `u`: undo;
 - `-`: bury card;
@@ -290,127 +228,71 @@ Required for this milestone:
 - `7`: seek forward;
 - Shift+A: toggle auto-advance.
 
-Additional official shortcuts such as editor, options, flags, mark, card info, delete note, forget card, set due date, recording, and copy-card should only be enabled when the corresponding AnkiFlutter feature/action exists. Missing feature-module actions should not be implemented as Reviewer-specific hacks.
+All keyboard commands and visible controls call the same controller commands. Platform-reserved shortcuts may receive a documented platform alternative, but the core answer/reveal shortcuts must remain identical wherever possible.
 
-Keyboard commands must be routed centrally so both Flutter controls and shortcuts invoke the same controller methods.
+Question side shows the card and official-style Show Answer affordance. Answer side shows Again / Hard / Good / Easy with upstream interval descriptions. Rating controls are disabled while transitioning.
 
-## 14. Answer controls
+The outer Flutter chrome may use Material 3, but the reviewing workflow must remain recognizably Anki rather than introducing a different study interaction.
 
-Question side:
+## 13. Auto-advance and focus behavior
 
-- large central card surface;
-- official-style Show Answer control;
-- visible queue counts consistent with Anki concepts;
-- optional remaining-time/auto-advance indicators where enabled.
-
-Answer side:
-
-- Again / Hard / Good / Easy controls;
-- interval text sourced from upstream scheduling states;
-- rating controls disabled during transition/submission;
-- visual focus/selection compatible with keyboard use.
-
-The exact outer Flutter styling may use Material 3, but the card/reviewer interaction should remain recognizably Anki and should not change the established reviewing workflow.
-
-## 15. Auto-advance and timers
-
-Mirror official Reviewer auto-advance behavior using deck configuration exposed by the backend where practical:
+Mirror official Reviewer auto-advance semantics where the pinned backend/deck configuration exposes the needed values:
 
 - seconds to show question;
 - seconds to show answer;
-- wait-for-audio setting;
+- wait-for-audio;
 - question timeout action;
-- answer timeout action;
-- current auto-advance enabled state.
+- answer timeout action.
 
-Do not trigger an auto action while the application/reviewer is not focused if official Anki would disable/pause the behavior in that situation.
+Do not auto-act while the Reviewer window is unfocused if official Anki would stop/disable auto-advance in that condition.
 
-Card answer timing sent to the backend must use a monotonic elapsed timer for duration and wall-clock milliseconds for `answered_at_millis`.
+Leaving Reviewer cancels timers.
 
-## 16. Undo
+## 14. Undo, bury, and suspend
 
-Undo must use official collection undo APIs.
+Undo uses official collection undo APIs only. The UI exposes undo when upstream undo status permits it, invokes `Undo`, then refreshes current card/queue state. It never reconstructs prior scheduling state locally.
 
-The Reviewer should:
-
-- expose undo only when upstream undo status allows it;
-- call official `Undo`;
-- refresh queue/current-card state after undo;
-- not attempt to reverse scheduling locally;
-- restore UI to a coherent state even when the undone operation came from another feature.
-
-## 17. Bury and suspend
-
-Use `BuryOrSuspendCards` for reviewer actions.
-
-Required actions:
+Use `BuryOrSuspendCards` for:
 
 - bury current card;
 - bury current note;
 - suspend current card;
 - suspend current note.
 
-After success, advance/refresh the queue exactly as the official Reviewer does for an operation that removes the current card from active study.
+On success, refresh/advance exactly as appropriate for a card removed from the active study queue. Do not mutate the frontend queue as a substitute for the backend result.
 
-No direct card queue mutation happens in Dart.
+## 15. End-of-queue behavior
 
-## 18. End-of-queue behavior
+When no queued card remains:
 
-When `GetQueuedCards` returns no card:
+- stop audio and Reviewer timers;
+- clear stale card content;
+- leave Reviewer cleanly;
+- return to the selected deck overview/congratulations state;
+- refresh real deck counts from the backend.
 
-- leave the Reviewer cleanly;
-- stop reviewer audio/timers;
-- show/return to the selected deck's overview/congratulations state;
-- refresh deck counts from the backend.
+## 16. Error and lifecycle rules
 
-Do not keep a stale rendered card visible after the backend queue is empty.
+Distinguish queue, render, media, TTS, answer, undo, bury/suspend, renderer-init, and backend/collection-session failures.
 
-## 19. Error handling
+A failed answer must leave the current card recoverable and must not advance. Missing individual media should not terminate reviewing. Unexpected errors retain diagnostic details for logs while user-facing text stays concise.
 
-Reviewer failures should be recoverable whenever possible.
+Entering Reviewer creates a session identity. Leaving Reviewer:
 
-Distinguish at least:
+- cancels timers;
+- stops/clears audio;
+- invalidates pending async completions;
+- detaches browser bridge callbacks;
+- disposes the card surface as needed;
+- leaves the collection open.
 
-- queue fetch failure;
-- card render failure;
-- media-not-found error;
-- TTS unavailable/error;
-- answer submission failure;
-- undo failure;
-- bury/suspend failure;
-- embedded renderer initialization failure;
-- backend/collection session failure.
+Closing the collection additionally stops the media server and invalidates the Reviewer session.
 
-A failed answer submission must not optimistically advance to the next card.
+## 17. State ownership
 
-A missing image/audio file should not terminate the review session.
+`ReviewController` owns immutable Reviewer state and commands. Widgets are presentation-only.
 
-Unexpected backend errors should preserve diagnostic details for logs while showing concise user-facing feedback.
-
-## 20. Lifecycle and cancellation
-
-Entering Reviewer starts a review session associated with the currently open collection and selected deck.
-
-Leaving Reviewer must:
-
-- cancel pending UI timers;
-- stop/clear audio playback;
-- invalidate pending async responses from the old card/session;
-- detach browser bridge callbacks;
-- dispose the embedded card surface when appropriate;
-- leave the collection itself open so navigation back to deck overview remains fast.
-
-Closing the collection must additionally stop the media server and invalidate any reviewer session.
-
-Late async completions from an old card must never overwrite a newer card's state.
-
-## 21. State ownership
-
-`ReviewController` owns reviewer state and commands.
-
-Widgets are presentation-only and receive immutable state plus callbacks.
-
-Suggested stable domain objects:
+Stable project-owned domain objects should cover concepts such as:
 
 ```text
 ReviewSessionState
@@ -423,192 +305,104 @@ ReviewAudioTag
 ReviewTtsTag
 ```
 
-Generated protobuf objects remain in repository/mapper code.
+Repositories/services are constructor-injected so controller and widget tests do not require native code, CEF, or real audio.
 
-The controller must be constructor-injected with repositories/services so unit/widget tests can run without loading native code or Chromium.
+## 18. Strict TDD
 
-## 22. Strict TDD requirements
+The existing repository rule remains absolute for handwritten behavior: focused failing test first, observe the intended RED, minimal implementation, focused GREEN, relevant/full suite, refactor only while green.
 
-The repository's existing TDD rule remains mandatory: no handwritten production behavior without first observing the focused test fail for the intended reason.
+At minimum test-drive:
 
-The implementation plan must decompose the Reviewer into small Red -> Green -> Refactor slices.
-
-At minimum, test-drive:
-
-- queue mapping;
-- current-state `custom_data` handling;
-- question-state entry;
-- answer reveal;
-- answer-choice mapping;
-- elapsed answer timing;
-- answer submission does not advance before success;
-- successful answer advances;
-- failed answer stays recoverable;
+- queued-card mapping and counts;
+- `custom_data` handling;
+- question entry and answer reveal;
+- answer-choice/rating mapping;
+- real interval-description mapping;
+- answer timing;
+- no advance before answer success;
+- success/failure transitions;
 - end-of-queue behavior;
-- queue counts;
-- interval labels;
-- keyboard routing;
-- replay/pause/seek command routing;
-- AV-tag mapping;
-- autoplay sequencing;
-- answer-side question-audio replay behavior;
-- TTS generation/playback orchestration;
-- auto-advance timing and wait-for-audio behavior;
-- undo refresh behavior;
-- bury/suspend behavior;
-- stale async response rejection;
-- media-server traversal protection;
+- keyboard command routing;
+- AV mapping and autoplay order;
+- replay/pause/seek routing;
+- answer-side question-audio replay;
+- TTS orchestration/error handling;
+- auto-advance and wait-for-audio;
+- undo refresh;
+- bury/suspend;
+- stale-response rejection;
+- loopback media traversal protection;
 - collection-close cleanup;
-- card-surface bridge messages;
-- renderer failure/error state.
+- CardSurface bridge messages and teardown;
+- renderer failure state.
 
-Generated code and unavoidable native/browser bootstrap configuration remain exempt from Red-first handwritten behavior, but must be covered by contract/smoke checks.
+Generated protobuf output and unavoidable native CEF bootstrap/configuration are exempt from Red-first behavior, but must be covered by drift/build/smoke checks.
 
-## 23. Test layers
+## 19. Real-backend contract and integration tests
 
-### Rust bridge contract tests
+Rust/native contract coverage must prove, against disposable real collections:
 
-Use temporary real Anki collections to prove the pinned backend operations work through the bridge:
-
-- set current deck;
+- select current deck;
 - queue a known card;
-- describe scheduler states;
-- answer a card;
-- verify scheduling state changed;
-- undo and verify restoration;
-- bury/suspend and verify queue impact;
-- render existing card;
+- get scheduling-state descriptions;
+- render the existing card;
 - extract AV tags;
-- enumerate/generate TTS where CI environment supports it.
+- answer the card and observe scheduling change;
+- undo and observe restoration;
+- bury/suspend and observe queue impact;
+- enumerate/generate TTS where the CI host supports the native voice API.
 
-### Dart unit tests
-
-Cover repository mappers, controller state machine, command routing, timers, media URL construction, audio/TTS orchestration, and stale-response protection.
-
-### Flutter widget tests
-
-Use fake `CardSurface` and fake repositories/services to verify:
-
-- question UI;
-- answer UI;
-- queue counts;
-- answer-button enablement;
-- keyboard behavior;
-- error/retry states;
-- navigation to finished/overview state.
-
-### CardSurface tests
-
-Keep browser-specific behavior behind a contract and test:
-
-- loading complete HTML/CSS;
-- question -> answer update;
-- JS bridge messages;
-- base/media URL behavior;
-- renderer teardown.
-
-### End-to-end integration test
-
-Against a disposable real Anki collection:
+Flutter E2E critical path:
 
 ```text
-open collection
+open disposable collection
 -> select seeded deck
 -> start review
 -> render seeded question
--> verify media can load
+-> load seeded media
 -> reveal answer
--> obtain real Again/Hard/Good/Easy choices
--> submit a rating
--> verify next card / changed queue
+-> show real Again/Hard/Good/Easy intervals
+-> submit rating
+-> verify changed queue/next card
 -> undo
 -> verify queue restoration
 ```
 
-CI should run the real integration path on Linux and add Windows/macOS smoke/build jobs when the selected Chromium/CEF integration can be run reliably in CI.
+CI must retain the Linux real-backend integration path and add Windows/macOS build/smoke coverage for the CEF Reviewer before those platforms are considered Reviewer-complete.
 
-## 24. Compatibility policy
+## 20. Licensing and upstream compatibility
 
-The project stays pinned to the current upstream Anki commit for this milestone.
+Keep the existing exact Anki submodule pin for this milestone. Do not depend on floating Anki assets/APIs.
 
-Reviewer code must not depend on floating upstream assets or APIs.
+Copied/ported Anki Reviewer assets must retain required copyright/license notices and comply with the repository's AGPL obligations. `webview_cef` remains a separately licensed dependency and its notices must be retained as required.
 
-Any copied/ported official Anki web assets must retain required copyright/license notices and remain compatible with the repository's AGPL obligations.
+Any future Anki submodule bump must pass Reviewer contract/integration tests before adoption.
 
-Future Anki submodule bumps require reviewer contract tests to pass before adoption.
-
-## 25. Implementation boundaries
-
-The implementation should introduce or extend the following areas without coupling unrelated features:
-
-```text
-app/lib/features/study/
-  domain/
-  data/
-  presentation/
-
-app/lib/core/media/
-app/lib/core/audio/
-app/lib/core/webview/
-
-native/anki_bridge/
-  descriptor-derived operations for scheduler/rendering/undo as needed
-
-app/test/features/study/
-app/test/core/media/
-app/test/core/audio/
-app/test/core/webview/
-
-integration_test/
-```
-
-Exact filenames are left to the implementation plan, but boundaries must stay narrow and testable.
-
-## 26. Milestone acceptance checklist
-
-The Reviewer milestone is accepted only when all of the following are true:
+## 21. Acceptance checklist
 
 - [ ] real Anki queue is used;
-- [ ] real card HTML/CSS/JS renders;
-- [ ] relative collection media loads;
-- [ ] question and answer AV tags work;
+- [ ] real Anki card rendering is used;
+- [ ] official Reviewer web behavior/assets are ported where applicable;
+- [ ] `webview_cef` 0.6.2 provides one Chromium card surface on Windows/macOS/Linux;
+- [ ] relative collection media loads safely;
+- [ ] question/answer audio works;
 - [ ] TTS works through official backend support where available;
 - [ ] Again/Hard/Good/Easy use real scheduler states;
-- [ ] displayed intervals come from upstream;
+- [ ] interval labels come from upstream;
 - [ ] answer timing is sent correctly;
-- [ ] official-style primary shortcuts work;
-- [ ] undo works through upstream;
-- [ ] bury/suspend works through upstream;
-- [ ] auto-advance/wait-for-audio behavior is supported;
+- [ ] core official shortcuts work;
+- [ ] undo uses upstream;
+- [ ] bury/suspend uses upstream;
+- [ ] auto-advance/wait-for-audio is supported;
 - [ ] queue completion returns cleanly to overview;
-- [ ] Windows/macOS/Linux use one shared reviewer implementation;
-- [ ] embedded Chromium/CEF card surface works on all three desktop targets;
-- [ ] no frontend scheduling/FSRS reimplementation exists;
-- [ ] handwritten behavior was introduced Red-first;
-- [ ] real-backend integration test passes;
-- [ ] license notices for reused official assets are preserved.
+- [ ] no scheduler/FSRS/template reimplementation exists in Dart;
+- [ ] one shared Reviewer implementation is used across all three desktop targets;
+- [ ] handwritten behavior was introduced strict Red-first;
+- [ ] real-backend integration passes;
+- [ ] copied upstream license notices are preserved.
 
-## 27. Deferred official Reviewer behavior
+## 22. Final design decision
 
-These official actions remain intentionally deferred until their owning feature module exists:
+AnkiFlutter's Reviewer will be a Flutter-hosted port of official Anki Desktop Reviewer behavior, not a new study experience.
 
-- edit current note;
-- card/note information dialogs;
-- recording and replay of user-recorded voice;
-- flags and mark/tag UI beyond minimal support needed elsewhere;
-- delete note;
-- forget card;
-- set due date;
-- create card copy;
-- deck options dialog;
-- arbitrary add-on hooks and custom scheduling JavaScript.
-
-The Reviewer command layer should reserve clean extension points for these actions rather than implementing temporary duplicates.
-
-## 28. Final design decision
-
-The Reviewer is not a new Anki-like study screen. It is a Flutter-hosted port of official Anki Desktop Reviewer behavior.
-
-Flutter owns the application shell and typed state/repository boundaries. A single Chromium/CEF card surface is used across Windows, macOS, and Linux. Official Anki `rslib` remains authoritative for queueing, rendering, scheduler states, FSRS, answering, undo, bury/suspend, and TTS support. Official Reviewer web assets/interaction patterns are reused or ported where practical and license-compatible.
-
-This keeps AnkiFlutter visually modern at the app-shell level while minimizing behavioral divergence in the most compatibility-sensitive workflow: studying cards.
+Flutter owns the app shell and typed project boundaries. `webview_cef` 0.6.2 provides the common Chromium card surface for Windows, macOS, and Linux. Official Anki `rslib` remains authoritative for card queueing, rendering, scheduling/FSRS, answering, undo, bury/suspend, AV extraction, and TTS support. Official Reviewer web assets and interaction patterns are reused/ported where practical and license-compatible.
