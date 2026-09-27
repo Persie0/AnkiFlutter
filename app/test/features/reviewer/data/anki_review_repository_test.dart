@@ -3,11 +3,18 @@ import 'dart:typed_data';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
-import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart' as deck_config_pb;
+import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
+    as collection_pb;
+import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
+    as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
-import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
-import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
+import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
+    as generic_pb;
+import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart'
+    as scheduler_pb;
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_card.dart';
+import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:fixnum/fixnum.dart';
@@ -334,6 +341,156 @@ void main() {
 
     expect(await repository.nextCard(), isNull);
   });
+
+  test('buryCard sends manual user bury for the current card only', () async {
+    final backend = _FakeBackend();
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = _mutationCard();
+
+    await repository.buryCard(card);
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.buryOrSuspendCards);
+    final request = scheduler_pb.BuryOrSuspendCardsRequest.fromBuffer(
+      backend.calls.single.request,
+    );
+    expect(request.cardIds.map((id) => id.toInt()), [101]);
+    expect(request.noteIds, isEmpty);
+    expect(
+      request.mode,
+      scheduler_pb.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+    );
+  });
+
+  test('buryNote sends manual user bury for the current note only', () async {
+    final backend = _FakeBackend();
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = _mutationCard();
+
+    await repository.buryNote(card);
+
+    expect(backend.calls, hasLength(1));
+    final request = scheduler_pb.BuryOrSuspendCardsRequest.fromBuffer(
+      backend.calls.single.request,
+    );
+    expect(request.cardIds, isEmpty);
+    expect(request.noteIds.map((id) => id.toInt()), [202]);
+    expect(
+      request.mode,
+      scheduler_pb.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+    );
+  });
+
+  test('suspendCard sends suspend for the current card only', () async {
+    final backend = _FakeBackend();
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = _mutationCard();
+
+    await repository.suspendCard(card);
+
+    expect(backend.calls, hasLength(1));
+    final request = scheduler_pb.BuryOrSuspendCardsRequest.fromBuffer(
+      backend.calls.single.request,
+    );
+    expect(request.cardIds.map((id) => id.toInt()), [101]);
+    expect(request.noteIds, isEmpty);
+    expect(
+      request.mode,
+      scheduler_pb.BuryOrSuspendCardsRequest_Mode.SUSPEND,
+    );
+  });
+
+  test('suspendNote sends suspend for the current note only', () async {
+    final backend = _FakeBackend();
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = _mutationCard();
+
+    await repository.suspendNote(card);
+
+    expect(backend.calls, hasLength(1));
+    final request = scheduler_pb.BuryOrSuspendCardsRequest.fromBuffer(
+      backend.calls.single.request,
+    );
+    expect(request.cardIds, isEmpty);
+    expect(request.noteIds.map((id) => id.toInt()), [202]);
+    expect(
+      request.mode,
+      scheduler_pb.BuryOrSuspendCardsRequest_Mode.SUSPEND,
+    );
+  });
+
+  test('canUndo reflects Anki GetUndoStatus instead of local state', () async {
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getUndoStatus: Uint8List.fromList(
+          collection_pb.UndoStatus(undo: 'Answer Card').writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    expect(await repository.canUndo(), isTrue);
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.getUndoStatus);
+    expect(
+      backend.calls.single.request,
+      orderedEquals(generic_pb.Empty().writeToBuffer()),
+    );
+  });
+
+  test('undo checks upstream status then invokes Anki Undo', () async {
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getUndoStatus: Uint8List.fromList(
+          collection_pb.UndoStatus(undo: 'Answer Card').writeToBuffer(),
+        ),
+        BackendOperation.undo: Uint8List.fromList(
+          collection_pb.OpChangesAfterUndo().writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    await repository.undo();
+
+    expect(
+      backend.calls.map((call) => call.operation),
+      [BackendOperation.getUndoStatus, BackendOperation.undo],
+    );
+  });
+
+  test('undo is a no-op when upstream has no undo entry', () async {
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getUndoStatus: Uint8List.fromList(
+          collection_pb.UndoStatus().writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+
+    await repository.undo();
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.getUndoStatus);
+  });
+}
+
+ReviewCard _mutationCard() {
+  return ReviewCard(
+    cardId: 101,
+    noteId: 202,
+    deckId: 303,
+    counts: const ReviewCounts(
+      newCount: 0,
+      learningCount: 0,
+      reviewCount: 0,
+    ),
+    currentStateBytes: Uint8List(0),
+    choices: const [],
+    deckName: 'Default',
+  );
 }
 
 class _BackendCall {
