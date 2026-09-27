@@ -113,7 +113,7 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    final settings = await _repository.settingsForDeck(card.deckId);
+    final settings = await _repository.settingsForDeck(card.currentDeckId);
     if (!_isCurrentGeneration(generationId)) {
       return;
     }
