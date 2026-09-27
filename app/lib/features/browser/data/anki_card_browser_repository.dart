@@ -44,6 +44,17 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
     final ids = anki_search.SearchResponse.fromBuffer(responseBytes).ids;
     final cards = <CardBrowserResult>[];
 
+    if (ids.isNotEmpty) {
+      await backend.invoke(
+        BackendOperation.setActiveBrowserColumns,
+        Uint8List.fromList(
+          generic.StringList(
+            vals: const ['noteFld', 'template', 'cardDue', 'deck'],
+          ).writeToBuffer(),
+        ),
+      );
+    }
+
     for (final id in ids.take(maxRows)) {
       final rowBytes = await backend.invoke(
         BackendOperation.browserRowForId,

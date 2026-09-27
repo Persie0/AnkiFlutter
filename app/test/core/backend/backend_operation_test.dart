@@ -35,6 +35,7 @@ void main() {
         'defaultsForAdding': 24,
         'searchCards': 25,
         'browserRowForId': 26,
+        'setActiveBrowserColumns': 27,
       },
     );
 

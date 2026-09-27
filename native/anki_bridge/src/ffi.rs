@@ -10,8 +10,8 @@ use crate::operations::{
     BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES,
     ENCODE_IRI_PATHS, EXTRACT_AV_TAGS, GET_DECK_CONFIGS_FOR_UPDATE, GET_NOTETYPE,
     GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS, NEW_NOTE, OPEN_COLLECTION,
-    REMOVE_DECKS, RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS, SET_CURRENT_DECK,
-    STATE_IS_LEECH, UNDO, WRITE_TTS_STREAM,
+    REMOVE_DECKS, RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS,
+    SET_CURRENT_DECK, STATE_IS_LEECH, UNDO, WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
@@ -128,6 +128,7 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
         24 => Ok(DEFAULTS_FOR_ADDING),
         25 => Ok(SEARCH_CARDS),
         26 => Ok(BROWSER_ROW_FOR_ID),
+        27 => Ok(SET_ACTIVE_BROWSER_COLUMNS),
         _ => Err(format!("Unknown Anki bridge operation {operation}")),
     }
 }
@@ -257,5 +258,9 @@ mod tests {
         assert_eq!(operation_from_id(24).unwrap(), DEFAULTS_FOR_ADDING);
         assert_eq!(operation_from_id(25).unwrap(), SEARCH_CARDS);
         assert_eq!(operation_from_id(26).unwrap(), BROWSER_ROW_FOR_ID);
+        assert_eq!(
+            operation_from_id(27).unwrap(),
+            crate::operations::SET_ACTIVE_BROWSER_COLUMNS
+        );
     }
 }

@@ -16,6 +16,7 @@ void main() {
     () async {
       final backend = _Backend([
         search.SearchResponse(ids: [Int64(21), Int64(34)]).writeToBuffer(),
+        Uint8List(0),
         search.BrowserRow(
           cells: [
             search.BrowserRow_Cell(text: 'Question one'),
@@ -35,6 +36,7 @@ void main() {
 
       expect(backend.calls.map((call) => call.operation), [
         BackendOperation.searchCards,
+        BackendOperation.setActiveBrowserColumns,
         BackendOperation.browserRowForId,
         BackendOperation.browserRowForId,
       ]);
@@ -42,7 +44,13 @@ void main() {
         search.SearchRequest.fromBuffer(backend.calls.first.request).search,
         'deck:Language',
       );
-      expect(generic.Int64.fromBuffer(backend.calls[1].request).val, Int64(21));
+      expect(generic.StringList.fromBuffer(backend.calls[1].request).vals, [
+        'noteFld',
+        'template',
+        'cardDue',
+        'deck',
+      ]);
+      expect(generic.Int64.fromBuffer(backend.calls[2].request).val, Int64(21));
       expect(result.totalCount, 2);
       expect(result.cards.map((card) => card.cardId), [21, 34]);
       expect(result.cards.first.cells, ['Question one', 'Language']);
@@ -56,6 +64,7 @@ void main() {
       final ids = [for (var id = 1; id <= 52; id++) Int64(id)];
       final backend = _Backend([
         search.SearchResponse(ids: ids).writeToBuffer(),
+        Uint8List(0),
         for (var index = 0; index < 50; index++)
           search.BrowserRow(
             cells: [search.BrowserRow_Cell(text: 'Card $index')],
@@ -67,7 +76,7 @@ void main() {
 
       expect(result.totalCount, 52);
       expect(result.cards, hasLength(50));
-      expect(backend.calls, hasLength(51));
+      expect(backend.calls, hasLength(52));
     },
   );
 }

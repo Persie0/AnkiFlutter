@@ -24,7 +24,8 @@ enum BackendOperation {
   getNotetype(23),
   defaultsForAdding(24),
   searchCards(25),
-  browserRowForId(26);
+  browserRowForId(26),
+  setActiveBrowserColumns(27);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

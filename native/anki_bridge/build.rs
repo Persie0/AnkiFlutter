@@ -54,6 +54,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let add_note = operation(&services, "BackendNotesService", "add_note")?;
     let search_cards = operation(&services, "BackendSearchService", "search_cards")?;
     let browser_row_for_id = operation(&services, "BackendSearchService", "browser_row_for_id")?;
+    let set_active_browser_columns = operation(
+        &services,
+        "BackendSearchService",
+        "set_active_browser_columns",
+    )?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -81,7 +86,8 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const GET_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const SEARCH_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const SET_ACTIVE_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -134,6 +140,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         search_cards.1,
         browser_row_for_id.0,
         browser_row_for_id.1,
+        set_active_browser_columns.0,
+        set_active_browser_columns.1,
     );
 
     fs::write(
