@@ -281,7 +281,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/bash;
-			shellScript = "set -euo pipefail\nREPO_ROOT=\"$SRCROOT/../..\"\npython3 \"$REPO_ROOT/tool/prepare_bridge_lock.py\"\nexport CC=clang\nexport CXX=clang++\ncase \"$PLATFORM_NAME\" in\n  iphonesimulator) RUST_TARGET=\"aarch64-apple-ios-sim\" ;;\n  iphoneos) RUST_TARGET=\"aarch64-apple-ios\" ;;\n  *) echo \"Unsupported iOS platform: $PLATFORM_NAME\" >&2; exit 1 ;;\nesac\ncargo build --release --locked --target \"$RUST_TARGET\" --manifest-path \"$REPO_ROOT/native/anki_bridge_ios/Cargo.toml\"\nmkdir -p \"$SRCROOT/AnkiBridge\"\ncp \"$REPO_ROOT/native/anki_bridge_ios/target/$RUST_TARGET/release/libanki_flutter_bridge_ios.a\" \"$SRCROOT/AnkiBridge/libanki_flutter_bridge.a\"\n";
+shellScript = "set -euo pipefail\nREPO_ROOT=\"$SRCROOT/../..\"\npython3 \"$REPO_ROOT/tool/prepare_bridge_lock.py\"\nexport CC=clang\nexport CXX=clang++\ncase \"$PLATFORM_NAME\" in\n  iphonesimulator) RUST_TARGET=\"aarch64-apple-ios-sim\" ;;\n  iphoneos) RUST_TARGET=\"aarch64-apple-ios\" ;;\n  *) echo \"Unsupported iOS platform: $PLATFORM_NAME\" >&2; exit 1 ;;\nesac\nCARGO_LOG=\"${TMPDIR:-/tmp}/anki-bridge-cargo-build.log\"\nif ! cargo build --release --locked --target \"$RUST_TARGET\" --manifest-path \"$REPO_ROOT/native/anki_bridge_ios/Cargo.toml\" >\"$CARGO_LOG\" 2>&1; then\n  cat \"$CARGO_LOG\" >&2\n  exit 1\nfi\nmkdir -p \"$SRCROOT/AnkiBridge\"\ncp \"$REPO_ROOT/native/anki_bridge_ios/target/$RUST_TARGET/release/libanki_flutter_bridge_ios.a\" \"$SRCROOT/AnkiBridge/libanki_flutter_bridge.a\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

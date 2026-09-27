@@ -22,7 +22,9 @@ enum BackendOperation {
   newNote(21),
   addNote(22),
   getNotetype(23),
-  defaultsForAdding(24);
+  defaultsForAdding(24),
+  searchCards(25),
+  browserRowForId(26);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

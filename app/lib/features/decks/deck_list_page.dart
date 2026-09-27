@@ -5,6 +5,8 @@ import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
+import 'package:anki_flutter/features/browser/card_browser_page.dart';
+import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
@@ -119,7 +121,27 @@ class _DeckListPageState extends State<DeckListPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('AnkiFlutter')),
+      appBar: AppBar(
+        title: const Text('AnkiFlutter'),
+        actions: [
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Browse cards',
+              icon: const Icon(Icons.search),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => CardBrowserPage(
+                      repository: AnkiCardBrowserRepository(
+                        backend: widget.backend!,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
       body: SafeArea(child: _buildBody()),
     );
   }

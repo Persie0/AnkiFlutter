@@ -33,10 +33,14 @@ void main() {
         'addNote': 22,
         'getNotetype': 23,
         'defaultsForAdding': 24,
+        'searchCards': 25,
+        'browserRowForId': 26,
       },
     );
 
-    final ids = BackendOperation.values.map((operation) => operation.nativeId).toList();
+    final ids = BackendOperation.values
+        .map((operation) => operation.nativeId)
+        .toList();
     expect(ids.toSet().length, ids.length);
   });
 }

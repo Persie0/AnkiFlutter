@@ -52,6 +52,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let defaults_for_adding = operation(&services, "BackendNotesService", "defaults_for_adding")?;
     let new_note = operation(&services, "BackendNotesService", "new_note")?;
     let add_note = operation(&services, "BackendNotesService", "add_note")?;
+    let search_cards = operation(&services, "BackendSearchService", "search_cards")?;
+    let browser_row_for_id = operation(&services, "BackendSearchService", "browser_row_for_id")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -77,7 +79,9 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const NEW_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const ADD_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const GET_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const SEARCH_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -126,6 +130,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         get_notetype.1,
         defaults_for_adding.0,
         defaults_for_adding.1,
+        search_cards.0,
+        search_cards.1,
+        browser_row_for_id.0,
+        browser_row_for_id.1,
     );
 
     fs::write(
