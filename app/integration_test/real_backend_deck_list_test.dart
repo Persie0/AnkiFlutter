@@ -11,6 +11,8 @@ import 'package:anki_flutter/features/collection/collection_session.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
+import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
+import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/reviewer/media/review_media_server.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -88,6 +90,21 @@ void main() {
     expect(find.text('Learn 0'), findsOneWidget);
     expect(find.text('Review 0'), findsOneWidget);
     expect(find.text('Study'), findsOneWidget);
+
+    final noteRepository = AnkiNoteRepository(backend: client);
+    final defaults = await noteRepository.defaultsForAdding(1);
+    final note = await noteRepository.newNote(defaults.notetypeId.toInt());
+    note.fields[0] = 'browser integration front';
+    note.fields[1] = 'browser integration back';
+    final noteId = await noteRepository.addNote(deckId: 1, note: note);
+    final browserResult = await AnkiCardBrowserRepository(backend: client)
+        .search('nid:$noteId');
+
+    expect(browserResult.totalCount, 1);
+    expect(
+      browserResult.cards.single.cells,
+      contains('browser integration front'),
+    );
   });
 
   testWidgets('real backend starts a review session from the deck overview', (
