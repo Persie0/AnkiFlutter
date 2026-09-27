@@ -78,6 +78,8 @@ class AnkiReviewRepository implements ReviewRepository {
       cardId: queued.card.id.toInt(),
       noteId: queued.card.noteId.toInt(),
       deckId: queued.card.deckId.toInt(),
+      originalDeckId: queued.card.originalDeckId.toInt(),
+      templateOrdinal: queued.card.templateIdx,
       counts: ReviewCounts(
         newCount: queuedCards.newCount,
         learningCount: queuedCards.learningCount,
