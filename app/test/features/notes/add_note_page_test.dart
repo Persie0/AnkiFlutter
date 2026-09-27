@@ -49,7 +49,7 @@ void main() {
 
   testWidgets('changing note type loads its fields and note values', (tester) async {
     final repository = _NoteRepository(
-      notetypes: [
+      notetypeChoices: [
         _typeChoice(1, 'Basic'),
         _typeChoice(2, 'Cloze'),
       ],
@@ -124,7 +124,7 @@ void main() {
   });
 
   testWidgets('explains when the collection has no note types', (tester) async {
-    final repository = _NoteRepository(notetypes: []);
+    final repository = _NoteRepository(notetypeChoices: []);
     await _showPage(tester, repository, deck);
 
     expect(find.text('This collection has no note types.'), findsOneWidget);
@@ -221,4 +221,3 @@ class _NoteRepository implements NoteEntryRepository {
     );
   }
 }
-import 'dart:async';

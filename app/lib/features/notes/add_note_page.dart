@@ -201,7 +201,7 @@ class _AddNotePageState extends State<AddNotePage> {
       padding: const EdgeInsets.all(16),
       children: [
         DropdownButtonFormField<int>(
-          value: _selectedNotetypeId,
+          initialValue: _selectedNotetypeId,
           decoration: const InputDecoration(labelText: 'Note type'),
           items: [
             for (final notetype in _notetypes)
