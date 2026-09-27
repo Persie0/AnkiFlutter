@@ -89,6 +89,24 @@ class _Repository implements ReviewRepository {
 
   @override
   Future<bool> stateIsLeech(ReviewAnswerChoice choice) async => false;
+
+  @override
+  Future<bool> canUndo() async => false;
+
+  @override
+  Future<void> undo() async {}
+
+  @override
+  Future<void> buryCard(ReviewCard card) async {}
+
+  @override
+  Future<void> buryNote(ReviewCard card) async {}
+
+  @override
+  Future<void> suspendCard(ReviewCard card) async {}
+
+  @override
+  Future<void> suspendNote(ReviewCard card) async {}
 }
 
 class _Renderer implements CardRenderRepository {
