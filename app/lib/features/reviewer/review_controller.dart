@@ -9,20 +9,14 @@ import 'package:flutter/foundation.dart';
 
 class ReviewController extends ChangeNotifier {
   ReviewController({
-    required ReviewRepository repository,
-    required CardRenderRepository renderer,
-    required int Function() wallClockMillis,
-    required Stopwatch Function() stopwatchFactory,
-    ReviewAudioService? audio,
-    ReviewTtsService? tts,
-    Uri Function(String filename)? mediaUriFor,
-  })  : _repository = repository,
-        _renderer = renderer,
-        _wallClockMillis = wallClockMillis,
-        _stopwatchFactory = stopwatchFactory,
-        _audio = audio,
-        _tts = tts,
-        _mediaUriFor = mediaUriFor;
+    required this._repository,
+    required this._renderer,
+    required this._wallClockMillis,
+    required this._stopwatchFactory,
+    this._audio,
+    this._tts,
+    this._mediaUriFor,
+  });
 
   final ReviewRepository _repository;
   final CardRenderRepository _renderer;
