@@ -17,5 +17,17 @@ abstract interface class ReviewRepository {
 
   Future<bool> stateIsLeech(ReviewAnswerChoice choice);
 
+  Future<bool> canUndo();
+
+  Future<void> undo();
+
+  Future<void> buryCard(ReviewCard card);
+
+  Future<void> buryNote(ReviewCard card);
+
+  Future<void> suspendCard(ReviewCard card);
+
+  Future<void> suspendNote(ReviewCard card);
+
   Future<ReviewDeckSettings> settingsForDeck(int deckId);
 }
