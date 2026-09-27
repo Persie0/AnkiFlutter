@@ -21,12 +21,16 @@ void main() {
       filtered: false,
       children: [],
     );
+    var reloads = 0;
 
     await tester.pumpWidget(
       MaterialApp(
         home: Builder(
           builder: (context) => DeckOverviewPage(
             deck: deck,
+            onChanged: () async {
+              reloads++;
+            },
             onAddNote: () async {
               await Navigator.of(context).push<void>(
                 MaterialPageRoute<void>(
@@ -49,6 +53,7 @@ void main() {
     await tester.pageBack();
     await tester.pumpAndSettle();
     expect(find.text('Study'), findsOneWidget);
+    expect(reloads, 1);
   });
 }
 

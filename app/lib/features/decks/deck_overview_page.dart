@@ -82,12 +82,6 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
         title: const Text('Delete deck?'),
         content: Text('Delete “${widget.deck.name}” and its cards?'),
         actions: [
-          if (widget.onAddNote != null)
-            IconButton(
-              tooltip: 'Add note',
-              onPressed: () => unawaited(widget.onAddNote!.call()),
-              icon: const Icon(Icons.note_add_outlined),
-            ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),
@@ -150,6 +144,11 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     unawaited(controller.start(widget.deck.id));
   }
 
+  Future<void> _addNote() async {
+    await widget.onAddNote?.call();
+    await widget.onChanged?.call();
+  }
+
   ReviewController? _createDefaultReviewController() {
     final backend = widget.backend;
     if (backend == null) return null;
@@ -174,6 +173,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       appBar: AppBar(
         title: Text(deck.name),
         actions: [
+          if (widget.onAddNote != null)
+            IconButton(
+              tooltip: 'Add note',
+              onPressed: () => unawaited(_addNote()),
+              icon: const Icon(Icons.note_add_outlined),
+            ),
           if (widget.onRename != null)
             IconButton(
               tooltip: 'Rename deck',
