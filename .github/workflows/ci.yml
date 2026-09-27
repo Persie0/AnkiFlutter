@@ -110,6 +110,10 @@ jobs:
         run: python3 tool/prepare_bridge_lock.py
       - name: Check iOS static bridge wrapper
         run: cargo check --manifest-path native/anki_bridge_ios/Cargo.toml --target aarch64-apple-ios-sim --locked
+      - name: Build iOS simulator bridge release
+        run: |
+          CC=clang CXX=clang++ cargo build --release --manifest-path native/anki_bridge_ios/Cargo.toml --target aarch64-apple-ios-sim --locked
+          test -f native/anki_bridge_ios/target/aarch64-apple-ios-sim/release/libanki_flutter_bridge_ios.a
       - name: Resolve Flutter dependencies
         run: flutter pub get --enforce-lockfile
         working-directory: app
