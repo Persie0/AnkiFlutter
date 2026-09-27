@@ -30,5 +30,9 @@ void main() {
     expect(debug, contains('libanki_flutter_bridge.a'));
     expect(release, contains('libanki_flutter_bridge.a'));
     expect(project, contains(r'cat \"$CARGO_LOG\" >&2'));
+    expect(
+      project,
+      contains('env -u SDKROOT -u IPHONEOS_DEPLOYMENT_TARGET cargo build'),
+    );
   });
 }
