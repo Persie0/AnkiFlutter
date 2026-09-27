@@ -118,5 +118,9 @@ jobs:
         run: flutter pub get --enforce-lockfile
         working-directory: app
       - name: Build iOS simulator app
-        run: flutter build ios --simulator --no-codesign
+        run: |
+          if ! flutter build ios --simulator --no-codesign --verbose >"$RUNNER_TEMP/ios-build.log" 2>&1; then
+            tail -n 300 "$RUNNER_TEMP/ios-build.log"
+            exit 1
+          fi
         working-directory: app
