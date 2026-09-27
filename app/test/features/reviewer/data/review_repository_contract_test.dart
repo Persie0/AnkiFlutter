@@ -19,6 +19,19 @@ void main() {
     expect(repository, isA<AnkiReviewRepository>());
   });
 
+  test('ReviewRepository exposes official undo bury and suspend commands', () {
+    final ReviewRepository repository = AnkiReviewRepository(
+      backend: _FakeBackend(),
+    );
+
+    expect(repository.canUndo, isNotNull);
+    expect(repository.undo, isNotNull);
+    expect(repository.buryCard, isNotNull);
+    expect(repository.buryNote, isNotNull);
+    expect(repository.suspendCard, isNotNull);
+    expect(repository.suspendNote, isNotNull);
+  });
+
   test('stateIsLeech forwards opaque state and returns Anki boolean', () async {
     final state = scheduler_pb.SchedulingState(customData: 'opaque-state');
     final backend = _FakeBackend(
