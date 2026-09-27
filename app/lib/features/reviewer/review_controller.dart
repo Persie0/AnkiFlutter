@@ -28,6 +28,10 @@ class ReviewController extends ChangeNotifier {
     _setState(const ReviewLoading());
 
     await _repository.selectDeck(deckId);
+    if (!_isCurrentGeneration(generationId)) {
+      return;
+    }
+
     await _loadNextCard(generationId);
   }
 
@@ -49,16 +53,18 @@ class ReviewController extends ChangeNotifier {
 
   Future<void> rate(ReviewRating rating) async {
     final current = _state;
-    if (current is! ReviewAnswer) {
+    if (current is! ReviewAnswer ||
+        !_isCurrentGeneration(current.generationId)) {
       return;
     }
 
+    final generationId = current.generationId;
     _setState(
       ReviewTransition(
         card: current.card,
         content: current.content,
         settings: current.settings,
-        generationId: current.generationId,
+        generationId: generationId,
       ),
     );
 
@@ -73,15 +79,22 @@ class ReviewController extends ChangeNotifier {
         millisecondsTaken: millisecondsTaken,
       );
     } catch (error) {
+      if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
       _setState(
         ReviewAnswer(
           card: current.card,
           content: current.content,
           settings: current.settings,
-          generationId: current.generationId,
+          generationId: generationId,
           error: error,
         ),
       );
+      return;
+    }
+
+    if (!_isCurrentGeneration(generationId)) {
       return;
     }
 
@@ -90,6 +103,10 @@ class ReviewController extends ChangeNotifier {
 
   Future<void> _loadNextCard(int generationId) async {
     final card = await _repository.nextCard();
+    if (!_isCurrentGeneration(generationId)) {
+      return;
+    }
+
     if (card == null) {
       _answerStopwatch = null;
       _setState(const ReviewFinished());
@@ -97,7 +114,15 @@ class ReviewController extends ChangeNotifier {
     }
 
     final settings = await _repository.settingsForDeck(card.deckId);
+    if (!_isCurrentGeneration(generationId)) {
+      return;
+    }
+
     final content = await _renderer.render(card.cardId);
+    if (!_isCurrentGeneration(generationId)) {
+      return;
+    }
+
     final stopwatch = _stopwatchFactory()..start();
     _answerStopwatch = stopwatch;
 
@@ -110,6 +135,8 @@ class ReviewController extends ChangeNotifier {
       ),
     );
   }
+
+  bool _isCurrentGeneration(int generationId) => generationId == _generation;
 
   void _setState(ReviewSessionState state) {
     _state = state;
