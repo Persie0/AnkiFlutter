@@ -11,6 +11,7 @@ import 'package:anki_flutter/features/collection/collection_session.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
+import 'package:anki_flutter/features/reviewer/media/review_media_server.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -56,7 +57,10 @@ class _AnkiDesktopRootState extends State<AnkiDesktopRoot> {
         bindings: bindings,
         init: Uint8List.fromList(init.writeToBuffer()),
       );
-      final session = CollectionSession(backend: client);
+      final session = CollectionSession(
+        backend: client,
+        mediaServer: ReviewMediaServer(),
+      );
       final repository = AnkiDeckRepository(
         backend: client,
         unixSeconds: () =>
