@@ -8,6 +8,8 @@ class ReviewCard {
     required this.cardId,
     required this.noteId,
     required this.deckId,
+    this.originalDeckId = 0,
+    this.templateOrdinal = 0,
     required this.counts,
     required Uint8List currentStateBytes,
     required List<ReviewAnswerChoice> choices,
@@ -18,10 +20,16 @@ class ReviewCard {
   final int cardId;
   final int noteId;
   final int deckId;
+  final int originalDeckId;
+  final int templateOrdinal;
   final ReviewCounts counts;
   final Uint8List _currentStateBytes;
   final List<ReviewAnswerChoice> choices;
   final String deckName;
+
+  int get storageDeckId => deckId;
+
+  int get currentDeckId => originalDeckId != 0 ? originalDeckId : deckId;
 
   Uint8List get currentStateBytes => Uint8List.fromList(_currentStateBytes);
 }
