@@ -134,6 +134,7 @@ class AnkiReviewRepository implements ReviewRepository {
     return generic_pb.Bool.fromBuffer(response).val;
   }
 
+  @override
   Future<void> buryCard(ReviewCard card) {
     return _buryOrSuspend(
       cardIds: [card.cardId],
@@ -141,6 +142,7 @@ class AnkiReviewRepository implements ReviewRepository {
     );
   }
 
+  @override
   Future<void> buryNote(ReviewCard card) {
     return _buryOrSuspend(
       noteIds: [card.noteId],
@@ -148,6 +150,7 @@ class AnkiReviewRepository implements ReviewRepository {
     );
   }
 
+  @override
   Future<void> suspendCard(ReviewCard card) {
     return _buryOrSuspend(
       cardIds: [card.cardId],
@@ -155,6 +158,7 @@ class AnkiReviewRepository implements ReviewRepository {
     );
   }
 
+  @override
   Future<void> suspendNote(ReviewCard card) {
     return _buryOrSuspend(
       noteIds: [card.noteId],
@@ -162,6 +166,7 @@ class AnkiReviewRepository implements ReviewRepository {
     );
   }
 
+  @override
   Future<bool> canUndo() async {
     final response = await backend.invoke(
       BackendOperation.getUndoStatus,
@@ -170,6 +175,7 @@ class AnkiReviewRepository implements ReviewRepository {
     return collection_pb.UndoStatus.fromBuffer(response).undo.isNotEmpty;
   }
 
+  @override
   Future<void> undo() async {
     if (!await canUndo()) {
       return;
