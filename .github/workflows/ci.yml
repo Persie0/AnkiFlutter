@@ -102,10 +102,10 @@ jobs:
           rustup toolchain install 1.88.0 --profile minimal
           rustup default 1.88.0
           rustup target add aarch64-apple-ios-sim
-      - name: Check iOS static bridge wrapper
-        run: cargo check --manifest-path native/anki_bridge_ios/Cargo.toml --target aarch64-apple-ios-sim --locked
       - name: Seed bridge lockfile from pinned Anki
         run: python3 tool/prepare_bridge_lock.py
+      - name: Check iOS static bridge wrapper
+        run: cargo check --manifest-path native/anki_bridge_ios/Cargo.toml --target aarch64-apple-ios-sim --locked
       - name: Resolve Flutter dependencies
         run: flutter pub get --enforce-lockfile
         working-directory: app

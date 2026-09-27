@@ -16,26 +16,29 @@ import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('question entry autoplays question media and TTS in tag order', () async {
-    final audio = _FakeAudioService();
-    final tts = _FakeTtsService();
-    final controller = _controller(
-      settings: _settings(autoplay: true),
-      content: _content(),
-      audio: audio,
-      tts: tts,
-    );
+  test(
+    'question entry autoplays question media and TTS in tag order',
+    () async {
+      final audio = _FakeAudioService();
+      final tts = _FakeTtsService();
+      final controller = _controller(
+        settings: _settings(autoplay: true),
+        content: _content(),
+        audio: audio,
+        tts: tts,
+      );
 
-    await controller.start(42);
+      await controller.start(42);
 
-    expect(tts.materializedTexts, ['question tts']);
-    expect(audio.queues, [
-      [
-        Uri.parse('http://media.local/q.mp3'),
-        Uri.parse('file:///tts/question.wav'),
-      ],
-    ]);
-  });
+      expect(tts.materializedTexts, ['question tts']);
+      expect(audio.queues, [
+        [
+          Uri.parse('http://media.local/q.mp3'),
+          Uri.parse('file:///tts/question.wav'),
+        ],
+      ]);
+    },
+  );
 
   test('autoplay disabled does not play question or answer audio', () async {
     final audio = _FakeAudioService();
@@ -54,26 +57,29 @@ void main() {
     expect(audio.queues, isEmpty);
   });
 
-  test('answer entry plays answer tags only when replay-question is skipped', () async {
-    final audio = _FakeAudioService();
-    final controller = _controller(
-      settings: _settings(
-        autoplay: true,
-        skipQuestionWhenReplayingAnswer: true,
-      ),
-      content: _content(),
-      audio: audio,
-      tts: _FakeTtsService(),
-    );
+  test(
+    'answer entry plays answer tags only when replay-question is skipped',
+    () async {
+      final audio = _FakeAudioService();
+      final controller = _controller(
+        settings: _settings(
+          autoplay: true,
+          skipQuestionWhenReplayingAnswer: true,
+        ),
+        content: _content(),
+        audio: audio,
+        tts: _FakeTtsService(),
+      );
 
-    await controller.start(42);
-    audio.queues.clear();
-    await controller.showAnswer();
+      await controller.start(42);
+      audio.queues.clear();
+      await controller.showAnswer();
 
-    expect(audio.queues, [
-      [Uri.parse('http://media.local/a.mp3')],
-    ]);
-  });
+      expect(audio.queues, [
+        [Uri.parse('http://media.local/a.mp3')],
+      ]);
+    },
+  );
 
   test('answer entry prepends question tags when official replay setting requires it', () async {
     final audio = _FakeAudioService();
@@ -103,65 +109,71 @@ void main() {
     ]);
   });
 
-  test('enabling auto advance schedules current question and reveals on timeout', () async {
-    final timers = _FakeTimerFactory();
-    final controller = _controller(
-      settings: _settings(
-        autoplay: false,
-        secondsToShowQuestion: 2.5,
-        secondsToShowAnswer: 4,
-      ),
-      content: _content(),
-      audio: _FakeAudioService(),
-      tts: _FakeTtsService(),
-      timerFactory: timers.call,
-    );
+  test(
+    'enabling auto advance schedules current question and reveals on timeout',
+    () async {
+      final timers = _FakeTimerFactory();
+      final controller = _controller(
+        settings: _settings(
+          autoplay: false,
+          secondsToShowQuestion: 2.5,
+          secondsToShowAnswer: 4,
+        ),
+        content: _content(),
+        audio: _FakeAudioService(),
+        tts: _FakeTtsService(),
+        timerFactory: timers.call,
+      );
 
-    await controller.start(42);
-    expect(timers.timers, isEmpty);
+      await controller.start(42);
+      expect(timers.timers, isEmpty);
 
-    await controller.toggleAutoAdvance();
+      await controller.toggleAutoAdvance();
 
-    expect(timers.timers, hasLength(1));
-    expect(timers.timers.single.delay, const Duration(milliseconds: 2500));
+      expect(timers.timers, hasLength(1));
+      expect(timers.timers.single.delay, const Duration(milliseconds: 2500));
 
-    await timers.timers.single.fire();
+      await timers.timers.single.fire();
 
-    expect(controller.state, isA<ReviewAnswer>());
-    expect(timers.timers, hasLength(2));
-    expect(timers.timers.last.delay, const Duration(seconds: 4));
-  });
+      expect(controller.state, isA<ReviewAnswer>());
+      expect(timers.timers, hasLength(2));
+      expect(timers.timers.last.delay, const Duration(seconds: 4));
+    },
+  );
 
-  test('answer timeout applies configured answer action through scheduler', () async {
-    final timers = _FakeTimerFactory();
-    final repository = _Repository(
-      _settings(
-        autoplay: false,
-        secondsToShowAnswer: 3,
-        answerAction: ReviewAnswerAction.answerGood,
-      ),
-    );
-    final controller = _controller(
-      repository: repository,
-      settings: repository.settings,
-      content: _content(),
-      audio: _FakeAudioService(),
-      tts: _FakeTtsService(),
-      timerFactory: timers.call,
-    );
+  test(
+    'answer timeout applies configured answer action through scheduler',
+    () async {
+      final timers = _FakeTimerFactory();
+      final repository = _Repository(
+        _settings(
+          autoplay: false,
+          secondsToShowAnswer: 3,
+          answerAction: ReviewAnswerAction.answerGood,
+        ),
+      );
+      final controller = _controller(
+        repository: repository,
+        settings: repository.settings,
+        content: _content(),
+        audio: _FakeAudioService(),
+        tts: _FakeTtsService(),
+        timerFactory: timers.call,
+      );
 
-    await controller.start(42);
-    await controller.toggleAutoAdvance();
-    await controller.showAnswer();
+      await controller.start(42);
+      await controller.toggleAutoAdvance();
+      await controller.showAnswer();
 
-    expect(timers.timers, hasLength(1));
-    expect(timers.timers.single.delay, const Duration(seconds: 3));
+      expect(timers.timers, hasLength(1));
+      expect(timers.timers.single.delay, const Duration(seconds: 3));
 
-    await timers.timers.single.fire();
+      await timers.timers.single.fire();
 
-    expect(repository.answerRatings, [ReviewRating.good]);
-    expect(controller.state, isA<ReviewFinished>());
-  });
+      expect(repository.answerRatings, [ReviewRating.good]);
+      expect(controller.state, isA<ReviewFinished>());
+    },
+  );
 
   test('wait for audio defers expired answer action until playback becomes idle once', () async {
     final timers = _FakeTimerFactory();
@@ -205,10 +217,7 @@ void main() {
   test('disabling auto advance cancels pending timeout action', () async {
     final timers = _FakeTimerFactory();
     final controller = _controller(
-      settings: _settings(
-        autoplay: false,
-        secondsToShowQuestion: 5,
-      ),
+      settings: _settings(autoplay: false, secondsToShowQuestion: 5),
       content: _content(),
       audio: _FakeAudioService(),
       tts: _FakeTtsService(),
@@ -225,6 +234,33 @@ void main() {
     await pending.fire();
     expect(controller.state, isA<ReviewQuestion>());
   });
+
+  test(
+    'dispose cancels its timer and releases audio and TTS services',
+    () async {
+      final timers = _FakeTimerFactory();
+      final audio = _FakeAudioService();
+      final tts = _FakeTtsService();
+      final controller = _controller(
+        settings: _settings(autoplay: false, secondsToShowQuestion: 5),
+        content: _content(),
+        audio: audio,
+        tts: tts,
+        timerFactory: timers.call,
+      );
+
+      await controller.start(42);
+      await controller.toggleAutoAdvance();
+      final pendingTimer = timers.timers.single;
+
+      controller.dispose();
+      await _flushMicrotasks();
+
+      expect(pendingTimer.cancelled, isTrue);
+      expect(audio.disposeCalled, isTrue);
+      expect(tts.disposeCalled, isTrue);
+    },
+  );
 }
 
 Future<void> _flushMicrotasks() => Future<void>.delayed(Duration.zero);
@@ -371,6 +407,7 @@ class _FakeAudioService implements ReviewAudioService {
   final StreamController<bool> _playingController =
       StreamController<bool>.broadcast();
   bool _playing = false;
+  bool disposeCalled = false;
 
   @override
   bool get isPlaying => _playing;
@@ -402,12 +439,14 @@ class _FakeAudioService implements ReviewAudioService {
 
   @override
   Future<void> dispose() async {
+    disposeCalled = true;
     await _playingController.close();
   }
 }
 
 class _FakeTtsService implements ReviewTtsService {
   final List<String> materializedTexts = [];
+  bool disposeCalled = false;
 
   @override
   Future<Uri?> materialize(ReviewTtsTag tag) async {
@@ -419,16 +458,15 @@ class _FakeTtsService implements ReviewTtsService {
   }
 
   @override
-  Future<void> dispose() async {}
+  Future<void> dispose() async {
+    disposeCalled = true;
+  }
 }
 
 class _FakeTimerFactory {
   final List<_FakeReviewTimer> timers = [];
 
-  ReviewTimerHandle call(
-    Duration delay,
-    Future<void> Function() callback,
-  ) {
+  ReviewTimerHandle call(Duration delay, Future<void> Function() callback) {
     final timer = _FakeReviewTimer(delay, callback);
     timers.add(timer);
     return timer;

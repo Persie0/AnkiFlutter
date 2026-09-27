@@ -18,6 +18,7 @@ class DeckListPage extends StatefulWidget {
     required this.openCollection,
     this.backend,
     this.mediaBaseUri,
+    this.reviewControllerBuilder,
     this.startupError,
     super.key,
   });
@@ -27,6 +28,7 @@ class DeckListPage extends StatefulWidget {
   final CollectionOpener openCollection;
   final BackendInvoker? backend;
   final Uri? Function()? mediaBaseUri;
+  final ReviewControllerBuilder? reviewControllerBuilder;
   final Object? startupError;
 
   @override
@@ -81,16 +83,17 @@ class _DeckListPageState extends State<DeckListPage> {
           deck: deck,
           backend: widget.backend,
           mediaBaseUri: widget.mediaBaseUri?.call(),
+          reviewControllerBuilder: widget.reviewControllerBuilder,
           onRename: widget.backend == null
               ? null
-              : (name) => DeckMutationRepository(
-                    backend: widget.backend!,
-                  ).renameDeck(deck.id, name),
+              : (name) =>
+                    DeckMutationRepository(backend: widget.backend!)
+                        .renameDeck(deck.id, name),
           onRemove: widget.backend == null
               ? null
-              : () => DeckMutationRepository(
-                    backend: widget.backend!,
-                  ).removeDecks([deck.id]),
+              : () =>
+                    DeckMutationRepository(backend: widget.backend!)
+                        .removeDecks([deck.id]),
           onChanged: widget.controller.load,
         ),
       ),

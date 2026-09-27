@@ -40,7 +40,7 @@ class ReviewController extends ChangeNotifier {
     _tts = tts;
     _mediaUriFor = mediaUriFor;
     _timerFactory = timerFactory;
-    _audio?.playingChanges.listen(_onPlayingChanged);
+    _playingSubscription = _audio?.playingChanges.listen(_onPlayingChanged);
   }
 
   late final ReviewRepository _repository;
@@ -51,6 +51,7 @@ class ReviewController extends ChangeNotifier {
   late final ReviewTtsService? _tts;
   late final Uri Function(String filename)? _mediaUriFor;
   late final ReviewTimerFactory? _timerFactory;
+  late final StreamSubscription<bool>? _playingSubscription;
 
   ReviewSessionState _state = const ReviewInitial();
   Stopwatch? _answerStopwatch;
@@ -61,6 +62,17 @@ class ReviewController extends ChangeNotifier {
   int? _selectedDeckId;
 
   ReviewSessionState get state => _state;
+
+  @override
+  void dispose() {
+    _generation++;
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
+    unawaited(_playingSubscription?.cancel());
+    unawaited(_audio?.dispose());
+    unawaited(_tts?.dispose());
+    super.dispose();
+  }
 
   Future<void> start(int deckId) async {
     _selectedDeckId = deckId;

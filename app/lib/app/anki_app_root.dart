@@ -11,7 +11,14 @@ import 'package:anki_flutter/features/collection/collection_session.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
+import 'package:anki_flutter/features/reviewer/audio/media_kit_review_audio_player_adapter.dart';
+import 'package:anki_flutter/features/reviewer/audio/native_media_kit_player_port.dart';
+import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
+import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
+import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
+import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/media/review_media_server.dart';
+import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -108,6 +115,32 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
       controller: controller,
       backend: _client!,
       mediaBaseUri: () => session.mediaBaseUri,
+      reviewControllerBuilder: () => ReviewController(
+        repository: AnkiReviewRepository(backend: _client!),
+        renderer: AnkiCardRenderRepository(backend: _client!),
+        wallClockMillis: () => DateTime.now().millisecondsSinceEpoch,
+        stopwatchFactory: Stopwatch.new,
+        audio: PlayerBackedReviewAudioService(
+          player: MediaKitReviewAudioPlayerAdapter(
+            player: NativeMediaKitPlayerPort(),
+          ),
+        ),
+        tts: AnkiReviewTtsService(
+          backend: _client!,
+          tempDirectoryProvider: () async => Directory.systemTemp,
+        ),
+        mediaUriFor: (filename) {
+          final baseUri = session.mediaBaseUri;
+          if (baseUri == null) {
+            throw StateError('The collection media server is not running.');
+          }
+          final encodedFilename = filename
+              .split('/')
+              .map(Uri.encodeComponent)
+              .join('/');
+          return baseUri.resolve(encodedFilename);
+        },
+      ),
       pickCollection: widget.pickCollection ?? _pickAnkiCollectionProfile,
       openCollection: (path) =>
           session.open(CollectionLocation.fromCollectionPath(path)),

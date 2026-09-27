@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:flutter/material.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
@@ -5,6 +7,8 @@ import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart'
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
+
+typedef ReviewControllerBuilder = ReviewController Function();
 
 class DeckOverviewPage extends StatefulWidget {
   const DeckOverviewPage({
@@ -14,6 +18,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onRename,
     this.onRemove,
     this.onChanged,
+    this.reviewControllerBuilder,
     super.key,
   });
 
@@ -23,6 +28,7 @@ class DeckOverviewPage extends StatefulWidget {
   final Future<void> Function(String name)? onRename;
   final Future<void> Function()? onRemove;
   final Future<void> Function()? onChanged;
+  final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
   State<DeckOverviewPage> createState() => _DeckOverviewPageState();
@@ -53,7 +59,8 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               child: const Text('Cancel'),
             ),
             FilledButton(
-              onPressed: () => Navigator.of(context).pop(controller.text.trim()),
+              onPressed: () =>
+                  Navigator.of(context).pop(controller.text.trim()),
               child: const Text('Save'),
             ),
           ],
@@ -106,25 +113,44 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
   }
 
   void _study() {
+    final controller =
+        widget.reviewControllerBuilder?.call() ??
+        _createDefaultReviewController();
+    if (controller == null) return;
+    _reviewController = controller;
+    unawaited(
+      Navigator.of(context)
+          .push(
+            MaterialPageRoute<void>(
+              builder: (_) => ReviewPage(
+                controller: controller,
+                mediaBaseUri: widget.mediaBaseUri,
+                onFinished: () {
+                  unawaited(widget.onChanged?.call());
+                  Navigator.of(context).maybePop();
+                },
+              ),
+            ),
+          )
+          .whenComplete(() {
+            if (identical(_reviewController, controller)) {
+              _reviewController = null;
+            }
+            controller.dispose();
+          }),
+    );
+    unawaited(controller.start(widget.deck.id));
+  }
+
+  ReviewController? _createDefaultReviewController() {
     final backend = widget.backend;
-    if (backend == null) return;
-    final controller = ReviewController(
+    if (backend == null) return null;
+    return ReviewController(
       repository: AnkiReviewRepository(backend: backend),
       renderer: AnkiCardRenderRepository(backend: backend),
       wallClockMillis: () => DateTime.now().millisecondsSinceEpoch,
       stopwatchFactory: Stopwatch.new,
     );
-    _reviewController = controller;
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ReviewPage(
-          controller: controller,
-          mediaBaseUri: widget.mediaBaseUri,
-          onFinished: () => Navigator.of(context).maybePop(),
-        ),
-      ),
-    );
-    controller.start(widget.deck.id);
   }
 
   @override
@@ -168,7 +194,11 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               Text('Review ${deck.reviewCount}'),
               const SizedBox(height: 24),
               FilledButton(
-                onPressed: widget.backend == null ? null : _study,
+                onPressed:
+                    widget.backend == null &&
+                        widget.reviewControllerBuilder == null
+                    ? null
+                    : _study,
                 child: const Text('Study'),
               ),
             ],
