@@ -7,5 +7,3 @@ analyzer:
     - windows/**
     - macos/**
     - linux/**
-    - android/**
-    - ios/**

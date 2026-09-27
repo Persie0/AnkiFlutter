@@ -11,12 +11,14 @@ class ReviewPage extends StatefulWidget {
     required this.controller,
     required this.onFinished,
     this.cardSurfaceBuilder,
+    this.mediaBaseUri,
     super.key,
   });
 
   final ReviewController controller;
   final VoidCallback onFinished;
   final Widget Function(BuildContext context, String html)? cardSurfaceBuilder;
+  final Uri? mediaBaseUri;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -98,6 +100,7 @@ class _ReviewPageState extends State<ReviewPage> {
                   child: CardSurface(
                     content: content,
                     showAnswer: isAnswer,
+                    mediaBaseUri: widget.mediaBaseUri,
                     builder: widget.cardSurfaceBuilder,
                   ),
                 ),

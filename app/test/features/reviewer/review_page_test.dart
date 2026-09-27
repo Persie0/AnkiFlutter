@@ -9,12 +9,44 @@ import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
+import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets(
+    'card surface resolves media against the selected profile server',
+    (tester) async {
+      String? html;
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: CardSurface(
+              content: ReviewCardContent(
+                questionHtml: '<img src="photo.png">',
+                answerHtml: 'Answer',
+                css: 'img{border:0}',
+                questionAudio: const [],
+                answerAudio: const [],
+              ),
+              showAnswer: false,
+              mediaBaseUri: Uri.parse('http://127.0.0.1:9000/session/'),
+              builder: (context, value) {
+                html = value;
+                return const SizedBox();
+              },
+            ),
+          ),
+        ),
+      );
+      expect(html, contains('<base href="http://127.0.0.1:9000/session/">'));
+      expect(html, contains('photo.png'));
+      expect(html, contains('img{border:0}'));
+    },
+  );
+
   testWidgets('question renders card and only show answer', (tester) async {
     final controller = _controller();
     await controller.start(4);

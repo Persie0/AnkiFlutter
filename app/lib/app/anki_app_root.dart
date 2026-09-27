@@ -107,6 +107,7 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
     return DeckListPage(
       controller: controller,
       backend: _client!,
+      mediaBaseUri: () => session.mediaBaseUri,
       pickCollection: widget.pickCollection ?? _pickAnkiCollectionProfile,
       openCollection: (path) =>
           session.open(CollectionLocation.fromCollectionPath(path)),

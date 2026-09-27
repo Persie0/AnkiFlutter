@@ -34,15 +34,10 @@ jobs:
             native/anki_bridge/target
           key: rust-1.88-${{ runner.os }}-${{ hashFiles('third_party/anki/Cargo.lock', 'native/anki_bridge/Cargo.toml') }}
       - name: Install Linux desktop and protoc dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb protobuf-compiler
-      - name: Install Android NDK and Rust Android target
-        run: |
-          rustup target add aarch64-linux-android x86_64-linux-android
-          cargo install cargo-ndk --version 4.1.2 --locked
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358"
+        run: >-
+          sudo apt-get update && sudo apt-get install -y
+          clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb
+          protobuf-compiler
       - name: Install Dart protoc plugin
         run: |
           dart pub global activate protoc_plugin 25.1.0
@@ -59,15 +54,13 @@ jobs:
         run: cargo clippy --manifest-path native/anki_bridge/Cargo.toml --all-targets -- -D warnings
       - name: Test Rust bridge
         run: cargo test --manifest-path native/anki_bridge/Cargo.toml
-      - name: Check iOS static bridge wrapper
-        run: cargo check --manifest-path native/anki_bridge_ios/Cargo.toml --target aarch64-apple-ios-sim --locked
       - name: Resolve Flutter dependencies from lockfile
         run: flutter pub get --enforce-lockfile
         working-directory: app
       - name: Verify Flutter generated config is clean
         run: >-
           git diff --exit-code -- app/.metadata app/pubspec.lock
-          app/analysis_options.yaml app/android app/ios app/linux app/macos app/windows
+          app/analysis_options.yaml app/linux app/macos app/windows
       - name: Analyze Flutter app
         run: flutter analyze
         working-directory: app
@@ -79,37 +72,9 @@ jobs:
       - name: Build Flutter Linux app
         run: flutter build linux
         working-directory: app
-      - name: Build Flutter Android APK
-        run: flutter build apk --debug
-        working-directory: app
       - name: Bundle Linux Anki bridge
         run: |
           cp native/anki_bridge/target/release/libanki_flutter_bridge.so app/build/linux/x64/release/bundle/
           test -f app/build/linux/x64/release/bundle/libanki_flutter_bridge.so
       - name: Real backend integration
         run: xvfb-run -a python3 tool/run_desktop_dev.py --test
-
-  ios:
-    runs-on: macos-15
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          submodules: recursive
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: 3.47.5
-          channel: stable
-          cache: true
-      - name: Use Rust 1.88 and iOS simulator target
-        run: |
-          rustup toolchain install 1.88.0 --profile minimal
-          rustup default 1.88.0
-          rustup target add aarch64-apple-ios-sim
-      - name: Seed bridge lockfile from pinned Anki
-        run: python3 tool/prepare_bridge_lock.py
-      - name: Resolve Flutter dependencies
-        run: flutter pub get --enforce-lockfile
-        working-directory: app
-      - name: Build iOS simulator app
-        run: flutter build ios --simulator --no-codesign
-        working-directory: app

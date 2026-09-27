@@ -19,52 +19,6 @@ void main() {
       nativeLibraryFileName(TargetPlatform.windows),
       'anki_flutter_bridge.dll',
     );
-    expect(
-      nativeLibraryFileName(TargetPlatform.android),
-      'libanki_flutter_bridge.so',
-    );
-  });
-
-  test('Android loads the packaged bridge by soname', () {
-    expect(
-      resolveNativeLibraryPath(
-        platform: TargetPlatform.android,
-        executablePath: '/data/app/anki_flutter',
-        environmentOverride: '',
-      ),
-      'libanki_flutter_bridge.so',
-    );
-  });
-
-  test('macOS loads the bridge from the sandboxed app Frameworks folder', () {
-    expect(
-      resolveNativeLibraryPath(
-        platform: TargetPlatform.macOS,
-        executablePath:
-            '/Applications/AnkiFlutter.app/Contents/MacOS/anki_flutter',
-        environmentOverride: '',
-      ),
-      '/Applications/AnkiFlutter.app/Contents/MacOS/../Frameworks/'
-      'libanki_flutter_bridge.dylib',
-    );
-  });
-
-  test('iOS resolves bridge symbols from the app process', () {
-    var usedProcessSymbols = false;
-    final process = DynamicLibrary.process();
-
-    final library = openPlatformNativeLibrary(
-      platform: TargetPlatform.iOS,
-      executablePath: '/unused',
-      environmentOverride: '',
-      processOpener: () {
-        usedProcessSymbols = true;
-        return process;
-      },
-    );
-
-    expect(usedProcessSymbols, isTrue);
-    expect(identical(library, process), isTrue);
   });
 
   test('dart-define override wins over executable-directory default', () {
@@ -97,11 +51,7 @@ void main() {
       ),
       throwsA(
         isA<AnkiBridgeException>()
-            .having(
-              (error) => error.message,
-              'message',
-              contains('Anki backend'),
-            )
+            .having((error) => error.message, 'message', contains('Anki backend'))
             .having((error) => error.message, 'message', contains(attempted)),
       ),
     );

@@ -4,9 +4,11 @@ AnkiFlutter is an independent, open-source Flutter frontend for Anki. The projec
 
 This project is not affiliated with or endorsed by Ankitects Pty Ltd.
 
-## Current functionality
+## Current milestone
 
-The current shared Flutter codebase opens a local `.anki2` collection, loads Anki's hierarchical deck tree and due counts, and begins reviewing cards through Anki's scheduler, renderer, and grading backend. Linux, macOS, and Windows desktop are supported; Android and iOS project/build integration is being added. The app is still an early port and does not yet implement all official Anki workflows.
+The first desktop vertical slice supports opening a local `.anki2` collection through the official Anki backend, loading the real hierarchical deck tree with Anki's New/Learn/Review counts, opening a deck overview, and returning to the still-loaded deck list.
+
+The reviewer is the next vertical slice. Card queueing, question/answer rendering, grading, undo, bury, and suspend are intentionally not part of this milestone yet.
 
 ## Toolchain
 
@@ -17,7 +19,7 @@ The repository and CI pin the development toolchain used for this slice:
 - `protoc_plugin` 25.1.0
 - the Anki git submodule revision recorded in `third_party/anki`
 
-Linux development requires the Flutter Linux toolchain (`clang`, CMake, Ninja, pkg-config, GTK 3 development headers) plus `protobuf-compiler`. Android builds additionally require Android SDK/NDK, Rust Android targets, and `cargo-ndk`. iOS builds require macOS with Xcode and Rust Apple targets.
+Linux desktop development also requires the normal Flutter Linux toolchain (`clang`, CMake, Ninja, pkg-config, GTK 3 development headers) plus `protobuf-compiler`.
 
 ## Development setup
 
@@ -76,8 +78,6 @@ python3 tool/run_desktop_dev.py --test
 ```
 
 The Linux CI build also creates the release Rust bridge and copies `libanki_flutter_bridge.so` beside the Flutter executable, matching the app's default native-library lookup path.
-
-Android packages the Rust bridge into ABI-specific JNI libraries. iOS statically links the Rust bridge into the app process to comply with iOS dynamic-library restrictions. Both platforms use the same Dart screens and business logic.
 
 ## Native backend troubleshooting
 

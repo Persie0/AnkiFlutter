@@ -21,24 +21,4 @@ void main() {
     expect(location.mediaFolderPath, '/tmp/COLLECTION.media');
     expect(location.mediaDbPath, '/tmp/COLLECTION.media.db2');
   });
-
-  test(
-    'builds the standard collection path from a selected profile folder',
-    () {
-      expect(
-        CollectionLocation.collectionPathInProfile(
-          '/Users/example/AnkiProfile',
-          pathSeparator: '/',
-        ),
-        '/Users/example/AnkiProfile/collection.anki2',
-      );
-      expect(
-        CollectionLocation.collectionPathInProfile(
-          r'C:\Users\example\AnkiProfile\',
-          pathSeparator: r'\',
-        ),
-        r'C:\Users\example\AnkiProfile\collection.anki2',
-      );
-    },
-  );
 }

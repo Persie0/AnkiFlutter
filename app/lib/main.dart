@@ -1,4 +1,4 @@
-import 'package:anki_flutter/app/anki_app_root.dart';
+import 'package:anki_flutter/app/anki_desktop_root.dart';
 import 'package:anki_flutter/app/anki_flutter_app.dart';
 import 'package:flutter/material.dart';
 import 'package:media_kit/media_kit.dart';
@@ -10,5 +10,5 @@ void main() {
 void startAnkiFlutter({void Function()? mediaKitInitializer}) {
   WidgetsFlutterBinding.ensureInitialized();
   (mediaKitInitializer ?? () => MediaKit.ensureInitialized())();
-  runApp(const AnkiFlutterApp(home: AnkiAppRoot()));
+  runApp(const AnkiFlutterApp(home: AnkiDesktopRoot()));
 }
