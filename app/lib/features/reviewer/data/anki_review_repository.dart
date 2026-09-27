@@ -2,7 +2,10 @@ import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
-import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart' as deck_config_pb;
+import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
+    as collection_pb;
+import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
+    as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
@@ -127,6 +130,68 @@ class AnkiReviewRepository implements ReviewRepository {
       Uint8List.fromList(state.writeToBuffer()),
     );
     return generic_pb.Bool.fromBuffer(response).val;
+  }
+
+  Future<void> buryCard(ReviewCard card) {
+    return _buryOrSuspend(
+      cardIds: [card.cardId],
+      mode: scheduler_pb.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+    );
+  }
+
+  Future<void> buryNote(ReviewCard card) {
+    return _buryOrSuspend(
+      noteIds: [card.noteId],
+      mode: scheduler_pb.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+    );
+  }
+
+  Future<void> suspendCard(ReviewCard card) {
+    return _buryOrSuspend(
+      cardIds: [card.cardId],
+      mode: scheduler_pb.BuryOrSuspendCardsRequest_Mode.SUSPEND,
+    );
+  }
+
+  Future<void> suspendNote(ReviewCard card) {
+    return _buryOrSuspend(
+      noteIds: [card.noteId],
+      mode: scheduler_pb.BuryOrSuspendCardsRequest_Mode.SUSPEND,
+    );
+  }
+
+  Future<bool> canUndo() async {
+    final response = await backend.invoke(
+      BackendOperation.getUndoStatus,
+      Uint8List.fromList(generic_pb.Empty().writeToBuffer()),
+    );
+    return collection_pb.UndoStatus.fromBuffer(response).undo.isNotEmpty;
+  }
+
+  Future<void> undo() async {
+    if (!await canUndo()) {
+      return;
+    }
+    await backend.invoke(
+      BackendOperation.undo,
+      Uint8List.fromList(generic_pb.Empty().writeToBuffer()),
+    );
+  }
+
+  Future<void> _buryOrSuspend({
+    Iterable<int> cardIds = const [],
+    Iterable<int> noteIds = const [],
+    required scheduler_pb.BuryOrSuspendCardsRequest_Mode mode,
+  }) async {
+    final request = scheduler_pb.BuryOrSuspendCardsRequest(
+      cardIds: cardIds.map(Int64.new),
+      noteIds: noteIds.map(Int64.new),
+      mode: mode,
+    );
+    await backend.invoke(
+      BackendOperation.buryOrSuspendCards,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
   }
 
   @override
