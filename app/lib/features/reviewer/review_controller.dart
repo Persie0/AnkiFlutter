@@ -1,21 +1,36 @@
+import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
+import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
 import 'package:flutter/foundation.dart';
 
 class ReviewController extends ChangeNotifier {
   ReviewController({
-    required this._repository,
-    required this._renderer,
-    required this._wallClockMillis,
-    required this._stopwatchFactory,
-  });
+    required ReviewRepository repository,
+    required CardRenderRepository renderer,
+    required int Function() wallClockMillis,
+    required Stopwatch Function() stopwatchFactory,
+    ReviewAudioService? audio,
+    ReviewTtsService? tts,
+    Uri Function(String filename)? mediaUriFor,
+  })  : _repository = repository,
+        _renderer = renderer,
+        _wallClockMillis = wallClockMillis,
+        _stopwatchFactory = stopwatchFactory,
+        _audio = audio,
+        _tts = tts,
+        _mediaUriFor = mediaUriFor;
 
   final ReviewRepository _repository;
   final CardRenderRepository _renderer;
   final int Function() _wallClockMillis;
   final Stopwatch Function() _stopwatchFactory;
+  final ReviewAudioService? _audio;
+  final ReviewTtsService? _tts;
+  final Uri Function(String filename)? _mediaUriFor;
 
   ReviewSessionState _state = const ReviewInitial();
   Stopwatch? _answerStopwatch;
@@ -49,6 +64,16 @@ class ReviewController extends ChangeNotifier {
         generationId: current.generationId,
       ),
     );
+
+    if (current.settings.autoplay) {
+      final tags = current.settings.skipQuestionWhenReplayingAnswer
+          ? current.content.answerAudio
+          : <ReviewAudioTag>[
+              ...current.content.questionAudio,
+              ...current.content.answerAudio,
+            ];
+      await _playTags(tags, current.generationId);
+    }
   }
 
   Future<void> rate(ReviewRating rating) async {
@@ -134,6 +159,46 @@ class ReviewController extends ChangeNotifier {
         generationId: generationId,
       ),
     );
+
+    if (settings.autoplay) {
+      await _playTags(content.questionAudio, generationId);
+    }
+  }
+
+  Future<void> _playTags(List<ReviewAudioTag> tags, int generationId) async {
+    final audio = _audio;
+    if (audio == null || tags.isEmpty) {
+      return;
+    }
+
+    final uris = <Uri>[];
+    for (final tag in tags) {
+      if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
+
+      if (tag is ReviewMediaTag) {
+        final resolver = _mediaUriFor;
+        if (resolver != null) {
+          uris.add(resolver(tag.filename));
+        }
+      } else if (tag is ReviewTtsTag) {
+        final tts = _tts;
+        if (tts != null) {
+          final uri = await tts.materialize(tag);
+          if (!_isCurrentGeneration(generationId)) {
+            return;
+          }
+          if (uri != null) {
+            uris.add(uri);
+          }
+        }
+      }
+    }
+
+    if (uris.isNotEmpty && _isCurrentGeneration(generationId)) {
+      await audio.playQueue(uris);
+    }
   }
 
   bool _isCurrentGeneration(int generationId) => generationId == _generation;
