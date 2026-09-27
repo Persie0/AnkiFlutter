@@ -4,6 +4,7 @@ import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
+import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -14,6 +15,7 @@ class DeckListPage extends StatefulWidget {
     required this.controller,
     required this.pickCollection,
     required this.openCollection,
+    this.backend,
     this.startupError,
     super.key,
   });
@@ -21,6 +23,7 @@ class DeckListPage extends StatefulWidget {
   final DeckListController controller;
   final CollectionPicker pickCollection;
   final CollectionOpener openCollection;
+  final BackendInvoker? backend;
   final Object? startupError;
 
   @override
@@ -70,7 +73,9 @@ class _DeckListPageState extends State<DeckListPage> {
 
   void _openDeck(DeckNode deck) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => DeckOverviewPage(deck: deck)),
+      MaterialPageRoute<void>(
+        builder: (_) => DeckOverviewPage(deck: deck, backend: widget.backend),
+      ),
     );
   }
 
@@ -125,19 +130,21 @@ class _DeckListPageState extends State<DeckListPage> {
       animation: widget.controller,
       builder: (context, _) {
         return switch (widget.controller.state) {
-          DeckListInitial() || DeckListLoading() =>
-            const Center(child: CircularProgressIndicator()),
+          DeckListInitial() ||
+          DeckListLoading() => const Center(child: CircularProgressIndicator()),
           DeckListFailure(:final error) => _CenteredMessage(
-              icon: Icons.error_outline,
-              title: 'Could not load decks',
-              message: error.toString(),
-              action: FilledButton.tonal(
-                onPressed: () => unawaited(widget.controller.load()),
-                child: const Text('Retry'),
-              ),
+            icon: Icons.error_outline,
+            title: 'Could not load decks',
+            message: error.toString(),
+            action: FilledButton.tonal(
+              onPressed: () => unawaited(widget.controller.load()),
+              child: const Text('Retry'),
             ),
-          DeckListReady(:final decks) =>
-            _DeckTree(decks: decks, onDeckTap: _openDeck),
+          ),
+          DeckListReady(:final decks) => _DeckTree(
+            decks: decks,
+            onDeckTap: _openDeck,
+          ),
         };
       },
     );
@@ -160,11 +167,23 @@ class _DeckTree extends StatelessWidget {
           child: Row(
             children: [
               Expanded(
-                child: Text('Decks', style: Theme.of(context).textTheme.titleLarge),
+                child: Text(
+                  'Decks',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
               ),
-              const SizedBox(width: 56, child: Text('New', textAlign: TextAlign.end)),
-              const SizedBox(width: 56, child: Text('Learn', textAlign: TextAlign.end)),
-              const SizedBox(width: 64, child: Text('Review', textAlign: TextAlign.end)),
+              const SizedBox(
+                width: 56,
+                child: Text('New', textAlign: TextAlign.end),
+              ),
+              const SizedBox(
+                width: 56,
+                child: Text('Learn', textAlign: TextAlign.end),
+              ),
+              const SizedBox(
+                width: 64,
+                child: Text('Review', textAlign: TextAlign.end),
+              ),
             ],
           ),
         ),
@@ -191,9 +210,18 @@ class _DeckTree extends StatelessWidget {
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                SizedBox(width: 56, child: Text('${node.newCount}', textAlign: TextAlign.end)),
-                SizedBox(width: 56, child: Text('${node.learnCount}', textAlign: TextAlign.end)),
-                SizedBox(width: 64, child: Text('${node.reviewCount}', textAlign: TextAlign.end)),
+                SizedBox(
+                  width: 56,
+                  child: Text('${node.newCount}', textAlign: TextAlign.end),
+                ),
+                SizedBox(
+                  width: 56,
+                  child: Text('${node.learnCount}', textAlign: TextAlign.end),
+                ),
+                SizedBox(
+                  width: 64,
+                  child: Text('${node.reviewCount}', textAlign: TextAlign.end),
+                ),
               ],
             ),
           ),

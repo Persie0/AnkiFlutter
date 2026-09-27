@@ -22,17 +22,14 @@ void main() {
     tester,
   ) async {
     const overridePath = String.fromEnvironment('ANKIFLUTTER_NATIVE_LIB');
-    final libraryPath = resolveNativeLibraryPath(
+    final DynamicLibrary library = openPlatformNativeLibrary(
       platform: defaultTargetPlatform,
       executablePath: Platform.resolvedExecutable,
       environmentOverride: overridePath,
     );
-    final DynamicLibrary library = openNativeLibrary(libraryPath);
     final bindings = FfiNativeAnkiBindings.fromLibrary(library);
     final init = BackendInit(
-      preferredLangs: [
-        PlatformDispatcher.instance.locale.toLanguageTag(),
-      ],
+      preferredLangs: [PlatformDispatcher.instance.locale.toLanguageTag()],
       server: false,
     );
     final client = AnkiBackendClient.create(
@@ -48,10 +45,15 @@ void main() {
       unixSeconds: () => DateTime.now().millisecondsSinceEpoch ~/ 1000,
     );
     final controller = DeckListController(repository: repository);
-    final temp = await Directory.systemTemp.createTemp(
-      'anki_flutter_real_backend_',
-    );
-    final collectionPath = '${temp.path}${Platform.pathSeparator}collection.anki2';
+    final sandboxHome =
+        Platform.environment['HOME'] ??
+        Platform.environment['USERPROFILE'] ??
+        Directory.current.path;
+    final sandboxTemp = Directory('$sandboxHome${Platform.pathSeparator}tmp');
+    await sandboxTemp.create(recursive: true);
+    final temp = await sandboxTemp.createTemp('anki_flutter_real_backend_');
+    final collectionPath =
+        '${temp.path}${Platform.pathSeparator}collection.anki2';
     final location = CollectionLocation.fromCollectionPath(collectionPath);
     await Directory(location.mediaFolderPath).create(recursive: true);
 
@@ -66,10 +68,10 @@ void main() {
       AnkiFlutterApp(
         home: DeckListPage(
           controller: controller,
+          backend: client,
           pickCollection: () async => collectionPath,
-          openCollection: (path) => session.open(
-            CollectionLocation.fromCollectionPath(path),
-          ),
+          openCollection: (path) =>
+              session.open(CollectionLocation.fromCollectionPath(path)),
         ),
       ),
     );
@@ -86,5 +88,63 @@ void main() {
     expect(find.text('Learn 0'), findsOneWidget);
     expect(find.text('Review 0'), findsOneWidget);
     expect(find.text('Study'), findsOneWidget);
+  });
+
+  testWidgets('real backend starts a review session from the deck overview', (
+    tester,
+  ) async {
+    const overridePath = String.fromEnvironment('ANKIFLUTTER_NATIVE_LIB');
+    final bindings = FfiNativeAnkiBindings.fromLibrary(
+      openPlatformNativeLibrary(
+        platform: defaultTargetPlatform,
+        executablePath: Platform.resolvedExecutable,
+        environmentOverride: overridePath,
+      ),
+    );
+    final client = AnkiBackendClient.create(
+      bindings: bindings,
+      init: Uint8List.fromList(BackendInit(server: false).writeToBuffer()),
+    );
+    final session = CollectionSession(
+      backend: client,
+      mediaServer: ReviewMediaServer(),
+    );
+    final controller = DeckListController(
+      repository: AnkiDeckRepository(
+        backend: client,
+        unixSeconds: () => DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      ),
+    );
+    final sandboxHome = Platform.environment['HOME'] ?? Directory.current.path;
+    final temp = await Directory('$sandboxHome${Platform.pathSeparator}tmp')
+        .createTemp('anki_flutter_reviewer_');
+    final location = CollectionLocation.fromCollectionPath(
+      '${temp.path}${Platform.pathSeparator}collection.anki2',
+    );
+    await Directory(location.mediaFolderPath).create(recursive: true);
+    addTearDown(() async {
+      await session.close();
+      controller.dispose();
+      client.dispose();
+      await temp.delete(recursive: true);
+    });
+
+    await tester.pumpWidget(
+      AnkiFlutterApp(
+        home: DeckListPage(
+          controller: controller,
+          backend: client,
+          pickCollection: () async => location.collectionPath,
+          openCollection: (_) => session.open(location),
+        ),
+      ),
+    );
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Default'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Study'));
+    await tester.pumpAndSettle();
+    expect(find.text('You have finished this deck for now.'), findsOneWidget);
   });
 }

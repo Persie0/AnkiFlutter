@@ -57,7 +57,11 @@ def main() -> int:
 
     device, library_name = _platform_config()
     library_path = _build_bridge(library_name)
-    dart_define = f"--dart-define={DART_DEFINE}={library_path}"
+    dart_defines = (
+        []
+        if sys.platform == "darwin"
+        else [f"--dart-define={DART_DEFINE}={library_path}"]
+    )
 
     if args.test:
         command = [
@@ -68,10 +72,10 @@ def main() -> int:
             device,
             "-r",
             "github",
-            dart_define,
+            *dart_defines,
         ]
     else:
-        command = ["flutter", "run", "-d", device, dart_define]
+        command = ["flutter", "run", "-d", device, *dart_defines]
 
     _run(command, cwd=APP_DIR)
     return 0
