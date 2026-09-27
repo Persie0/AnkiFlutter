@@ -36,6 +36,7 @@ void main() {
         'searchCards': 25,
         'browserRowForId': 26,
         'setActiveBrowserColumns': 27,
+        'getConfigJson': 28,
       },
     );
 

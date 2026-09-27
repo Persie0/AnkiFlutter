@@ -59,6 +59,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "BackendSearchService",
         "set_active_browser_columns",
     )?;
+    let get_config_json = operation(&services, "BackendConfigService", "get_config_json")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -87,7 +88,8 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const SEARCH_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const SET_ACTIVE_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const SET_ACTIVE_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_CONFIG_JSON: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -142,6 +144,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         browser_row_for_id.1,
         set_active_browser_columns.0,
         set_active_browser_columns.1,
+        get_config_json.0,
+        get_config_json.1,
     );
 
     fs::write(

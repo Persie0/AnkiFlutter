@@ -25,7 +25,8 @@ enum BackendOperation {
   defaultsForAdding(24),
   searchCards(25),
   browserRowForId(26),
-  setActiveBrowserColumns(27);
+  setActiveBrowserColumns(27),
+  getConfigJson(28);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

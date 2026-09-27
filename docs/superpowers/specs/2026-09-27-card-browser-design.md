@@ -6,7 +6,7 @@ Add a shared card browser that works wherever the Flutter app runs. Users can se
 
 ## Scope
 
-- Expose Anki `BackendSearchService.search_cards` and `browser_row_for_id` through stable operation IDs 25 and 26.
+- Expose Anki `BackendSearchService.search_cards`, `browser_row_for_id`, and `set_active_browser_columns` through stable operation IDs 25–27, plus `BackendConfigService.get_config_json` as operation ID 28.
 - Add a repository that maps returned card IDs and browser cells into a small Dart model. Load at most 50 rows per query and retain the total match count so large results remain responsive and explain truncation.
 - Add a shared screen with query entry, submit/retry, loading, empty, error, and result states.
 - Make the browser reachable from the main deck screen when a collection is open and a backend is available.
@@ -17,6 +17,7 @@ Add a shared card browser that works wherever the Flutter app runs. Users can se
 - The search box starts empty and submitting it searches all cards, matching Anki's browser behavior.
 - Anki parses and evaluates the query; the app does not reimplement search syntax.
 - Search order is left to Anki's default browser order.
+- Before loading rows, initialize Anki's active browser columns from the collection's `activeCols` config; use Anki's standard card columns when no value has been saved.
 - Each visible result displays non-empty browser cell text in its configured order, and keeps its card ID for future workflows.
 - Search failures keep the query visible and provide retry.
 - If more than 50 cards match, show the visible count and total and ask the user to refine the query.
