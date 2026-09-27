@@ -43,6 +43,15 @@ fn main() -> Result<(), Box<dyn Error>> {
     let encode_iri_paths = operation(&services, "BackendCardRenderingService", "encode_iri_paths")?;
     let rename_deck = operation(&services, "BackendDecksService", "rename_deck")?;
     let remove_decks = operation(&services, "BackendDecksService", "remove_decks")?;
+    let get_notetype_names_and_counts = operation(
+        &services,
+        "BackendNotetypesService",
+        "get_notetype_names_and_counts",
+    )?;
+    let get_notetype = operation(&services, "BackendNotetypesService", "get_notetype")?;
+    let defaults_for_adding = operation(&services, "BackendNotesService", "defaults_for_adding")?;
+    let new_note = operation(&services, "BackendNotesService", "new_note")?;
+    let add_note = operation(&services, "BackendNotesService", "add_note")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -63,7 +72,12 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const GET_DECK_CONFIGS_FOR_UPDATE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const ENCODE_IRI_PATHS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const RENAME_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const REMOVE_DECKS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const REMOVE_DECKS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_NOTETYPE_NAMES_AND_COUNTS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const NEW_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ADD_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -102,6 +116,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         rename_deck.1,
         remove_decks.0,
         remove_decks.1,
+        get_notetype_names_and_counts.0,
+        get_notetype_names_and_counts.1,
+        new_note.0,
+        new_note.1,
+        add_note.0,
+        add_note.1,
+        get_notetype.0,
+        get_notetype.1,
+        defaults_for_adding.0,
+        defaults_for_adding.1,
     );
 
     fs::write(

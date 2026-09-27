@@ -11,6 +11,7 @@ void main() {
     expect(gradle, contains('x86_64'));
     expect(gradle, contains('src/main/jniLibs'));
     expect(gradle, contains('native/anki_bridge/Cargo.toml'));
+    expect(gradle, contains('workingDir = rustBridgeManifest.parentFile'));
   });
 
   test('iOS build links the static bridge into the sandboxed app process', () {

@@ -28,6 +28,11 @@ void main() {
         'encodeIriPaths': 17,
         'renameDeck': 18,
         'removeDecks': 19,
+        'getNotetypeNamesAndCounts': 20,
+        'newNote': 21,
+        'addNote': 22,
+        'getNotetype': 23,
+        'defaultsForAdding': 24,
       },
     );
 

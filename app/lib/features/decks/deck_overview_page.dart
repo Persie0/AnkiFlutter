@@ -18,6 +18,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onRename,
     this.onRemove,
     this.onChanged,
+    this.onAddNote,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -28,6 +29,7 @@ class DeckOverviewPage extends StatefulWidget {
   final Future<void> Function(String name)? onRename;
   final Future<void> Function()? onRemove;
   final Future<void> Function()? onChanged;
+  final Future<void> Function()? onAddNote;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -80,6 +82,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
         title: const Text('Delete deck?'),
         content: Text('Delete “${widget.deck.name}” and its cards?'),
         actions: [
+          if (widget.onAddNote != null)
+            IconButton(
+              tooltip: 'Add note',
+              onPressed: () => unawaited(widget.onAddNote!.call()),
+              icon: const Icon(Icons.note_add_outlined),
+            ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
             child: const Text('Cancel'),

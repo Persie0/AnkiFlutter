@@ -13,7 +13,10 @@ val rustAndroidLibraries = projectDir.resolve("src/main/jniLibs")
 val buildAnkiRustBridge by tasks.registering(Exec::class) {
     group = "build"
     description = "Builds the Anki Rust bridge for Android arm64 and x86_64."
-    workingDir = repoRoot
+    // cargo-ndk runs `cargo metadata` before processing the manifest flag, so
+    // start in the bridge crate instead of the repository root (which has no
+    // workspace Cargo.toml).
+    workingDir = rustBridgeManifest.parentFile
     commandLine(
         "cargo", "ndk", "-t", "arm64-v8a", "-t", "x86_64",
         "-o", rustAndroidLibraries.absolutePath,

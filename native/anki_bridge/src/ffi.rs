@@ -6,10 +6,11 @@ use std::slice;
 
 use crate::backend::BridgeBackend;
 use crate::operations::{
-    OperationIndex, ALL_TTS_VOICES, ANSWER_CARD, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION,
-    DECK_TREE, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXTRACT_AV_TAGS,
-    GET_DECK_CONFIGS_FOR_UPDATE, GET_QUEUED_CARDS, GET_UNDO_STATUS, OPEN_COLLECTION, REMOVE_DECKS,
-    RENAME_DECK, RENDER_EXISTING_CARD, SET_CURRENT_DECK, STATE_IS_LEECH, UNDO, WRITE_TTS_STREAM,
+    OperationIndex, ADD_NOTE, ALL_TTS_VOICES, ANSWER_CARD, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION,
+    DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXTRACT_AV_TAGS,
+    GET_DECK_CONFIGS_FOR_UPDATE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS,
+    GET_UNDO_STATUS, NEW_NOTE, OPEN_COLLECTION, REMOVE_DECKS, RENAME_DECK, RENDER_EXISTING_CARD,
+    SET_CURRENT_DECK, STATE_IS_LEECH, UNDO, WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
@@ -119,6 +120,11 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
         17 => Ok(ENCODE_IRI_PATHS),
         18 => Ok(RENAME_DECK),
         19 => Ok(REMOVE_DECKS),
+        20 => Ok(GET_NOTETYPE_NAMES_AND_COUNTS),
+        21 => Ok(NEW_NOTE),
+        22 => Ok(ADD_NOTE),
+        23 => Ok(GET_NOTETYPE),
+        24 => Ok(DEFAULTS_FOR_ADDING),
         _ => Err(format!("Unknown Anki bridge operation {operation}")),
     }
 }
@@ -226,4 +232,24 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
             }
         }
     }));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::operation_from_id;
+    use crate::operations::{
+        ADD_NOTE, DEFAULTS_FOR_ADDING, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, NEW_NOTE,
+    };
+
+    #[test]
+    fn note_operation_ids_map_to_the_pinned_backend_descriptors() {
+        assert_eq!(
+            operation_from_id(20).unwrap(),
+            GET_NOTETYPE_NAMES_AND_COUNTS
+        );
+        assert_eq!(operation_from_id(21).unwrap(), NEW_NOTE);
+        assert_eq!(operation_from_id(22).unwrap(), ADD_NOTE);
+        assert_eq!(operation_from_id(23).unwrap(), GET_NOTETYPE);
+        assert_eq!(operation_from_id(24).unwrap(), DEFAULTS_FOR_ADDING);
+    }
 }

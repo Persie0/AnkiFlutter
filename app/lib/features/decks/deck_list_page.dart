@@ -5,6 +5,8 @@ import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
+import 'package:anki_flutter/features/notes/add_note_page.dart';
+import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:flutter/material.dart';
 
@@ -95,6 +97,20 @@ class _DeckListPageState extends State<DeckListPage> {
                     DeckMutationRepository(backend: widget.backend!)
                         .removeDecks([deck.id]),
           onChanged: widget.controller.load,
+          onAddNote: widget.backend == null
+              ? null
+              : () async {
+                  await Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => AddNotePage(
+                        deck: deck,
+                        repository: AnkiNoteRepository(
+                          backend: widget.backend!,
+                        ),
+                      ),
+                    ),
+                  );
+                },
         ),
       ),
     );
