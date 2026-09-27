@@ -1,11 +1,25 @@
+import 'dart:async';
+
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
+import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
 import 'package:flutter/foundation.dart';
+
+abstract interface class ReviewTimerHandle {
+  bool get isActive;
+
+  void cancel();
+}
+
+typedef ReviewTimerFactory = ReviewTimerHandle Function(
+  Duration delay,
+  Future<void> Function() callback,
+);
 
 class ReviewController extends ChangeNotifier {
   ReviewController({
@@ -16,7 +30,10 @@ class ReviewController extends ChangeNotifier {
     this._audio,
     this._tts,
     this._mediaUriFor,
-  });
+    this._timerFactory,
+  }) {
+    _audio?.playingChanges.listen(_onPlayingChanged);
+  }
 
   final ReviewRepository _repository;
   final CardRenderRepository _renderer;
@@ -25,14 +42,20 @@ class ReviewController extends ChangeNotifier {
   final ReviewAudioService? _audio;
   final ReviewTtsService? _tts;
   final Uri Function(String filename)? _mediaUriFor;
+  final ReviewTimerFactory? _timerFactory;
 
   ReviewSessionState _state = const ReviewInitial();
   Stopwatch? _answerStopwatch;
+  ReviewTimerHandle? _autoAdvanceTimer;
+  _DeferredAutoAdvance? _deferredAutoAdvance;
+  bool _autoAdvanceEnabled = false;
   int _generation = 0;
 
   ReviewSessionState get state => _state;
 
   Future<void> start(int deckId) async {
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
     final generationId = ++_generation;
     _setState(const ReviewLoading());
 
@@ -58,6 +81,7 @@ class ReviewController extends ChangeNotifier {
         generationId: current.generationId,
       ),
     );
+    _scheduleAutoAdvanceForCurrentState();
 
     if (current.settings.autoplay) {
       final tags = current.settings.skipQuestionWhenReplayingAnswer
@@ -77,6 +101,8 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
     final generationId = current.generationId;
     _setState(
       ReviewTransition(
@@ -110,6 +136,7 @@ class ReviewController extends ChangeNotifier {
           error: error,
         ),
       );
+      _scheduleAutoAdvanceForCurrentState();
       return;
     }
 
@@ -120,6 +147,15 @@ class ReviewController extends ChangeNotifier {
     await _loadNextCard(++_generation);
   }
 
+  Future<void> toggleAutoAdvance() async {
+    _autoAdvanceEnabled = !_autoAdvanceEnabled;
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
+    if (_autoAdvanceEnabled) {
+      _scheduleAutoAdvanceForCurrentState();
+    }
+  }
+
   Future<void> _loadNextCard(int generationId) async {
     final card = await _repository.nextCard();
     if (!_isCurrentGeneration(generationId)) {
@@ -127,6 +163,8 @@ class ReviewController extends ChangeNotifier {
     }
 
     if (card == null) {
+      _clearAutoAdvanceTimer();
+      _deferredAutoAdvance = null;
       _answerStopwatch = null;
       _setState(const ReviewFinished());
       return;
@@ -153,10 +191,104 @@ class ReviewController extends ChangeNotifier {
         generationId: generationId,
       ),
     );
+    _scheduleAutoAdvanceForCurrentState();
 
     if (settings.autoplay) {
       await _playTags(content.questionAudio, generationId);
     }
+  }
+
+  void _scheduleAutoAdvanceForCurrentState() {
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
+    if (!_autoAdvanceEnabled) {
+      return;
+    }
+
+    final current = _state;
+    if (current is ReviewQuestion) {
+      _scheduleAutoAdvance(
+        seconds: current.settings.secondsToShowQuestion,
+        side: _AutoAdvanceSide.question,
+        generationId: current.generationId,
+      );
+    } else if (current is ReviewAnswer) {
+      _scheduleAutoAdvance(
+        seconds: current.settings.secondsToShowAnswer,
+        side: _AutoAdvanceSide.answer,
+        generationId: current.generationId,
+      );
+    }
+  }
+
+  void _scheduleAutoAdvance({
+    required double seconds,
+    required _AutoAdvanceSide side,
+    required int generationId,
+  }) {
+    if (seconds <= 0) {
+      return;
+    }
+    final delay = Duration(milliseconds: (seconds * 1000).toInt());
+    final factory = _timerFactory ?? _defaultReviewTimerFactory;
+    _autoAdvanceTimer = factory(
+      delay,
+      () => _onAutoAdvanceTimeout(side, generationId),
+    );
+  }
+
+  Future<void> _onAutoAdvanceTimeout(
+    _AutoAdvanceSide side,
+    int generationId,
+  ) async {
+    _autoAdvanceTimer = null;
+    if (!_autoAdvanceEnabled || !_isCurrentGeneration(generationId)) {
+      return;
+    }
+
+    final current = _state;
+    final ReviewDeckSettings? settings;
+    if (side == _AutoAdvanceSide.question && current is ReviewQuestion) {
+      settings = current.settings;
+    } else if (side == _AutoAdvanceSide.answer && current is ReviewAnswer) {
+      settings = current.settings;
+    } else {
+      return;
+    }
+
+    if (settings.waitForAudio && (_audio?.isPlaying ?? false)) {
+      _deferredAutoAdvance = _DeferredAutoAdvance(side, generationId);
+      return;
+    }
+    _deferredAutoAdvance = null;
+
+    if (side == _AutoAdvanceSide.question) {
+      if (settings.questionAction == ReviewQuestionAction.showAnswer) {
+        await showAnswer();
+      }
+      return;
+    }
+
+    if (settings.answerAction == ReviewAnswerAction.answerGood) {
+      await rate(ReviewRating.good);
+    }
+  }
+
+  void _onPlayingChanged(bool isPlaying) {
+    if (isPlaying) {
+      return;
+    }
+    final deferred = _deferredAutoAdvance;
+    if (deferred == null) {
+      return;
+    }
+    _deferredAutoAdvance = null;
+    unawaited(_onAutoAdvanceTimeout(deferred.side, deferred.generationId));
+  }
+
+  void _clearAutoAdvanceTimer() {
+    _autoAdvanceTimer?.cancel();
+    _autoAdvanceTimer = null;
   }
 
   Future<void> _playTags(List<ReviewAudioTag> tags, int generationId) async {
@@ -201,4 +333,35 @@ class ReviewController extends ChangeNotifier {
     _state = state;
     notifyListeners();
   }
+}
+
+class _DartReviewTimerHandle implements ReviewTimerHandle {
+  _DartReviewTimerHandle(
+    Duration delay,
+    Future<void> Function() callback,
+  ) : _timer = Timer(delay, () => unawaited(callback()));
+
+  final Timer _timer;
+
+  @override
+  bool get isActive => _timer.isActive;
+
+  @override
+  void cancel() => _timer.cancel();
+}
+
+ReviewTimerHandle _defaultReviewTimerFactory(
+  Duration delay,
+  Future<void> Function() callback,
+) {
+  return _DartReviewTimerHandle(delay, callback);
+}
+
+enum _AutoAdvanceSide { question, answer }
+
+class _DeferredAutoAdvance {
+  const _DeferredAutoAdvance(this.side, this.generationId);
+
+  final _AutoAdvanceSide side;
+  final int generationId;
 }
