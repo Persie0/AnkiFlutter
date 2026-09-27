@@ -7,19 +7,18 @@ import 'package:anki_flutter/features/collection/collection_location.dart';
 import 'package:anki_flutter/features/reviewer/media/review_media_server.dart';
 
 class CollectionSession {
-  CollectionSession({
-    required this.backend,
-    required this.mediaServer,
-  });
+  CollectionSession({required this.backend, required this.mediaServer});
 
   final BackendInvoker backend;
   final ReviewMediaServer mediaServer;
 
   bool _isOpen = false;
   CollectionLocation? _location;
+  Uri? _mediaBaseUri;
 
   bool get isOpen => _isOpen;
   CollectionLocation? get location => _location;
+  Uri? get mediaBaseUri => _mediaBaseUri;
 
   Future<void> open(CollectionLocation location) async {
     final request = OpenCollectionRequest(
@@ -31,7 +30,7 @@ class CollectionSession {
       BackendOperation.openCollection,
       Uint8List.fromList(request.writeToBuffer()),
     );
-    await mediaServer.start(location.mediaFolderPath);
+    _mediaBaseUri = await mediaServer.start(location.mediaFolderPath);
     _location = location;
     _isOpen = true;
   }
@@ -46,6 +45,7 @@ class CollectionSession {
       Uint8List.fromList(request.writeToBuffer()),
     );
     await mediaServer.close();
+    _mediaBaseUri = null;
     _location = null;
     _isOpen = false;
   }

@@ -26,6 +26,8 @@ void main() {
         'writeTtsStream': 15,
         'getDeckConfigsForUpdate': 16,
         'encodeIriPaths': 17,
+        'renameDeck': 18,
+        'removeDecks': 19,
       },
     );
 

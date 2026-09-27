@@ -213,6 +213,7 @@
 				33CC10EB2044A3C60003C045 /* Resources */,
 				33CC110E2044A8840003C045 /* Bundle Framework */,
 				3399D490228B24CF009A79C7 /* ShellScript */,
+				A7410D912D4A000100000001 /* Embed Anki backend bridge */,
 			);
 			buildRules = (
 			);
@@ -318,6 +319,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "echo \"$PRODUCT_NAME.app\" > \"$PROJECT_DIR\"/Flutter/ephemeral/.app_filename && \"$FLUTTER_ROOT\"/packages/flutter_tools/bin/macos_assemble.sh embed\n";
+		};
+		A7410D912D4A000100000001 /* Embed Anki backend bridge */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "set -eu\nREPO_ROOT=\"$SRCROOT/../..\"\npython3 \"$REPO_ROOT/tool/prepare_bridge_lock.py\"\ncargo build --locked --manifest-path \"$REPO_ROOT/native/anki_bridge/Cargo.toml\"\nmkdir -p \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME/Contents/Frameworks\"\ncp \"$REPO_ROOT/native/anki_bridge/target/debug/libanki_flutter_bridge.dylib\" \"$TARGET_BUILD_DIR/$FULL_PRODUCT_NAME/Contents/Frameworks/libanki_flutter_bridge.dylib\"\n";
 		};
 		33CC111E2044C6BF0003C045 /* ShellScript */ = {
 			isa = PBXShellScriptBuildPhase;

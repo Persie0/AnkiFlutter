@@ -41,6 +41,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "get_deck_configs_for_update",
     )?;
     let encode_iri_paths = operation(&services, "BackendCardRenderingService", "encode_iri_paths")?;
+    let rename_deck = operation(&services, "BackendDecksService", "rename_deck")?;
+    let remove_decks = operation(&services, "BackendDecksService", "remove_decks")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -59,7 +61,9 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const ALL_TTS_VOICES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const WRITE_TTS_STREAM: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const GET_DECK_CONFIGS_FOR_UPDATE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ENCODE_IRI_PATHS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const ENCODE_IRI_PATHS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const RENAME_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const REMOVE_DECKS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -94,6 +98,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         get_deck_configs_for_update.1,
         encode_iri_paths.0,
         encode_iri_paths.1,
+        rename_deck.0,
+        rename_deck.1,
+        remove_decks.0,
+        remove_decks.1,
     );
 
     fs::write(

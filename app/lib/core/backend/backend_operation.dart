@@ -15,7 +15,9 @@ enum BackendOperation {
   allTtsVoices(14),
   writeTtsStream(15),
   getDeckConfigsForUpdate(16),
-  encodeIriPaths(17);
+  encodeIriPaths(17),
+  renameDeck(18),
+  removeDecks(19);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

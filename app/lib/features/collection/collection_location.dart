@@ -17,6 +17,19 @@ class CollectionLocation {
     );
   }
 
+  static String collectionPathInProfile(
+    String profileDirectory, {
+    required String pathSeparator,
+  }) {
+    final normalizedDirectory = profileDirectory.endsWith(pathSeparator)
+        ? profileDirectory.substring(
+            0,
+            profileDirectory.length - pathSeparator.length,
+          )
+        : profileDirectory;
+    return '$normalizedDirectory${pathSeparator}collection.anki2';
+  }
+
   final String collectionPath;
   final String mediaFolderPath;
   final String mediaDbPath;

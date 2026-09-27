@@ -23,26 +23,34 @@ typedef ReviewTimerFactory = ReviewTimerHandle Function(
 
 class ReviewController extends ChangeNotifier {
   ReviewController({
-    required this._repository,
-    required this._renderer,
-    required this._wallClockMillis,
-    required this._stopwatchFactory,
-    this._audio,
-    this._tts,
-    this._mediaUriFor,
-    this._timerFactory,
+    required ReviewRepository repository,
+    required CardRenderRepository renderer,
+    required int Function() wallClockMillis,
+    required Stopwatch Function() stopwatchFactory,
+    ReviewAudioService? audio,
+    ReviewTtsService? tts,
+    Uri Function(String filename)? mediaUriFor,
+    ReviewTimerFactory? timerFactory,
   }) {
+    _repository = repository;
+    _renderer = renderer;
+    _wallClockMillis = wallClockMillis;
+    _stopwatchFactory = stopwatchFactory;
+    _audio = audio;
+    _tts = tts;
+    _mediaUriFor = mediaUriFor;
+    _timerFactory = timerFactory;
     _audio?.playingChanges.listen(_onPlayingChanged);
   }
 
-  final ReviewRepository _repository;
-  final CardRenderRepository _renderer;
-  final int Function() _wallClockMillis;
-  final Stopwatch Function() _stopwatchFactory;
-  final ReviewAudioService? _audio;
-  final ReviewTtsService? _tts;
-  final Uri Function(String filename)? _mediaUriFor;
-  final ReviewTimerFactory? _timerFactory;
+  late final ReviewRepository _repository;
+  late final CardRenderRepository _renderer;
+  late final int Function() _wallClockMillis;
+  late final Stopwatch Function() _stopwatchFactory;
+  late final ReviewAudioService? _audio;
+  late final ReviewTtsService? _tts;
+  late final Uri Function(String filename)? _mediaUriFor;
+  late final ReviewTimerFactory? _timerFactory;
 
   ReviewSessionState _state = const ReviewInitial();
   Stopwatch? _answerStopwatch;
@@ -50,21 +58,31 @@ class ReviewController extends ChangeNotifier {
   _DeferredAutoAdvance? _deferredAutoAdvance;
   bool _autoAdvanceEnabled = false;
   int _generation = 0;
+  int? _selectedDeckId;
 
   ReviewSessionState get state => _state;
 
   Future<void> start(int deckId) async {
+    _selectedDeckId = deckId;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     final generationId = ++_generation;
     _setState(const ReviewLoading());
 
-    await _repository.selectDeck(deckId);
-    if (!_isCurrentGeneration(generationId)) {
-      return;
+    try {
+      await _repository.selectDeck(deckId);
+      if (!_isCurrentGeneration(generationId)) return;
+      await _loadNextCard(generationId);
+    } catch (error) {
+      if (_isCurrentGeneration(generationId)) {
+        _setState(ReviewFailure(error));
+      }
     }
+  }
 
-    await _loadNextCard(generationId);
+  Future<void> retry() async {
+    final deckId = _selectedDeckId;
+    if (deckId != null) await start(deckId);
   }
 
   Future<void> showAnswer() async {
@@ -157,44 +175,48 @@ class ReviewController extends ChangeNotifier {
   }
 
   Future<void> _loadNextCard(int generationId) async {
-    final card = await _repository.nextCard();
-    if (!_isCurrentGeneration(generationId)) {
-      return;
-    }
+    try {
+      final card = await _repository.nextCard();
+      if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
 
-    if (card == null) {
-      _clearAutoAdvanceTimer();
-      _deferredAutoAdvance = null;
-      _answerStopwatch = null;
-      _setState(const ReviewFinished());
-      return;
-    }
+      if (card == null) {
+        _clearAutoAdvanceTimer();
+        _deferredAutoAdvance = null;
+        _answerStopwatch = null;
+        _setState(const ReviewFinished());
+        return;
+      }
 
-    final settings = await _repository.settingsForDeck(card.currentDeckId);
-    if (!_isCurrentGeneration(generationId)) {
-      return;
-    }
+      final settings = await _repository.settingsForDeck(card.currentDeckId);
+      if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
 
-    final content = await _renderer.render(card.cardId);
-    if (!_isCurrentGeneration(generationId)) {
-      return;
-    }
+      final content = await _renderer.render(card.cardId);
+      if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
 
-    final stopwatch = _stopwatchFactory()..start();
-    _answerStopwatch = stopwatch;
+      final stopwatch = _stopwatchFactory()..start();
+      _answerStopwatch = stopwatch;
 
-    _setState(
-      ReviewQuestion(
-        card: card,
-        content: content,
-        settings: settings,
-        generationId: generationId,
-      ),
-    );
-    _scheduleAutoAdvanceForCurrentState();
+      _setState(
+        ReviewQuestion(
+          card: card,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+        ),
+      );
+      _scheduleAutoAdvanceForCurrentState();
 
-    if (settings.autoplay) {
-      await _playTags(content.questionAudio, generationId);
+      if (settings.autoplay) {
+        await _playTags(content.questionAudio, generationId);
+      }
+    } catch (error) {
+      if (_isCurrentGeneration(generationId)) _setState(ReviewFailure(error));
     }
   }
 
@@ -336,10 +358,8 @@ class ReviewController extends ChangeNotifier {
 }
 
 class _DartReviewTimerHandle implements ReviewTimerHandle {
-  _DartReviewTimerHandle(
-    Duration delay,
-    Future<void> Function() callback,
-  ) : _timer = Timer(delay, () => unawaited(callback()));
+  _DartReviewTimerHandle(Duration delay, Future<void> Function() callback)
+    : _timer = Timer(delay, () => unawaited(callback()));
 
   final Timer _timer;
 
