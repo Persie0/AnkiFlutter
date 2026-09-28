@@ -37,6 +37,9 @@ void main() {
         'browserRowForId': 26,
         'setActiveBrowserColumns': 27,
         'getConfigJson': 28,
+        'getNote': 29,
+        'updateNotes': 30,
+        'getCard': 31,
       },
     );
 
