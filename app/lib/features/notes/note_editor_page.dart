@@ -79,13 +79,13 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       _saving = true;
       _error = null;
     });
-    final updated = notes.Note.fromBuffer(note.writeToBuffer())
-      ..fields
-          .clear()
-          .addAll(_fields.map((field) => field.text))
-      ..tags
-          .clear()
-          .addAll(parseNoteTags(_tags.text));
+    final updated = notes.Note.fromBuffer(note.writeToBuffer());
+    updated.fields
+      ..clear()
+      ..addAll(_fields.map((field) => field.text));
+    updated.tags
+      ..clear()
+      ..addAll(parseNoteTags(_tags.text));
     try {
       await widget.repository.updateNote(updated);
       if (mounted) Navigator.of(context).pop(true);
