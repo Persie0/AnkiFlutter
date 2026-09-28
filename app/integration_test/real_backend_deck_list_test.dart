@@ -105,6 +105,27 @@ void main() {
       browserResult.cards.single.cells,
       contains('browser integration front'),
     );
+
+    final browser = AnkiCardBrowserRepository(backend: client);
+    final resolvedNoteId = await browser.noteIdForCard(
+      browserResult.cards.single.cardId,
+    );
+    expect(resolvedNoteId, noteId);
+
+    final editableNote = await noteRepository.getNote(resolvedNoteId);
+    editableNote.fields[0] = 'browser integration edited front';
+    editableNote.tags.add('integration-edited');
+    await noteRepository.updateNote(editableNote);
+
+    final editedNote = await noteRepository.getNote(noteId);
+    expect(editedNote.fields.first, 'browser integration edited front');
+    expect(editedNote.tags, contains('integration-edited'));
+    final editedSearch = await browser.search('nid:$noteId');
+    expect(editedSearch.totalCount, 1);
+    expect(
+      editedSearch.cards.single.cells,
+      contains('browser integration edited front'),
+    );
   });
 
   testWidgets('real backend starts a review session from the deck overview', (
