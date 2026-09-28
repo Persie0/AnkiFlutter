@@ -8,11 +8,14 @@ import 'package:anki_flutter/core/backend/generated/anki/backend.pbenum.dart'
     as backend_proto;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as anki_search;
 
 abstract interface class CardBrowserRepository {
   Future<CardBrowserSearchResult> search(String query);
+
+  Future<int> noteIdForCard(int cardId);
 }
 
 class CardBrowserSearchResult {
@@ -78,6 +81,16 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
       totalCount: ids.length,
       cards: List.unmodifiable(cards),
     );
+  }
+
+  @override
+  Future<int> noteIdForCard(int cardId) async {
+    final request = anki_cards.CardId(cid: Int64(cardId));
+    final response = await backend.invoke(
+      BackendOperation.getCard,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return anki_cards.Card.fromBuffer(response).noteId.toInt();
   }
 
   List<String> _decodeColumns(Uint8List responseBytes) {
