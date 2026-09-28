@@ -135,6 +135,9 @@ class _DeckListPageState extends State<DeckListPage> {
                       repository: AnkiCardBrowserRepository(
                         backend: widget.backend!,
                       ),
+                      noteRepository: AnkiNoteRepository(
+                        backend: widget.backend!,
+                      ),
                     ),
                   ),
                 );
