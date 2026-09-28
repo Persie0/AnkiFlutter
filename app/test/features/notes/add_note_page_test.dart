@@ -220,4 +220,10 @@ class _NoteRepository implements NoteEntryRepository {
       fields: ['', ''],
     );
   }
+
+  @override
+  Future<notes.Note> getNote(int noteId) async => throw UnimplementedError();
+
+  @override
+  Future<void> updateNote(notes.Note note) async => throw UnimplementedError();
 }
