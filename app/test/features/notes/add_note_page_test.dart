@@ -31,7 +31,7 @@ void main() {
       tester
           .widgetList<TextField>(find.byType(TextField))
           .map((field) => field.decoration?.labelText),
-      ['Front', 'Back'],
+      ['Front', 'Back', 'Tags'],
     );
     expect(repository.defaultsDeckId, 72);
   });
@@ -71,11 +71,13 @@ void main() {
 
     await tester.enterText(find.byKey(const ValueKey('note-field-0')), 'hola');
     await tester.enterText(find.byKey(const ValueKey('note-field-1')), 'hello');
+    await tester.enterText(find.byKey(const ValueKey('note-tags')), 'lesson-1');
     await tester.tap(find.text('Add note'));
     await tester.pumpAndSettle();
 
     expect(repository.savedDeckId, 72);
     expect(repository.savedNote!.fields, ['hola', 'hello']);
+    expect(repository.savedNote!.tags, ['lesson-1']);
     expect(
       tester.widget<TextField>(
         find.byKey(const ValueKey('note-field-0')),
