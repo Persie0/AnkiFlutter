@@ -11,6 +11,7 @@ import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as anki_search;
+import 'package:fixnum/fixnum.dart';
 
 abstract interface class CardBrowserRepository {
   Future<CardBrowserSearchResult> search(String query);
