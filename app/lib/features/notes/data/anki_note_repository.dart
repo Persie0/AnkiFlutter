@@ -20,6 +20,10 @@ abstract interface class NoteEntryRepository {
   Future<notes.Note> newNote(int notetypeId);
 
   Future<int> addNote({required int deckId, required notes.Note note});
+
+  Future<notes.Note> getNote(int noteId);
+
+  Future<void> updateNote(notes.Note note);
 }
 
 /// Sends note-entry requests through the shared native Anki backend.
@@ -77,5 +81,27 @@ class AnkiNoteRepository implements NoteEntryRepository {
       Uint8List.fromList(request.writeToBuffer()),
     );
     return notes.AddNoteResponse.fromBuffer(response).noteId.toInt();
+  }
+
+  @override
+  Future<notes.Note> getNote(int noteId) async {
+    final request = notes.NoteId(nid: Int64(noteId));
+    final response = await backend.invoke(
+      BackendOperation.getNote,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return notes.Note.fromBuffer(response);
+  }
+
+  @override
+  Future<void> updateNote(notes.Note note) async {
+    final request = notes.UpdateNotesRequest(
+      notes: [note],
+      skipUndoEntry: false,
+    );
+    await backend.invoke(
+      BackendOperation.updateNotes,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
   }
 }
