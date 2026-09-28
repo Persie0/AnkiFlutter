@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
+import 'package:anki_flutter/features/notes/note_fields_form.dart';
 import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
@@ -26,6 +27,7 @@ class _AddNotePageState extends State<AddNotePage> {
   notetypes.Notetype? _selectedNotetype;
   notes.Note? _note;
   List<TextEditingController> _fields = [];
+  final TextEditingController _tags = TextEditingController();
   int? _selectedNotetypeId;
   int _generation = 0;
   bool _loading = true;
@@ -99,6 +101,7 @@ class _AddNotePageState extends State<AddNotePage> {
         for (final value in note.fields)
           TextEditingController(text: value),
       ];
+      _tags.text = note.tags.join(' ');
       setState(() {
         _selectedNotetype = type;
         _note = note;
@@ -127,6 +130,9 @@ class _AddNotePageState extends State<AddNotePage> {
     submittedNote.fields
       ..clear()
       ..addAll(_fields.map((field) => field.text));
+    submittedNote.tags
+      ..clear()
+      ..addAll(parseNoteTags(_tags.text));
 
     try {
       await widget.repository.addNote(
@@ -160,6 +166,7 @@ class _AddNotePageState extends State<AddNotePage> {
   void dispose() {
     _generation++;
     _disposeFields();
+    _tags.dispose();
     super.dispose();
   }
 
@@ -219,38 +226,19 @@ class _AddNotePageState extends State<AddNotePage> {
                 },
         ),
         const SizedBox(height: 16),
-        for (var index = 0; index < _fields.length; index++) ...[
-          TextField(
-            key: ValueKey('note-field-$index'),
-            controller: _fields[index],
-            minLines: 1,
-            maxLines: 5,
-            decoration: InputDecoration(
-              labelText: index < _selectedNotetype!.fields.length
-                  ? _selectedNotetype!.fields[index].name
-                  : 'Field ${index + 1}',
-              alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-        ],
-        if (_error case final error?) ...[
-          Text(
-            'Could not add note: $error',
-            key: const ValueKey('add-note-error'),
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
-          ),
-          const SizedBox(height: 12),
-        ],
-        FilledButton.icon(
-          onPressed: _saving || _loading ? null : _save,
-          icon: _saving
-              ? const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.add),
-          label: const Text('Add note'),
+        NoteFieldsForm(
+          fields: _fields,
+          fieldNames: _selectedNotetype!.fields
+              .map((field) => field.name)
+              .toList(growable: false),
+          tagsController: _tags,
+          busy: _saving || _loading,
+          error: _error,
+          errorKey: 'add-note-error',
+          errorPrefix: 'Could not add note',
+          saveLabel: 'Add note',
+          saveIcon: Icons.add,
+          onSave: _save,
         ),
       ],
     );
