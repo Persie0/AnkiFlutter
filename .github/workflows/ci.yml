@@ -124,3 +124,66 @@ jobs:
             exit 1
           fi
         working-directory: app
+
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+      - name: Use Rust 1.88
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+      - name: Seed bridge lockfile from pinned Anki
+        run: python3 tool/prepare_bridge_lock.py
+      - name: Build macOS Anki bridge
+        run: cargo build --release --manifest-path native/anki_bridge/Cargo.toml --locked
+      - name: Resolve Flutter dependencies
+        run: flutter pub get --enforce-lockfile
+        working-directory: app
+      - name: Build Flutter macOS app
+        run: flutter build macos --release
+        working-directory: app
+      - name: Bundle macOS Anki bridge
+        run: |
+          mkdir -p app/build/macos/Build/Products/Release/anki_flutter.app/Contents/Frameworks
+          cp native/anki_bridge/target/release/libanki_flutter_bridge.dylib app/build/macos/Build/Products/Release/anki_flutter.app/Contents/Frameworks/
+          test -f app/build/macos/Build/Products/Release/anki_flutter.app/Contents/Frameworks/libanki_flutter_bridge.dylib
+
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.5
+          channel: stable
+          cache: true
+      - name: Use Rust 1.88
+        shell: pwsh
+        run: |
+          rustup toolchain install 1.88.0 --profile minimal
+          rustup default 1.88.0
+      - name: Seed bridge lockfile from pinned Anki
+        run: python3 tool/prepare_bridge_lock.py
+      - name: Build Windows Anki bridge
+        run: cargo build --release --manifest-path native/anki_bridge/Cargo.toml --locked
+      - name: Resolve Flutter dependencies
+        run: flutter pub get --enforce-lockfile
+        working-directory: app
+      - name: Build Flutter Windows app
+        run: flutter build windows --release
+        working-directory: app
+      - name: Bundle Windows Anki bridge
+        shell: pwsh
+        run: |
+          Copy-Item native/anki_bridge/target/release/anki_flutter_bridge.dll app/build/windows/x64/runner/Release/
+          if (-not (Test-Path app/build/windows/x64/runner/Release/anki_flutter_bridge.dll)) { throw 'Anki bridge DLL missing from Windows bundle' }
