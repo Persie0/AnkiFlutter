@@ -76,4 +76,10 @@ class _EmptyNoteRepository implements NoteEntryRepository {
 
   @override
   Future<notes.Note> newNote(int notetypeId) async => throw UnimplementedError();
+
+  @override
+  Future<notes.Note> getNote(int noteId) async => throw UnimplementedError();
+
+  @override
+  Future<void> updateNote(notes.Note note) async => throw UnimplementedError();
 }
