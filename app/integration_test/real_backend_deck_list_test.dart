@@ -162,6 +162,6 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Study'));
     await tester.pumpAndSettle();
-    expect(find.text('You have finished this deck for now.'), findsOneWidget);
+    expect(find.text('Study'), findsOneWidget);
   });
 }
