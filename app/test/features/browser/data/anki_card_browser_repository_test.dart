@@ -6,6 +6,7 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/anki_backend_exception.dart';
 import 'package:anki_flutter/core/backend/generated/anki/backend.pbenum.dart'
     as backend_proto;
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
@@ -15,6 +16,22 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('resolves a browser card ID to its Anki note ID on demand', () async {
+    final backend = _Backend([
+      cards.Card(noteId: Int64(987)).writeToBuffer(),
+    ]);
+
+    final noteId = await AnkiCardBrowserRepository(backend: backend)
+        .noteIdForCard(42);
+
+    expect(noteId, 987);
+    expect(backend.calls.single.operation, BackendOperation.getCard);
+    expect(
+      cards.CardId.fromBuffer(backend.calls.single.request),
+      cards.CardId(cid: Int64(42)),
+    );
+  });
+
   test(
     'uses Anki search and browser rows to map ordered card previews',
     () async {
