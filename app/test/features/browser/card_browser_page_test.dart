@@ -6,7 +6,6 @@ import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:fixnum/fixnum.dart';
 
 void main() {
   testWidgets('submits Anki search text and renders configured row cells', (
