@@ -108,6 +108,45 @@ void main() {
     );
     expect(noteId, 345);
   });
+
+  test('loads an existing note by its Anki note ID', () async {
+    final expected = notes.Note(
+      id: Int64(42),
+      notetypeId: Int64(12),
+      fields: ['front', 'back'],
+      tags: ['lesson-1'],
+    );
+    final backend = _Backend(expected.writeToBuffer());
+    final repository = AnkiNoteRepository(backend: backend);
+
+    final note = await repository.getNote(42);
+
+    expect(backend.calls.single.operation, BackendOperation.getNote);
+    expect(
+      notes.NoteId.fromBuffer(backend.calls.single.request),
+      notes.NoteId(nid: Int64(42)),
+    );
+    expect(note, expected);
+  });
+
+  test('updates an existing note through Anki with an undo entry', () async {
+    final note = notes.Note(
+      id: Int64(42),
+      notetypeId: Int64(12),
+      fields: ['changed front', 'changed back'],
+      tags: ['lesson-2'],
+    );
+    final backend = _Backend(Uint8List(0));
+    final repository = AnkiNoteRepository(backend: backend);
+
+    await repository.updateNote(note);
+
+    expect(backend.calls.single.operation, BackendOperation.updateNotes);
+    expect(
+      notes.UpdateNotesRequest.fromBuffer(backend.calls.single.request),
+      notes.UpdateNotesRequest(notes: [note], skipUndoEntry: false),
+    );
+  });
 }
 
 class _Call {
