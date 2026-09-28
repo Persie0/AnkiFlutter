@@ -30,7 +30,7 @@ void main() {
     expect(debug, contains('libanki_flutter_bridge.a'));
     expect(release, contains('libanki_flutter_bridge.a'));
     expect(project, contains(r'cat \"$CARGO_LOG\" >&2'));
-    expect(project, contains(r'MACOS_SDKROOT="$(xcrun --sdk macosx --show-sdk-path)"'));
-    expect(project, contains(r'SDKROOT="$MACOS_SDKROOT"'));
+    expect(project, contains(r'MACOS_SDKROOT=\"$(xcrun --sdk macosx --show-sdk-path)\"'));
+    expect(project, contains(r'SDKROOT=\"$MACOS_SDKROOT\"'));
   });
 }
