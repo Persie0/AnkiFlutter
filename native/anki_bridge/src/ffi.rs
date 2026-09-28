@@ -243,8 +243,9 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ADD_NOTE, BROWSER_ROW_FOR_ID, DEFAULTS_FOR_ADDING, GET_CONFIG_JSON, GET_NOTETYPE,
-        GET_NOTETYPE_NAMES_AND_COUNTS, NEW_NOTE, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS,
+        ADD_NOTE, BROWSER_ROW_FOR_ID, DEFAULTS_FOR_ADDING, GET_CARD, GET_CONFIG_JSON, GET_NOTE,
+        GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, NEW_NOTE, SEARCH_CARDS,
+        SET_ACTIVE_BROWSER_COLUMNS, UPDATE_NOTES,
     };
 
     #[test]
@@ -261,5 +262,8 @@ mod tests {
         assert_eq!(operation_from_id(26).unwrap(), BROWSER_ROW_FOR_ID);
         assert_eq!(operation_from_id(27).unwrap(), SET_ACTIVE_BROWSER_COLUMNS);
         assert_eq!(operation_from_id(28).unwrap(), GET_CONFIG_JSON);
+        assert_eq!(operation_from_id(29).unwrap(), GET_NOTE);
+        assert_eq!(operation_from_id(30).unwrap(), UPDATE_NOTES);
+        assert_eq!(operation_from_id(31).unwrap(), GET_CARD);
     }
 }
