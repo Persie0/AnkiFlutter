@@ -1,12 +1,19 @@
 import 'dart:async';
 
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
+import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
+import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:flutter/material.dart';
 
 class CardBrowserPage extends StatefulWidget {
-  const CardBrowserPage({required this.repository, super.key});
+  const CardBrowserPage({
+    required this.repository,
+    required this.noteRepository,
+    super.key,
+  });
 
   final CardBrowserRepository repository;
+  final NoteEntryRepository noteRepository;
 
   @override
   State<CardBrowserPage> createState() => _CardBrowserPageState();
@@ -44,6 +51,28 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         _error = error;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _editNote(int cardId) async {
+    try {
+      final noteId = await widget.repository.noteIdForCard(cardId);
+      if (!mounted) return;
+      final saved = await Navigator.of(context).push<bool>(
+        MaterialPageRoute<bool>(
+          builder: (_) => NoteEditorPage.edit(
+            noteId: noteId,
+            repository: widget.noteRepository,
+          ),
+        ),
+      );
+      if (saved == true && mounted) await _search();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open note editor: $error')),
+        );
+      }
     }
   }
 
@@ -140,6 +169,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           key: ValueKey('card-browser-result-${card.cardId}'),
           title: Text(title),
           subtitle: subtitle == null ? null : Text(subtitle),
+          trailing: IconButton(
+            tooltip: 'Edit note',
+            onPressed: () => unawaited(_editNote(card.cardId)),
+            icon: const Icon(Icons.edit_outlined),
+          ),
         );
       },
     );
