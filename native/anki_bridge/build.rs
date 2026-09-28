@@ -60,6 +60,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "set_active_browser_columns",
     )?;
     let get_config_json = operation(&services, "BackendConfigService", "get_config_json")?;
+    let get_note = operation(&services, "BackendNotesService", "get_note")?;
+    let update_notes = operation(&services, "BackendNotesService", "update_notes")?;
+    let get_card = operation(&services, "BackendCardsService", "get_card")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
@@ -89,7 +92,10 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const SEARCH_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const SET_ACTIVE_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_CONFIG_JSON: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const GET_CONFIG_JSON: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const UPDATE_NOTES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -146,6 +152,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         set_active_browser_columns.1,
         get_config_json.0,
         get_config_json.1,
+        get_note.0,
+        get_note.1,
+        update_notes.0,
+        update_notes.1,
+        get_card.0,
+        get_card.1,
     );
 
     fs::write(
