@@ -33,6 +33,56 @@ void main() {
     expect(find.text('Travel'), findsOneWidget);
   });
 
+  testWidgets('sorts Anki results by a supported browser column', (
+    tester,
+  ) async {
+    final repository = _SequenceRepository(
+      [
+        _cards(10, 20),
+        _cards(10, 20),
+        _cards(10, 20),
+        _cards(10, 20),
+      ],
+      options: const [
+        CardBrowserSortOption(
+          column: 'noteFld',
+          label: 'Sort field',
+          reverseByDefault: true,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('card-browser-search')),
+      'deck:Travel',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('card-browser-sort-column')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sort field').last);
+    await tester.pumpAndSettle();
+
+    expect(repository.queries, ['', 'deck:Travel', 'deck:Travel']);
+    expect(repository.sortRequests.last?.column, 'noteFld');
+    expect(repository.sortRequests.last?.reverse, isTrue);
+
+    await tester.tap(find.byKey(const ValueKey('card-browser-sort-direction')));
+    await tester.pumpAndSettle();
+
+    expect(repository.queries, [
+      '',
+      'deck:Travel',
+      'deck:Travel',
+      'deck:Travel',
+    ]);
+    expect(repository.sortRequests.last?.column, 'noteFld');
+    expect(repository.sortRequests.last?.reverse, isFalse);
+  });
+
   testWidgets('shows an empty-search message when Anki finds no cards', (
     tester,
   ) async {
@@ -301,9 +351,11 @@ CardBrowserSearchResult _cards(int firstId, int secondId) =>
     );
 
 class _SequenceRepository implements CardBrowserRepository {
-  _SequenceRepository(this.outcomes);
+  _SequenceRepository(this.outcomes, {this.options = const []});
   final List<Object> outcomes;
+  final List<CardBrowserSortOption> options;
   final queries = <String>[];
+  final sortRequests = <CardBrowserSort?>[];
   final bulkActions = <MapEntry<List<int>, CardBulkAction>>[];
   Object? bulkActionError;
 
@@ -311,8 +363,15 @@ class _SequenceRepository implements CardBrowserRepository {
   Future<int> noteIdForCard(int cardId) async => 42;
 
   @override
-  Future<CardBrowserSearchResult> search(String query) async {
+  Future<List<CardBrowserSortOption>> sortOptions() async => options;
+
+  @override
+  Future<CardBrowserSearchResult> search(
+    String query, {
+    CardBrowserSort? sort,
+  }) async {
     queries.add(query);
+    sortRequests.add(sort);
     final outcome = outcomes[queries.length - 1];
     if (outcome is Error) throw outcome;
     return outcome as CardBrowserSearchResult;
