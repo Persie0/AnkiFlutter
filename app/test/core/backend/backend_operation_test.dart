@@ -42,6 +42,8 @@ void main() {
         'getCard': 31,
         'removeCards': 32,
         'allBrowserColumns': 33,
+        'newDeck': 34,
+        'addDeck': 35,
       },
     );
 

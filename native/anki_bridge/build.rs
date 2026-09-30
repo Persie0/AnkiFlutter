@@ -41,6 +41,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "get_deck_configs_for_update",
     )?;
     let encode_iri_paths = operation(&services, "BackendCardRenderingService", "encode_iri_paths")?;
+    let new_deck = operation(&services, "BackendDecksService", "new_deck")?;
+    let add_deck = operation(&services, "BackendDecksService", "add_deck")?;
     let rename_deck = operation(&services, "BackendDecksService", "rename_deck")?;
     let remove_decks = operation(&services, "BackendDecksService", "remove_decks")?;
     let get_notetype_names_and_counts = operation(
@@ -99,7 +101,9 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const UPDATE_NOTES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const GET_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const REMOVE_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ALL_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const ALL_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const NEW_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ADD_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -166,6 +170,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         remove_cards.1,
         all_browser_columns.0,
         all_browser_columns.1,
+        new_deck.0,
+        new_deck.1,
+        add_deck.0,
+        add_deck.1,
     );
 
     fs::write(

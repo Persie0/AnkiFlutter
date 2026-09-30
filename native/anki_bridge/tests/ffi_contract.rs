@@ -85,7 +85,7 @@ fn reviewer_operation_ids_are_recognized() {
     let created = unsafe { anki_bridge_create(init.as_ptr(), init.len()) };
     assert_eq!(created.status, STATUS_SUCCESS);
 
-    for operation in 4..=19 {
+    for operation in (4..=19).chain(34..=35) {
         let result = unsafe { anki_bridge_invoke(created.handle, operation, ptr::null(), 0) };
         let status = result.status;
         let bytes = unsafe { copy_and_free(result.data) };

@@ -1,9 +1,16 @@
 import 'dart:async';
+import 'dart:typed_data';
 
+import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/core/backend/backend_operation.dart';
+import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
+import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
+import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_repository.dart';
+import 'package:fixnum/fixnum.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -182,6 +189,63 @@ void main() {
     expect(grandchildPadding.left, greaterThan(childPadding.left));
   });
 
+  testWidgets('creates a deck and refreshes the deck list', (tester) async {
+    final repository = _CountingDeckRepository();
+    final controller = DeckListController(repository: repository);
+    final backend = _DeckCreationBackend();
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      backend: backend,
+      pickCollection: () async => '/tmp/collection.anki2',
+      openCollection: (_) async {},
+    ));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Create deck'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create deck'), findsOneWidget);
+    await tester.enterText(
+      find.byKey(const ValueKey('create-deck-name')),
+      'Language::Norwegian',
+    );
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(backend.calls.map((call) => call.operation), [
+      BackendOperation.newDeck,
+      BackendOperation.addDeck,
+    ]);
+    expect(
+      Deck.fromBuffer(backend.calls.last.request).name,
+      'Language::Norwegian',
+    );
+    expect(repository.calls, 2);
+    expect(find.text('Create deck'), findsNothing);
+  });
+
+  testWidgets('create deck validates a blank name in the dialog', (tester) async {
+    final backend = _DeckCreationBackend();
+    final controller = DeckListController(repository: _FixedRepository(const []));
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      backend: backend,
+      pickCollection: () async => '/tmp/collection.anki2',
+      openCollection: (_) async {},
+    ));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Create deck'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Create'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Enter a deck name'), findsOneWidget);
+    expect(backend.calls, isEmpty);
+  });
+
   testWidgets('deck load failure is readable and Retry can recover', (tester) async {
     final repository = _SequenceRepository([StateError('broken deck tree'), nestedDecks]);
     final controller = DeckListController(repository: repository);
@@ -222,6 +286,7 @@ Widget _app({
   required DeckListController controller,
   required Future<String?> Function() pickCollection,
   required Future<void> Function(String path) openCollection,
+  BackendInvoker? backend,
   Future<void> Function()? closeCollection,
   Object? startupError,
 }) {
@@ -230,10 +295,47 @@ Widget _app({
       controller: controller,
       pickCollection: pickCollection,
       openCollection: openCollection,
+      backend: backend,
       closeCollection: closeCollection,
       startupError: startupError,
     ),
   );
+}
+
+class _CountingDeckRepository implements DeckRepository {
+  int calls = 0;
+
+  @override
+  Future<List<DeckNode>> loadDeckTree() async {
+    calls++;
+    return const [];
+  }
+}
+
+class _DeckCreationBackend implements BackendInvoker {
+  final calls = <_BackendCall>[];
+
+  @override
+  Future<Uint8List> invoke(
+    BackendOperation operation,
+    Uint8List request,
+  ) async {
+    calls.add(_BackendCall(operation, request));
+    if (operation == BackendOperation.newDeck) {
+      return Deck(common: Deck_Common(), normal: Deck_Normal()).writeToBuffer();
+    }
+    if (operation == BackendOperation.addDeck) {
+      return OpChangesWithId(id: Int64(73)).writeToBuffer();
+    }
+    return Uint8List(0);
+  }
+}
+
+class _BackendCall {
+  const _BackendCall(this.operation, this.request);
+
+  final BackendOperation operation;
+  final Uint8List request;
 }
 
 class _FixedRepository implements DeckRepository {

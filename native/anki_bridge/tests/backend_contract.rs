@@ -17,8 +17,11 @@ use anki_proto::card_rendering::{
     RenderedTemplateNode,
 };
 use anki_proto::cards::RemoveCardsRequest;
-use anki_proto::collection::{CloseCollectionRequest, OpChangesWithCount, OpenCollectionRequest};
+use anki_proto::collection::{
+    CloseCollectionRequest, OpChangesWithCount, OpChangesWithId, OpenCollectionRequest,
+};
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
+use anki_proto::generic::Empty;
 use anki_proto::search::BrowserColumns;
 use prost::Message;
 use tempfile::TempDir;
@@ -30,6 +33,8 @@ const DECK_TREE: u32 = 3;
 const RENDER_EXISTING_CARD: u32 = 12;
 const REMOVE_CARDS: u32 = 32;
 const ALL_BROWSER_COLUMNS: u32 = 33;
+const NEW_DECK: u32 = 34;
+const ADD_DECK: u32 = 35;
 
 struct TestBackend {
     handle: *mut BridgeBackend,
@@ -168,6 +173,46 @@ fn real_collection_opens_exposes_default_deck_and_reopens_through_ffi() {
         String::from_utf8_lossy(&bytes)
     );
     assert_empty_default_deck(&fetch_tree(&backend));
+}
+
+#[test]
+fn real_backend_creates_a_deck_from_anki_defaults_through_ffi() {
+    let temp = TempDir::new().unwrap();
+    let backend = TestBackend::new();
+    let open = collection_request(&temp);
+
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(NEW_DECK, &Empty::default());
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "Anki default deck creation failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let mut deck = anki_proto::decks::Deck::decode(bytes.as_slice()).unwrap();
+    deck.name = "Created by AnkiFlutter".to_string();
+
+    let (status, bytes) = backend.invoke(ADD_DECK, &deck);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "deck add failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let result = OpChangesWithId::decode(bytes.as_slice()).unwrap();
+    assert!(result.id > 1, "new deck should receive a non-default id");
+
+    let tree = fetch_tree(&backend);
+    assert!(tree.children.iter().any(|node| {
+        node.deck_id == result.id && node.name == "Created by AnkiFlutter"
+    }));
 }
 
 #[test]

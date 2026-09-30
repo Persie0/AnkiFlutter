@@ -127,6 +127,23 @@ class _DeckListPageState extends State<DeckListPage> {
     }
   }
 
+  Future<void> _createDeck() async {
+    final backend = widget.backend;
+    if (backend == null) {
+      return;
+    }
+    final created = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CreateDeckDialog(
+        onCreate: (name) =>
+            DeckMutationRepository(backend: backend).addDeck(name),
+      ),
+    );
+    if (created == true && mounted) {
+      await widget.controller.load();
+    }
+  }
+
   void _openDeck(DeckNode deck) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -184,6 +201,12 @@ class _DeckListPageState extends State<DeckListPage> {
                 onPressed: _opening ? null : _closeCollection,
               ),
           ],
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Create deck',
+              icon: const Icon(Icons.add),
+              onPressed: _opening ? null : _createDeck,
+            ),
           if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Browse cards',
@@ -287,6 +310,101 @@ class _DeckListPageState extends State<DeckListPage> {
           ],
         ),
         Expanded(child: deckContent),
+      ],
+    );
+  }
+}
+
+class _CreateDeckDialog extends StatefulWidget {
+  const _CreateDeckDialog({required this.onCreate});
+
+  final Future<int> Function(String name) onCreate;
+
+  @override
+  State<_CreateDeckDialog> createState() => _CreateDeckDialogState();
+}
+
+class _CreateDeckDialogState extends State<_CreateDeckDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  bool _creating = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_creating || !(_formKey.currentState?.validate() ?? false)) {
+      return;
+    }
+    setState(() {
+      _creating = true;
+      _error = null;
+    });
+    try {
+      await widget.onCreate(_nameController.text.trim());
+      if (mounted) {
+        Navigator.of(context).pop(true);
+      }
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _creating = false;
+          _error = 'Could not create deck: $error';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Create deck'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            TextFormField(
+              key: const ValueKey('create-deck-name'),
+              controller: _nameController,
+              autofocus: true,
+              decoration: const InputDecoration(labelText: 'Deck name'),
+              textCapitalization: TextCapitalization.sentences,
+              onFieldSubmitted: (_) => _submit(),
+              validator: (value) => value == null || value.trim().isEmpty
+                  ? 'Enter a deck name'
+                  : null,
+            ),
+            if (_error case final error?) ...[
+              const SizedBox(height: 12),
+              Text(
+                error,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: _creating ? null : () => Navigator.of(context).pop(false),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _creating ? null : _submit,
+          child: _creating
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Create'),
+        ),
       ],
     );
   }
