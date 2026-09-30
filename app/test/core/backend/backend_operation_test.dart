@@ -40,6 +40,7 @@ void main() {
         'getNote': 29,
         'updateNotes': 30,
         'getCard': 31,
+        'removeCards': 32,
       },
     );
 
