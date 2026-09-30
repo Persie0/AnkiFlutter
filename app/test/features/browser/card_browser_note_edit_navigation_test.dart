@@ -90,7 +90,13 @@ class _BrowserRepository implements CardBrowserRepository {
   final requestedNoteCards = <int>[];
 
   @override
-  Future<CardBrowserSearchResult> search(String query) async {
+  Future<List<CardBrowserSortOption>> sortOptions() async => const [];
+
+  @override
+  Future<CardBrowserSearchResult> search(
+    String query, {
+    CardBrowserSort? sort,
+  }) async {
     queries.add(query);
     return results[queries.length - 1];
   }
