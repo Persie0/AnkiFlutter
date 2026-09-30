@@ -41,6 +41,7 @@ void main() {
         'updateNotes': 30,
         'getCard': 31,
         'removeCards': 32,
+        'allBrowserColumns': 33,
       },
     );
 
