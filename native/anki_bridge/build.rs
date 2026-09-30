@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let get_note = operation(&services, "BackendNotesService", "get_note")?;
     let update_notes = operation(&services, "BackendNotesService", "update_notes")?;
     let get_card = operation(&services, "BackendCardsService", "get_card")?;
-    let remove_cards = operation(&services, "CardsService", "remove_cards")?;
+    let remove_cards = operation(&services, "BackendCardsService", "remove_cards")?;
 
     let generated = format!(
         "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
