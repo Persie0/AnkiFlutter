@@ -200,6 +200,80 @@ void main() {
     expect(find.text('1 card selected'), findsNothing);
     expect(repository.queries, ['', 'tag:new-search']);
   });
+
+  testWidgets(
+    'confirms selected-card deletion and refreshes the current query',
+    (tester) async {
+      final repository = _SequenceRepository([
+        _result('All cards'),
+        _cards(10, 20),
+        _result('Remaining card'),
+      ]);
+
+      await tester.pumpWidget(_app(repository));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('card-browser-search')),
+        'deck:Language',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('select-card-10')));
+      await tester.tap(find.byKey(const ValueKey('select-card-20')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete selected'), findsOneWidget);
+      await tester.tap(find.text('Delete selected'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Delete 2 cards?'), findsOneWidget);
+      expect(repository.bulkActions, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('confirm-card-bulk-action')));
+      await tester.pumpAndSettle();
+
+      expect(repository.bulkActions, hasLength(1));
+      expect(repository.bulkActions.single.key, [10, 20]);
+      expect(repository.bulkActions.single.value, CardBulkAction.delete);
+      expect(repository.queries, ['', 'deck:Language', 'deck:Language']);
+      expect(find.text('Remaining card'), findsOneWidget);
+      expect(find.text('2 cards selected'), findsNothing);
+    },
+  );
+
+  testWidgets('canceling card deletion keeps the selection', (tester) async {
+    final repository = _SequenceRepository([_cards(10, 20)]);
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    expect(find.text('Delete 1 card?'), findsOneWidget);
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.bulkActions, isEmpty);
+    expect(find.text('1 card selected'), findsOneWidget);
+  });
+
+  testWidgets('retains selection when card deletion fails', (tester) async {
+    final repository = _SequenceRepository([_cards(10, 20)])
+      ..bulkActionError = StateError('delete failed');
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Delete selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-card-bulk-action')));
+    await tester.pumpAndSettle();
+
+    expect(repository.bulkActions.single.value, CardBulkAction.delete);
+    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.textContaining('delete failed'), findsOneWidget);
+    expect(repository.queries, ['']);
+  });
 }
 
 Widget _app(CardBrowserRepository repository) => MaterialApp(

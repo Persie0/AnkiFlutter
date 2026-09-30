@@ -129,7 +129,7 @@ Commit as `feat: add confirmed card browser bulk actions`.
 Run `flutter pub get --enforce-lockfile`, `flutter analyze`, and `flutter test`
 against the completed AnkiFlutter branch. Expected: all commands pass.
 
-- [ ] **Step 2: Update the existing parity PR branch**
+- [x] **Step 2: Update the existing parity PR branch**
 
 Move `feat/mobile-and-core-parity` to the tested feature commit, then inspect
 its all-platform CI run. Expected: protobuf/Rust checks, Flutter tests, and

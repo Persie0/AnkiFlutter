@@ -163,11 +163,25 @@ void main() {
     },
   );
 
+  test('encodes deletion with only the requested card IDs', () async {
+    final backend = _Backend([Uint8List(0)]);
+    final repository = AnkiCardBrowserRepository(backend: backend);
+
+    await repository.applyBulkAction([21, 34], CardBulkAction.delete);
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.removeCards);
+    expect(
+      cards.RemoveCardsRequest.fromBuffer(backend.calls.single.request).cardIds,
+      [Int64(21), Int64(34)],
+    );
+  });
+
   test('does not call Anki when there are no selected cards', () async {
     final backend = _Backend([]);
 
     await AnkiCardBrowserRepository(backend: backend)
-        .applyBulkAction([], CardBulkAction.suspend);
+        .applyBulkAction([], CardBulkAction.delete);
 
     expect(backend.calls, isEmpty);
   });

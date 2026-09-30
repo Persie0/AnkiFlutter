@@ -16,7 +16,9 @@ use anki_proto::card_rendering::{
     rendered_template_node::Value, RenderCardResponse, RenderExistingCardRequest,
     RenderedTemplateNode,
 };
-use anki_proto::collection::{CloseCollectionRequest, OpenCollectionRequest};
+use anki_proto::cards::RemoveCardsRequest;
+use anki_proto::collection::{CloseCollectionRequest, OpChangesWithCount, OpenCollectionRequest};
+use anki_flutter_bridge::operations::REMOVE_CARDS;
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use prost::Message;
 use tempfile::TempDir;
@@ -218,6 +220,51 @@ fn reviewer_render_uses_real_anki_frontside_back_and_css() {
     assert!(answer.contains("reviewer-front"));
     assert!(answer.contains("reviewer-back"));
     assert!(!rendered.css.trim().is_empty());
+}
+
+#[test]
+fn selected_card_removal_uses_anki_cards_service_through_ffi() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype should exist");
+    let mut note = notetype.new_note();
+    note.set_field(0, "remove-selected-card").unwrap();
+    note.set_field(1, "back").unwrap();
+    collection.add_note(&mut note, DeckId(1)).unwrap();
+    let card_ids = collection.search_cards(note.id, SortMode::NoOrder).unwrap();
+    assert_eq!(card_ids.len(), 1);
+    let card_id = card_ids[0].0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let (status, bytes) = backend.invoke(
+        REMOVE_CARDS,
+        &RemoveCardsRequest {
+            card_ids: vec![card_id],
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "removal failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
+    assert_eq!(changes.count, 1);
 }
 
 #[test]
