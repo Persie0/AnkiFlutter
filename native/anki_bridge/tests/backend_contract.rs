@@ -19,6 +19,7 @@ use anki_proto::card_rendering::{
 use anki_proto::cards::RemoveCardsRequest;
 use anki_proto::collection::{CloseCollectionRequest, OpChangesWithCount, OpenCollectionRequest};
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
+use anki_proto::search::BrowserColumns;
 use prost::Message;
 use tempfile::TempDir;
 
@@ -28,6 +29,7 @@ const CLOSE_COLLECTION: u32 = 2;
 const DECK_TREE: u32 = 3;
 const RENDER_EXISTING_CARD: u32 = 12;
 const REMOVE_CARDS: u32 = 32;
+const ALL_BROWSER_COLUMNS: u32 = 33;
 
 struct TestBackend {
     handle: *mut BridgeBackend,
@@ -265,6 +267,32 @@ fn selected_card_removal_uses_anki_cards_service_through_ffi() {
     );
     let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
     assert_eq!(changes.count, 1);
+}
+
+#[test]
+fn browser_sort_metadata_is_available_through_ffi() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let backend = TestBackend::new();
+
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(ALL_BROWSER_COLUMNS, &anki_proto::generic::Empty {});
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "browser columns failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let columns = BrowserColumns::decode(bytes.as_slice()).unwrap();
+    assert!(columns.columns.iter().any(|column| column.key == "noteFld"));
+    assert!(columns.columns.iter().any(|column| column.key == "cardDue"));
 }
 
 #[test]
