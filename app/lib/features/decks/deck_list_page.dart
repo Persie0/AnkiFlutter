@@ -14,12 +14,15 @@ import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
 typedef CollectionOpener = Future<void> Function(String path);
+typedef CollectionCloser = Future<void> Function();
 
 class DeckListPage extends StatefulWidget {
   const DeckListPage({
     required this.controller,
     required this.pickCollection,
     required this.openCollection,
+    this.closeCollection,
+    this.collectionIsOpen,
     this.backend,
     this.mediaBaseUri,
     this.reviewControllerBuilder,
@@ -30,6 +33,8 @@ class DeckListPage extends StatefulWidget {
   final DeckListController controller;
   final CollectionPicker pickCollection;
   final CollectionOpener openCollection;
+  final CollectionCloser? closeCollection;
+  final bool Function()? collectionIsOpen;
   final BackendInvoker? backend;
   final Uri? Function()? mediaBaseUri;
   final ReviewControllerBuilder? reviewControllerBuilder;
@@ -42,12 +47,13 @@ class DeckListPage extends StatefulWidget {
 class _DeckListPageState extends State<DeckListPage> {
   bool _opening = false;
   bool _collectionOpened = false;
-  Object? _collectionError;
+  String? _collectionErrorMessage;
 
   Future<void> _chooseCollection() async {
+    final wasOpen = _collectionOpened;
     setState(() {
       _opening = true;
-      _collectionError = null;
+      _collectionErrorMessage = null;
     });
 
     try {
@@ -75,8 +81,49 @@ class _DeckListPageState extends State<DeckListPage> {
       }
       setState(() {
         _opening = false;
-        _collectionError = error;
+        _collectionErrorMessage = wasOpen
+            ? 'Could not switch collection: $error'
+            : 'Could not open collection: $error';
+        _collectionOpened = widget.collectionIsOpen?.call() ?? wasOpen;
       });
+      if (wasOpen) {
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(_collectionErrorMessage!)),
+        );
+      }
+    }
+  }
+
+  Future<void> _closeCollection() async {
+    final closeCollection = widget.closeCollection;
+    if (closeCollection == null) {
+      return;
+    }
+    setState(() {
+      _opening = true;
+      _collectionErrorMessage = null;
+    });
+    try {
+      await closeCollection();
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _opening = false;
+        _collectionOpened = false;
+      });
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _opening = false;
+        _collectionErrorMessage = 'Could not close collection: $error';
+        _collectionOpened = widget.collectionIsOpen?.call() ?? true;
+      });
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(_collectionErrorMessage!)),
+      );
     }
   }
 
@@ -124,6 +171,19 @@ class _DeckListPageState extends State<DeckListPage> {
       appBar: AppBar(
         title: const Text('AnkiFlutter'),
         actions: [
+          if (_collectionOpened) ...[
+            IconButton(
+              tooltip: 'Switch collection',
+              icon: const Icon(Icons.folder_open),
+              onPressed: _opening ? null : _chooseCollection,
+            ),
+            if (widget.closeCollection != null)
+              IconButton(
+                tooltip: 'Close collection',
+                icon: const Icon(Icons.close),
+                onPressed: _opening ? null : _closeCollection,
+              ),
+          ],
           if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Browse cards',
@@ -174,10 +234,10 @@ class _DeckListPageState extends State<DeckListPage> {
                 icon: const Icon(Icons.folder_open),
                 label: const Text('Open Anki Collection'),
               ),
-              if (_collectionError case final error?) ...[
+              if (_collectionErrorMessage case final error?) ...[
                 const SizedBox(height: 16),
                 Text(
-                  'Could not open collection: $error',
+                  error,
                   key: const ValueKey('collection-error'),
                   textAlign: TextAlign.center,
                 ),
@@ -188,7 +248,7 @@ class _DeckListPageState extends State<DeckListPage> {
       );
     }
 
-    return AnimatedBuilder(
+    final deckContent = AnimatedBuilder(
       animation: widget.controller,
       builder: (context, _) {
         return switch (widget.controller.state) {
@@ -209,6 +269,25 @@ class _DeckListPageState extends State<DeckListPage> {
           ),
         };
       },
+    );
+    final error = _collectionErrorMessage;
+    if (error == null) {
+      return deckContent;
+    }
+    return Column(
+      children: [
+        MaterialBanner(
+          key: const ValueKey('collection-operation-error'),
+          content: Text(error),
+          actions: [
+            TextButton(
+              onPressed: () => setState(() => _collectionErrorMessage = null),
+              child: const Text('Dismiss'),
+            ),
+          ],
+        ),
+        Expanded(child: deckContent),
+      ],
     );
   }
 }

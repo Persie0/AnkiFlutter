@@ -50,6 +50,19 @@ void main() {
     expect(mediaServer.startCalls, isEmpty);
   });
 
+  test('failed media startup closes the backend collection again', () async {
+    mediaServer.startError = StateError('media server failed');
+
+    await expectLater(session.open(location), throwsStateError);
+
+    expect(session.isOpen, isFalse);
+    expect(session.location, isNull);
+    expect(
+      backend.calls.map((call) => call.operation),
+      [BackendOperation.openCollection, BackendOperation.closeCollection],
+    );
+  });
+
   test('close clears location closes media and sends non-downgrading request', () async {
     await session.open(location);
     backend.calls.clear();
@@ -76,6 +89,121 @@ void main() {
     expect(backend.calls.length, callsAfterFirstClose);
     expect(mediaServer.closeCalls, mediaClosesAfterFirstClose);
   });
+
+  test('opening another collection closes the old one before opening it', () async {
+    const nextLocation = CollectionLocation(
+      collectionPath: '/tmp/next.anki2',
+      mediaFolderPath: '/tmp/next.media',
+      mediaDbPath: '/tmp/next.media.db2',
+    );
+    await session.open(location);
+    backend.calls.clear();
+
+    await session.open(nextLocation);
+
+    expect(
+      backend.calls.map((call) => call.operation),
+      [BackendOperation.closeCollection, BackendOperation.openCollection],
+    );
+    expect(session.isOpen, isTrue);
+    expect(session.location, same(nextLocation));
+    expect(mediaServer.closeCalls, 1);
+    expect(mediaServer.startCalls, ['/tmp/collection.media', '/tmp/next.media']);
+  });
+
+  test('failed collection switch restores the previously open collection', () async {
+    const nextLocation = CollectionLocation(
+      collectionPath: '/tmp/next.anki2',
+      mediaFolderPath: '/tmp/next.media',
+      mediaDbPath: '/tmp/next.media.db2',
+    );
+    await session.open(location);
+    backend.calls.clear();
+    backend.openFailures[nextLocation.collectionPath] = 1;
+
+    await expectLater(session.open(nextLocation), throwsStateError);
+
+    expect(
+      backend.calls.map((call) => call.operation),
+      [
+        BackendOperation.closeCollection,
+        BackendOperation.openCollection,
+        BackendOperation.openCollection,
+      ],
+    );
+    expect(session.isOpen, isTrue);
+    expect(session.location, same(location));
+    expect(session.mediaBaseUri, isNotNull);
+    expect(mediaServer.closeCalls, 1);
+    expect(
+      mediaServer.startCalls,
+      ['/tmp/collection.media', '/tmp/collection.media'],
+    );
+  });
+
+  test('opening the already open location is a no-op', () async {
+    await session.open(location);
+    backend.calls.clear();
+
+    await session.open(location);
+
+    expect(backend.calls, isEmpty);
+    expect(mediaServer.startCalls, ['/tmp/collection.media']);
+    expect(mediaServer.closeCalls, 0);
+  });
+
+  test('reports when a failed switch cannot restore the previous collection', () async {
+    const nextLocation = CollectionLocation(
+      collectionPath: '/tmp/next.anki2',
+      mediaFolderPath: '/tmp/next.media',
+      mediaDbPath: '/tmp/next.media.db2',
+    );
+    await session.open(location);
+    backend.openFailures[nextLocation.collectionPath] = 1;
+    backend.openFailures[location.collectionPath] = 1;
+
+    await expectLater(
+      session.open(nextLocation),
+      throwsA(isA<CollectionSwitchException>()),
+    );
+
+    expect(session.isOpen, isFalse);
+    expect(session.location, isNull);
+    expect(session.mediaBaseUri, isNull);
+  });
+
+  test('close failure keeps the active collection state intact', () async {
+    await session.open(location);
+    backend.error = StateError('close failed');
+
+    await expectLater(session.close(), throwsStateError);
+
+    expect(session.isOpen, isTrue);
+    expect(session.location, same(location));
+    expect(session.mediaBaseUri, isNotNull);
+    expect(mediaServer.closeCalls, 0);
+  });
+
+  test('media shutdown failure restores the collection before rejecting a switch', () async {
+    const nextLocation = CollectionLocation(
+      collectionPath: '/tmp/next.anki2',
+      mediaFolderPath: '/tmp/next.media',
+      mediaDbPath: '/tmp/next.media.db2',
+    );
+    await session.open(location);
+    backend.calls.clear();
+    mediaServer.closeError = StateError('media shutdown failed');
+
+    await expectLater(session.open(nextLocation), throwsStateError);
+
+    expect(
+      backend.calls.map((call) => call.operation),
+      [BackendOperation.closeCollection, BackendOperation.openCollection],
+    );
+    expect(session.isOpen, isTrue);
+    expect(session.location, same(location));
+    expect(mediaServer.startCalls, ['/tmp/collection.media', '/tmp/collection.media']);
+  });
 }
 
 int _eventOrder = 0;
@@ -83,6 +211,7 @@ int _eventOrder = 0;
 class _FakeBackend implements BackendInvoker {
   final calls = <_Invocation>[];
   final events = <_OrderedEvent>[];
+  final openFailures = <String, int>{};
   Object? error;
 
   @override
@@ -92,6 +221,12 @@ class _FakeBackend implements BackendInvoker {
       throw error;
     }
     if (operation == BackendOperation.openCollection) {
+      final path = OpenCollectionRequest.fromBuffer(request).collectionPath;
+      final failuresRemaining = openFailures[path] ?? 0;
+      if (failuresRemaining > 0) {
+        openFailures[path] = failuresRemaining - 1;
+        throw StateError('open failed: $path');
+      }
       events.add(_OrderedEvent('backend:open', _eventOrder++));
     }
     return Uint8List(0);
@@ -102,17 +237,25 @@ class _FakeReviewMediaServer extends ReviewMediaServer {
   final startCalls = <String>[];
   final events = <_OrderedEvent>[];
   int closeCalls = 0;
+  Object? startError;
+  Object? closeError;
 
   @override
   Future<Uri> start(String mediaRoot) async {
     startCalls.add(mediaRoot);
     events.add(_OrderedEvent('media:start', _eventOrder++));
+    if (startError case final error?) {
+      throw error;
+    }
     return Uri.parse('http://127.0.0.1:43210/token/');
   }
 
   @override
   Future<void> close() async {
     closeCalls += 1;
+    if (closeError case final error?) {
+      throw error;
+    }
   }
 }
 

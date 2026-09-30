@@ -70,6 +70,75 @@ void main() {
     expect(find.byKey(const ValueKey('collection-error')), findsNothing);
   });
 
+  testWidgets('an open collection can be switched without leaving the deck list', (tester) async {
+    final controller = DeckListController(repository: _FixedRepository(nestedDecks));
+    final selectedPaths = <String?>[
+      '/tmp/collection.anki2',
+      '/tmp/next.anki2',
+    ];
+    final openedPaths = <String>[];
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      pickCollection: () async => selectedPaths.removeAt(0),
+      openCollection: (path) async => openedPaths.add(path),
+    ));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Switch collection'));
+    await tester.pumpAndSettle();
+
+    expect(openedPaths, ['/tmp/collection.anki2', '/tmp/next.anki2']);
+    expect(find.text('Languages'), findsOneWidget);
+    expect(find.byTooltip('Switch collection'), findsOneWidget);
+  });
+
+  testWidgets('a failed switch keeps the current deck list visible', (tester) async {
+    final controller = DeckListController(repository: _FixedRepository(nestedDecks));
+    final selectedPaths = <String?>[
+      '/tmp/collection.anki2',
+      '/tmp/broken.anki2',
+    ];
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      pickCollection: () async => selectedPaths.removeAt(0),
+      openCollection: (path) async {
+        if (path == '/tmp/broken.anki2') {
+          throw StateError('collection is unavailable');
+        }
+      },
+    ));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Switch collection'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Languages'), findsOneWidget);
+    expect(find.byKey(const ValueKey('collection-operation-error')), findsOneWidget);
+  });
+
+  testWidgets('closing a collection returns to the open collection screen', (tester) async {
+    final controller = DeckListController(repository: _FixedRepository(nestedDecks));
+    var closeCalls = 0;
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      pickCollection: () async => '/tmp/collection.anki2',
+      openCollection: (_) async {},
+      closeCollection: () async => closeCalls++,
+    ));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Close collection'));
+    await tester.pumpAndSettle();
+
+    expect(closeCalls, 1);
+    expect(find.text('Open Anki Collection'), findsOneWidget);
+    expect(find.text('Languages'), findsNothing);
+  });
+
   testWidgets('opening and loading a collection shows progress', (tester) async {
     final completer = Completer<List<DeckNode>>();
     final controller = DeckListController(repository: _CompleterRepository(completer));
@@ -153,6 +222,7 @@ Widget _app({
   required DeckListController controller,
   required Future<String?> Function() pickCollection,
   required Future<void> Function(String path) openCollection,
+  Future<void> Function()? closeCollection,
   Object? startupError,
 }) {
   return MaterialApp(
@@ -160,6 +230,7 @@ Widget _app({
       controller: controller,
       pickCollection: pickCollection,
       openCollection: openCollection,
+      closeCollection: closeCollection,
       startupError: startupError,
     ),
   );

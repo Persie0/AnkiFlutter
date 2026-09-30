@@ -144,6 +144,8 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
       pickCollection: widget.pickCollection ?? _pickAnkiCollectionProfile,
       openCollection: (path) =>
           session.open(CollectionLocation.fromCollectionPath(path)),
+      closeCollection: session.close,
+      collectionIsOpen: () => session.isOpen,
     );
   }
 
