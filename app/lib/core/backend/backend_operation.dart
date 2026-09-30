@@ -29,7 +29,8 @@ enum BackendOperation {
   getConfigJson(28),
   getNote(29),
   updateNotes(30),
-  getCard(31);
+  getCard(31),
+  removeCards(32);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

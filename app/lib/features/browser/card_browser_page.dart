@@ -87,17 +87,21 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     final actionName = switch (action) {
       CardBulkAction.suspend => 'Suspend',
       CardBulkAction.bury => 'Bury',
+      CardBulkAction.delete => 'Delete',
     };
     final cardLabel = cardIds.length == 1 ? 'card' : 'cards';
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: Text('$actionName ${cardIds.length} $cardLabel?'),
-        content: Text(
-          action == CardBulkAction.suspend
-              ? 'These cards will be suspended until you unsuspend them.'
-              : 'These cards will be buried for the current day.',
-        ),
+        content: Text(switch (action) {
+          CardBulkAction.suspend =>
+            'These cards will be suspended until you unsuspend them.',
+          CardBulkAction.bury =>
+            'These cards will be buried for the current day.',
+          CardBulkAction.delete =>
+            'Delete these cards from the collection? Their notes will remain.',
+        }),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -125,7 +129,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     } catch (error) {
       if (!mounted) return;
       setState(() => _bulkActionInProgress = false);
-      final verb = action == CardBulkAction.suspend ? 'suspend' : 'bury';
+      final verb = switch (action) {
+        CardBulkAction.suspend => 'suspend',
+        CardBulkAction.bury => 'bury',
+        CardBulkAction.delete => 'delete',
+      };
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Could not $verb selected cards: $error')),
       );
@@ -216,6 +224,16 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     ? null
                     : () => unawaited(_confirmBulkAction(CardBulkAction.bury)),
                 child: const Text('Bury selected'),
+              ),
+              OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                onPressed: _loading || _bulkActionInProgress
+                    ? null
+                    : () =>
+                          unawaited(_confirmBulkAction(CardBulkAction.delete)),
+                child: const Text('Delete selected'),
               ),
             ],
           ),

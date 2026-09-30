@@ -18,7 +18,6 @@ use anki_proto::card_rendering::{
 };
 use anki_proto::cards::RemoveCardsRequest;
 use anki_proto::collection::{CloseCollectionRequest, OpChangesWithCount, OpenCollectionRequest};
-use anki_flutter_bridge::operations::REMOVE_CARDS;
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use prost::Message;
 use tempfile::TempDir;
@@ -28,6 +27,7 @@ const OPEN_COLLECTION: u32 = 1;
 const CLOSE_COLLECTION: u32 = 2;
 const DECK_TREE: u32 = 3;
 const RENDER_EXISTING_CARD: u32 = 12;
+const REMOVE_CARDS: u32 = 32;
 
 struct TestBackend {
     handle: *mut BridgeBackend,

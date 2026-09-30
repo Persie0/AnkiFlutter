@@ -16,7 +16,7 @@ import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart'
     as anki_scheduler;
 import 'package:fixnum/fixnum.dart';
 
-enum CardBulkAction { suspend, bury }
+enum CardBulkAction { suspend, bury, delete }
 
 abstract interface class CardBrowserRepository {
   Future<CardBrowserSearchResult> search(String query);
@@ -105,6 +105,17 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
   Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action) async {
     if (cardIds.isEmpty) return;
 
+    if (action == CardBulkAction.delete) {
+      final request = anki_cards.RemoveCardsRequest(
+        cardIds: cardIds.map((cardId) => Int64(cardId)),
+      );
+      await backend.invoke(
+        BackendOperation.removeCards,
+        Uint8List.fromList(request.writeToBuffer()),
+      );
+      return;
+    }
+
     final request = anki_scheduler.BuryOrSuspendCardsRequest(
       cardIds: cardIds.map((cardId) => Int64(cardId)),
       mode: switch (action) {
@@ -112,6 +123,9 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
           anki_scheduler.BuryOrSuspendCardsRequest_Mode.SUSPEND,
         CardBulkAction.bury =>
           anki_scheduler.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+        CardBulkAction.delete => throw StateError(
+          'Card deletion is handled above.',
+        ),
       },
     );
     await backend.invoke(
