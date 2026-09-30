@@ -258,6 +258,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                   key: const ValueKey('card-browser-sort-column'),
                   isExpanded: true,
                   value: _selectedSortOption,
+                  hint: const Text('Anki default order'),
                   items: [
                     const DropdownMenuItem<CardBrowserSortOption?>(
                       value: null,
