@@ -5,8 +5,9 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart';
-import 'package:anki_flutter/features/decks/deck_list_controller.dart';
+import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
+import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_repository.dart';
@@ -75,6 +76,51 @@ void main() {
     expect(openCalls, 0);
     expect(find.text('Open Anki Collection'), findsOneWidget);
     expect(find.byKey(const ValueKey('collection-error')), findsNothing);
+  });
+
+  testWidgets('a recent collection can be reopened from the initial screen', (
+    tester,
+  ) async {
+    final controller = DeckListController(repository: _FixedRepository(const []));
+    final recents = _MemoryRecentCollectionStore(['/tmp/french.anki2']);
+    final openedPaths = <String>[];
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      recentCollectionsStore: recents,
+      pickCollection: () async => null,
+      openCollection: (path) async => openedPaths.add(path),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('french'), findsOneWidget);
+    await tester.tap(find.text('french'));
+    await tester.pumpAndSettle();
+
+    expect(openedPaths, ['/tmp/french.anki2']);
+    expect(find.text('Decks'), findsOneWidget);
+    expect(recents.paths, ['/tmp/french.anki2']);
+  });
+
+  testWidgets('a failed recent collection open keeps the entry available', (
+    tester,
+  ) async {
+    final controller = DeckListController(repository: _FixedRepository(const []));
+    final recents = _MemoryRecentCollectionStore(['/tmp/french.anki2']);
+
+    await tester.pumpWidget(_app(
+      controller: controller,
+      recentCollectionsStore: recents,
+      pickCollection: () async => null,
+      openCollection: (_) async => throw StateError('file is unavailable'),
+    ));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('french'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('file is unavailable'), findsOneWidget);
+    expect(find.text('french'), findsOneWidget);
+    expect(recents.paths, ['/tmp/french.anki2']);
   });
 
   testWidgets('an open collection can be switched without leaving the deck list', (tester) async {
@@ -287,6 +333,7 @@ Widget _app({
   required Future<String?> Function() pickCollection,
   required Future<void> Function(String path) openCollection,
   BackendInvoker? backend,
+  RecentCollectionStore? recentCollectionsStore,
   Future<void> Function()? closeCollection,
   Object? startupError,
 }) {
@@ -296,10 +343,31 @@ Widget _app({
       pickCollection: pickCollection,
       openCollection: openCollection,
       backend: backend,
+      recentCollectionsStore: recentCollectionsStore,
       closeCollection: closeCollection,
       startupError: startupError,
     ),
   );
+}
+
+class _MemoryRecentCollectionStore implements RecentCollectionStore {
+  _MemoryRecentCollectionStore(this.paths);
+
+  final List<String> paths;
+
+  @override
+  Future<List<String>> load() async => List.of(paths);
+
+  @override
+  Future<void> remember(String collectionPath) async {
+    paths.remove(collectionPath);
+    paths.insert(0, collectionPath);
+  }
+
+  @override
+  Future<void> forget(String collectionPath) async {
+    paths.remove(collectionPath);
+  }
 }
 
 class _CountingDeckRepository implements DeckRepository {

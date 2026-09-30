@@ -8,6 +8,8 @@ import 'package:anki_flutter/core/backend/native/native_anki_bindings.dart';
 import 'package:anki_flutter/core/backend/native/native_library_loader.dart';
 import 'package:anki_flutter/features/collection/collection_location.dart';
 import 'package:anki_flutter/features/collection/collection_session.dart';
+import 'package:anki_flutter/features/collection/mobile_collection_storage.dart';
+import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
@@ -141,7 +143,8 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
           return baseUri.resolve(encodedFilename);
         },
       ),
-      pickCollection: widget.pickCollection ?? _pickAnkiCollectionProfile,
+      pickCollection: widget.pickCollection ?? _pickAnkiCollection,
+      recentCollectionsStore: FileRecentCollectionStore(),
       openCollection: (path) =>
           session.open(CollectionLocation.fromCollectionPath(path)),
       closeCollection: session.close,
@@ -173,7 +176,25 @@ NativeAnkiBindings _loadNativeBindings() {
   return FfiNativeAnkiBindings.fromLibrary(library);
 }
 
-Future<String?> _pickAnkiCollectionProfile() async {
+Future<String?> _pickAnkiCollection() async {
+  if (Platform.isAndroid || Platform.isIOS) {
+    final selection = await FilePicker.platform.pickFiles(
+      dialogTitle: 'Choose an Anki collection',
+      type: FileType.custom,
+      allowedExtensions: const ['anki2'],
+    );
+    if (selection == null) {
+      return null;
+    }
+    final path = selection.files.single.path;
+    if (path == null) {
+      throw StateError('The selected collection could not be accessed.');
+    }
+    return MobileCollectionStorage(
+      collectionsDirectory: ApplicationDataPaths.collectionsDirectory,
+    ).copySelectedCollection(File(path));
+  }
+
   final directory = await FilePicker.getDirectoryPath(
     dialogTitle: 'Choose an Anki profile folder',
   );

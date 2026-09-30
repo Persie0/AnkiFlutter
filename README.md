@@ -6,7 +6,7 @@ This project is not affiliated with or endorsed by Ankitects Pty Ltd.
 
 ## Current functionality
 
-The shared Flutter app opens local `.anki2` collections, loads Anki's deck tree and due counts, reviews cards through Anki's scheduler and renderer, and supports shared browser and note-editing flows. Build integration is present for Linux, macOS, Windows, Android, and iOS. Collection switching, review, browser, and authoring behavior stay in the shared Flutter code; the app remains an early port and does not yet implement every official Anki workflow.
+The shared Flutter app opens local `.anki2` collections, remembers up to eight recent collections, and supports profile-folder selection on desktop and collection-file selection on Android and iOS. Mobile selections are copied into app storage before opening, along with adjacent media files when available. It loads Anki's deck tree and due counts, creates decks through Anki's native defaults, reviews cards through Anki's scheduler and renderer, and supports shared browser and note-editing flows. Build integration is present for Linux, macOS, Windows, Android, and iOS. Collection switching, review, browser, and authoring behavior stay in the shared Flutter code; the app remains an early port and does not yet implement every official Anki workflow.
 
 ## Toolchain
 

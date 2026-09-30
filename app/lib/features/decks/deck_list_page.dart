@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/features/browser/card_browser_page.dart';
+import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
+import 'package:anki_flutter/features/collection/recent_collection_store.dart';
+import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
+import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
-import 'package:anki_flutter/features/decks/deck_overview_page.dart';
-import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
-import 'package:anki_flutter/features/browser/card_browser_page.dart';
-import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
-import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -23,6 +24,7 @@ class DeckListPage extends StatefulWidget {
     required this.openCollection,
     this.closeCollection,
     this.collectionIsOpen,
+    this.recentCollectionsStore,
     this.backend,
     this.mediaBaseUri,
     this.reviewControllerBuilder,
@@ -35,6 +37,7 @@ class DeckListPage extends StatefulWidget {
   final CollectionOpener openCollection;
   final CollectionCloser? closeCollection;
   final bool Function()? collectionIsOpen;
+  final RecentCollectionStore? recentCollectionsStore;
   final BackendInvoker? backend;
   final Uri? Function()? mediaBaseUri;
   final ReviewControllerBuilder? reviewControllerBuilder;
@@ -48,6 +51,28 @@ class _DeckListPageState extends State<DeckListPage> {
   bool _opening = false;
   bool _collectionOpened = false;
   String? _collectionErrorMessage;
+  List<String> _recentCollections = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_loadRecentCollections());
+  }
+
+  Future<void> _loadRecentCollections() async {
+    final store = widget.recentCollectionsStore;
+    if (store == null) {
+      return;
+    }
+    try {
+      final paths = await store.load();
+      if (mounted) {
+        setState(() => _recentCollections = paths);
+      }
+    } catch (_) {
+      // Recent paths are a convenience; opening a collection must still work.
+    }
+  }
 
   Future<void> _chooseCollection() async {
     final wasOpen = _collectionOpened;
@@ -66,29 +91,85 @@ class _DeckListPageState extends State<DeckListPage> {
         return;
       }
 
-      await widget.openCollection(path);
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _opening = false;
-        _collectionOpened = true;
-      });
-      await widget.controller.load();
+      await _activateCollection(path);
     } catch (error) {
-      if (!mounted) {
-        return;
+      _reportOpenFailure(error, wasOpen: wasOpen);
+    }
+  }
+
+  Future<void> _openRecentCollection(String path) async {
+    if (_opening) {
+      return;
+    }
+    final wasOpen = _collectionOpened;
+    setState(() {
+      _opening = true;
+      _collectionErrorMessage = null;
+    });
+    try {
+      await _activateCollection(path);
+    } catch (error) {
+      _reportOpenFailure(error, wasOpen: wasOpen);
+    }
+  }
+
+  Future<void> _activateCollection(String path) async {
+    await widget.openCollection(path);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _opening = false;
+      _collectionOpened = true;
+    });
+    await widget.controller.load();
+    final store = widget.recentCollectionsStore;
+    if (store != null) {
+      try {
+        await store.remember(path);
+        await _loadRecentCollections();
+      } catch (error) {
+        if (mounted) {
+          setState(
+            () => _collectionErrorMessage =
+                'Could not update recent collections: $error',
+          );
+        }
       }
-      setState(() {
-        _opening = false;
-        _collectionErrorMessage = wasOpen
-            ? 'Could not switch collection: $error'
-            : 'Could not open collection: $error';
-        _collectionOpened = widget.collectionIsOpen?.call() ?? wasOpen;
-      });
-      if (wasOpen) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text(_collectionErrorMessage!)),
+    }
+  }
+
+  void _reportOpenFailure(Object error, {required bool wasOpen}) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _opening = false;
+      _collectionErrorMessage = wasOpen
+          ? 'Could not switch collection: $error'
+          : 'Could not open collection: $error';
+      _collectionOpened = widget.collectionIsOpen?.call() ?? wasOpen;
+    });
+    if (wasOpen) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(content: Text(_collectionErrorMessage!)),
+      );
+    }
+  }
+
+  Future<void> _forgetRecentCollection(String path) async {
+    final store = widget.recentCollectionsStore;
+    if (store == null) {
+      return;
+    }
+    try {
+      await store.forget(path);
+      await _loadRecentCollections();
+    } catch (error) {
+      if (mounted) {
+        setState(
+          () => _collectionErrorMessage =
+              'Could not remove recent collection: $error',
         );
       }
     }
@@ -247,25 +328,48 @@ class _DeckListPageState extends State<DeckListPage> {
         return const Center(child: CircularProgressIndicator());
       }
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              FilledButton.icon(
-                onPressed: _chooseCollection,
-                icon: const Icon(Icons.folder_open),
-                label: const Text('Open Anki Collection'),
-              ),
-              if (_collectionErrorMessage case final error?) ...[
-                const SizedBox(height: 16),
-                Text(
-                  error,
-                  key: const ValueKey('collection-error'),
-                  textAlign: TextAlign.center,
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                FilledButton.icon(
+                  onPressed: _chooseCollection,
+                  icon: const Icon(Icons.folder_open),
+                  label: const Text('Open Anki Collection'),
                 ),
+                if (_recentCollections.isNotEmpty) ...[
+                  const SizedBox(height: 24),
+                  Text(
+                    'Recent collections',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  for (final path in _recentCollections)
+                    ListTile(
+                      key: ValueKey('recent-collection-$path'),
+                      leading: const Icon(Icons.history),
+                      title: Text(_collectionLabel(path)),
+                      subtitle: Text(path),
+                      onTap: _opening ? null : () => _openRecentCollection(path),
+                      trailing: IconButton(
+                        tooltip: 'Forget ${_collectionLabel(path)}',
+                        icon: const Icon(Icons.remove_circle_outline),
+                        onPressed: () => _forgetRecentCollection(path),
+                      ),
+                    ),
+                ],
+                if (_collectionErrorMessage case final error?) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    error,
+                    key: const ValueKey('collection-error'),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );
@@ -313,6 +417,11 @@ class _DeckListPageState extends State<DeckListPage> {
       ],
     );
   }
+}
+
+String _collectionLabel(String path) {
+  final filename = path.split(RegExp(r'[/\\]')).last;
+  return filename.replaceFirst(RegExp(r'\.anki2$', caseSensitive: false), '');
 }
 
 class _CreateDeckDialog extends StatefulWidget {
