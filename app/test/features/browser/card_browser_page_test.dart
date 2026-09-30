@@ -1,6 +1,7 @@
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
-import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes;
+import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart'
+    as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
@@ -91,6 +92,101 @@ void main() {
     expect(repository.queries, ['', '']);
     expect(find.text('Recovered card'), findsOneWidget);
   });
+
+  testWidgets(
+    'confirms selected cards before suspending and refreshes the current query',
+    (tester) async {
+      final filtered = _cards(10, 20);
+      final repository = _SequenceRepository([
+        _result('All cards'),
+        filtered,
+        filtered,
+      ]);
+
+      await tester.pumpWidget(_app(repository));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const ValueKey('card-browser-search')),
+        'deck:Language',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('select-card-10')));
+      await tester.tap(find.byKey(const ValueKey('select-card-20')));
+      await tester.pumpAndSettle();
+
+      expect(find.text('2 cards selected'), findsOneWidget);
+      await tester.tap(find.text('Suspend selected'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Suspend 2 cards?'), findsOneWidget);
+      expect(repository.bulkActions, isEmpty);
+      await tester.tap(find.byKey(const ValueKey('confirm-card-bulk-action')));
+      await tester.pumpAndSettle();
+
+      expect(repository.bulkActions, hasLength(1));
+      expect(repository.bulkActions.single.key, [10, 20]);
+      expect(repository.bulkActions.single.value, CardBulkAction.suspend);
+      expect(repository.queries, ['', 'deck:Language', 'deck:Language']);
+      expect(find.text('2 cards selected'), findsNothing);
+    },
+  );
+
+  testWidgets('canceling a bulk action keeps the selection', (tester) async {
+    final repository = _SequenceRepository([_cards(10, 20)]);
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Bury selected'));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Cancel'));
+    await tester.pumpAndSettle();
+
+    expect(repository.bulkActions, isEmpty);
+    expect(find.text('1 card selected'), findsOneWidget);
+  });
+
+  testWidgets('retains the selection after a backend action fails', (
+    tester,
+  ) async {
+    final repository = _SequenceRepository([_cards(10, 20)])
+      ..bulkActionError = StateError('backend unavailable');
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Suspend selected'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('confirm-card-bulk-action')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 card selected'), findsOneWidget);
+    expect(find.textContaining('backend unavailable'), findsOneWidget);
+    expect(repository.queries, ['']);
+  });
+
+  testWidgets('clears selection when a new search is submitted', (
+    tester,
+  ) async {
+    final repository = _SequenceRepository([_cards(10, 20), _cards(30, 40)]);
+    await tester.pumpWidget(_app(repository));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    await tester.pumpAndSettle();
+    expect(find.text('1 card selected'), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(const ValueKey('card-browser-search')),
+      'tag:new-search',
+    );
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+
+    expect(find.text('1 card selected'), findsNothing);
+    expect(repository.queries, ['', 'tag:new-search']);
+  });
 }
 
 Widget _app(CardBrowserRepository repository) => MaterialApp(
@@ -108,10 +204,21 @@ CardBrowserSearchResult _result(String first, [String second = '']) =>
       ],
     );
 
+CardBrowserSearchResult _cards(int firstId, int secondId) =>
+    CardBrowserSearchResult(
+      totalCount: 2,
+      cards: [
+        CardBrowserResult(cardId: firstId, cells: ['Card $firstId']),
+        CardBrowserResult(cardId: secondId, cells: ['Card $secondId']),
+      ],
+    );
+
 class _SequenceRepository implements CardBrowserRepository {
   _SequenceRepository(this.outcomes);
   final List<Object> outcomes;
   final queries = <String>[];
+  final bulkActions = <MapEntry<List<int>, CardBulkAction>>[];
+  Object? bulkActionError;
 
   @override
   Future<int> noteIdForCard(int cardId) async => 42;
@@ -122,6 +229,11 @@ class _SequenceRepository implements CardBrowserRepository {
     final outcome = outcomes[queries.length - 1];
     if (outcome is Error) throw outcome;
     return outcome as CardBrowserSearchResult;
+  }
+
+  Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action) async {
+    bulkActions.add(MapEntry(List.of(cardIds), action));
+    if (bulkActionError case final error?) throw error;
   }
 }
 
@@ -149,5 +261,6 @@ class _EmptyNoteRepository implements NoteEntryRepository {
       throw UnimplementedError();
 
   @override
-  Future<notes.Note> newNote(int notetypeId) async => throw UnimplementedError();
+  Future<notes.Note> newNote(int notetypeId) async =>
+      throw UnimplementedError();
 }

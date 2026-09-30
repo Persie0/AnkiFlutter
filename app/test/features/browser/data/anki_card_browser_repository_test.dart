@@ -6,20 +6,21 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/anki_backend_exception.dart';
 import 'package:anki_flutter/core/backend/generated/anki/backend.pbenum.dart'
     as backend_proto;
-import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards;
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
+    as cards;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as search;
+import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart'
+    as scheduler;
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('resolves a browser card ID to its Anki note ID on demand', () async {
-    final backend = _Backend([
-      cards.Card(noteId: Int64(987)).writeToBuffer(),
-    ]);
+    final backend = _Backend([cards.Card(noteId: Int64(987)).writeToBuffer()]);
 
     final noteId = await AnkiCardBrowserRepository(backend: backend)
         .noteIdForCard(42);
@@ -133,6 +134,42 @@ void main() {
       'cardDue',
       'deck',
     ]);
+  });
+
+  test(
+    'encodes suspend and bury modes with only the requested card IDs',
+    () async {
+      final backend = _Backend([Uint8List(0), Uint8List(0)]);
+      final repository = AnkiCardBrowserRepository(backend: backend);
+
+      await repository.applyBulkAction([21, 34], CardBulkAction.suspend);
+      await repository.applyBulkAction([21, 34], CardBulkAction.bury);
+
+      expect(backend.calls.map((call) => call.operation), [
+        BackendOperation.buryOrSuspendCards,
+        BackendOperation.buryOrSuspendCards,
+      ]);
+      final suspend = scheduler.BuryOrSuspendCardsRequest.fromBuffer(
+        backend.calls[0].request,
+      );
+      expect(suspend.cardIds, [Int64(21), Int64(34)]);
+      expect(suspend.mode, scheduler.BuryOrSuspendCardsRequest_Mode.SUSPEND);
+
+      final bury = scheduler.BuryOrSuspendCardsRequest.fromBuffer(
+        backend.calls[1].request,
+      );
+      expect(bury.cardIds, [Int64(21), Int64(34)]);
+      expect(bury.mode, scheduler.BuryOrSuspendCardsRequest_Mode.BURY_USER);
+    },
+  );
+
+  test('does not call Anki when there are no selected cards', () async {
+    final backend = _Backend([]);
+
+    await AnkiCardBrowserRepository(backend: backend)
+        .applyBulkAction([], CardBulkAction.suspend);
+
+    expect(backend.calls, isEmpty);
   });
 }
 
