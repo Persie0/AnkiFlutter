@@ -19,11 +19,35 @@ import 'package:fixnum/fixnum.dart';
 enum CardBulkAction { suspend, bury, delete }
 
 abstract interface class CardBrowserRepository {
-  Future<CardBrowserSearchResult> search(String query);
+  Future<List<CardBrowserSortOption>> sortOptions();
+
+  Future<CardBrowserSearchResult> search(
+    String query, {
+    CardBrowserSort? sort,
+  });
 
   Future<int> noteIdForCard(int cardId);
 
   Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action);
+}
+
+class CardBrowserSortOption {
+  const CardBrowserSortOption({
+    required this.column,
+    required this.label,
+    required this.reverseByDefault,
+  });
+
+  final String column;
+  final String label;
+  final bool reverseByDefault;
+}
+
+class CardBrowserSort {
+  const CardBrowserSort({required this.column, required this.reverse});
+
+  final String column;
+  final bool reverse;
 }
 
 class CardBrowserSearchResult {
@@ -52,8 +76,47 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
   final int maxRows;
 
   @override
-  Future<CardBrowserSearchResult> search(String query) async {
+  Future<List<CardBrowserSortOption>> sortOptions() async {
+    final responseBytes = await backend.invoke(
+      BackendOperation.allBrowserColumns,
+      Uint8List.fromList(generic.Empty().writeToBuffer()),
+    );
+    final columns = anki_search.BrowserColumns.fromBuffer(responseBytes).columns;
+    return List.unmodifiable(
+      columns
+          .where(
+            (column) =>
+                column.sortingCards !=
+                anki_search.BrowserColumns_Sorting.SORTING_NONE,
+          )
+          .map(
+            (column) => CardBrowserSortOption(
+              column: column.key,
+              label: column.cardsModeLabel.isEmpty
+                  ? column.key
+                  : column.cardsModeLabel,
+              reverseByDefault:
+                  column.sortingCards ==
+                  anki_search.BrowserColumns_Sorting.SORTING_DESCENDING,
+            ),
+          ),
+    );
+  }
+
+  @override
+  Future<CardBrowserSearchResult> search(
+    String query, {
+    CardBrowserSort? sort,
+  }) async {
     final request = anki_search.SearchRequest(search: query);
+    if (sort != null) {
+      request.order = anki_search.SortOrder(
+        builtin: anki_search.SortOrder_Builtin(
+          column: sort.column,
+          reverse: sort.reverse,
+        ),
+      );
+    }
     final responseBytes = await backend.invoke(
       BackendOperation.searchCards,
       Uint8List.fromList(request.writeToBuffer()),
