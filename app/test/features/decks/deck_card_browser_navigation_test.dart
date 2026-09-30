@@ -34,7 +34,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Browse cards'), findsOneWidget);
-      expect(backend.operations, [BackendOperation.searchCards]);
+      expect(backend.operations, [
+        BackendOperation.allBrowserColumns,
+        BackendOperation.searchCards,
+      ]);
       controller.dispose();
     },
   );
@@ -49,7 +52,13 @@ class _Backend implements BackendInvoker {
     Uint8List request,
   ) async {
     operations.add(operation);
-    return Uint8List.fromList(search.SearchResponse().writeToBuffer());
+    return switch (operation) {
+      BackendOperation.allBrowserColumns =>
+        Uint8List.fromList(search.BrowserColumns().writeToBuffer()),
+      BackendOperation.searchCards =>
+        Uint8List.fromList(search.SearchResponse().writeToBuffer()),
+      _ => Uint8List(0),
+    };
   }
 }
 
