@@ -8,15 +8,22 @@ import 'package:anki_flutter/core/backend/generated/anki/backend.pbenum.dart'
     as backend_proto;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
-import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as anki_cards;
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
+    as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as anki_search;
+import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart'
+    as anki_scheduler;
 import 'package:fixnum/fixnum.dart';
+
+enum CardBulkAction { suspend, bury }
 
 abstract interface class CardBrowserRepository {
   Future<CardBrowserSearchResult> search(String query);
 
   Future<int> noteIdForCard(int cardId);
+
+  Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action);
 }
 
 class CardBrowserSearchResult {
@@ -92,6 +99,25 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
       Uint8List.fromList(request.writeToBuffer()),
     );
     return anki_cards.Card.fromBuffer(response).noteId.toInt();
+  }
+
+  @override
+  Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action) async {
+    if (cardIds.isEmpty) return;
+
+    final request = anki_scheduler.BuryOrSuspendCardsRequest(
+      cardIds: cardIds.map((cardId) => Int64(cardId)),
+      mode: switch (action) {
+        CardBulkAction.suspend =>
+          anki_scheduler.BuryOrSuspendCardsRequest_Mode.SUSPEND,
+        CardBulkAction.bury =>
+          anki_scheduler.BuryOrSuspendCardsRequest_Mode.BURY_USER,
+      },
+    );
+    await backend.invoke(
+      BackendOperation.buryOrSuspendCards,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
   }
 
   List<String> _decodeColumns(Uint8List responseBytes) {
