@@ -54,6 +54,7 @@ void main() {
 
     await tester.pumpWidget(_app(repository));
     await tester.pumpAndSettle();
+    expect(find.text('Anki default order'), findsOneWidget);
     await tester.enterText(
       find.byKey(const ValueKey('card-browser-search')),
       'deck:Travel',
