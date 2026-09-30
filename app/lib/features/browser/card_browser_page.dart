@@ -27,11 +27,50 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   bool _loading = true;
   bool _bulkActionInProgress = false;
   final Set<int> _selectedCardIds = <int>{};
+  List<CardBrowserSortOption> _sortOptions = const [];
+  CardBrowserSortOption? _selectedSortOption;
+  CardBrowserSort? _sort;
 
   @override
   void initState() {
     super.initState();
+    unawaited(_loadSortOptions());
     unawaited(_search());
+  }
+
+  Future<void> _loadSortOptions() async {
+    try {
+      final options = await widget.repository.sortOptions();
+      if (!mounted) return;
+      setState(() => _sortOptions = options);
+    } catch (_) {
+      // Keep searching with Anki's default ordering if metadata is unavailable.
+    }
+  }
+
+  void _selectSortOption(CardBrowserSortOption? option) {
+    setState(() {
+      _selectedSortOption = option;
+      _sort = option == null
+          ? null
+          : CardBrowserSort(
+              column: option.column,
+              reverse: option.reverseByDefault,
+            );
+    });
+    unawaited(_search(clearSelection: true));
+  }
+
+  void _toggleSortDirection() {
+    final sort = _sort;
+    if (sort == null) return;
+    setState(() {
+      _sort = CardBrowserSort(
+        column: sort.column,
+        reverse: !sort.reverse,
+      );
+    });
+    unawaited(_search(clearSelection: true));
   }
 
   Future<void> _search({bool clearSelection = false}) async {
@@ -43,7 +82,10 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _error = null;
     });
     try {
-      final result = await widget.repository.search(_queryController.text);
+      final result = await widget.repository.search(
+        _queryController.text,
+        sort: _sort,
+      );
       if (!mounted || generation != _generation) return;
       setState(() {
         _result = result;
@@ -190,10 +232,65 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                 },
               ),
             ),
+            if (_sortOptions.isNotEmpty) _buildSortControls(),
             if (_selectedCardIds.isNotEmpty) _buildSelectionActions(),
             Expanded(child: _buildResults()),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSortControls() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Sort by',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<CardBrowserSortOption?>(
+                  key: const ValueKey('card-browser-sort-column'),
+                  isExpanded: true,
+                  value: _selectedSortOption,
+                  items: [
+                    const DropdownMenuItem<CardBrowserSortOption?>(
+                      value: null,
+                      child: Text('Anki default order'),
+                    ),
+                    ..._sortOptions.map(
+                      (option) => DropdownMenuItem<CardBrowserSortOption?>(
+                        value: option,
+                        child: Text(option.label),
+                      ),
+                    ),
+                  ],
+                  onChanged: _loading || _bulkActionInProgress
+                      ? null
+                      : _selectSortOption,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            key: const ValueKey('card-browser-sort-direction'),
+            tooltip: 'Reverse sort order',
+            onPressed: _sort == null || _loading || _bulkActionInProgress
+                ? null
+                : _toggleSortDirection,
+            icon: Icon(
+              _sort?.reverse == true
+                  ? Icons.arrow_downward
+                  : Icons.arrow_upward,
+            ),
+          ),
+        ],
       ),
     );
   }
