@@ -43,7 +43,7 @@
   `BuryOrSuspendCardsRequest_Mode.BURY_USER`, using
   `BackendOperation.buryOrSuspendCards`.
 
-- [ ] **Step 1: Add failing repository contract tests**
+- [x] **Step 1: Add failing repository contract tests**
 
 Add tests named `encodes suspend and bury modes with only the requested card
 IDs` and `does not call Anki when there are no selected cards`. Assert the
@@ -51,23 +51,23 @@ captured operation is `BackendOperation.buryOrSuspendCards`, decoded
 `cardIds` equal `[Int64(21), Int64(34)]`, each decoded mode equals the requested
 action, and an empty ID list makes no backend call.
 
-- [ ] **Step 2: Run the repository tests to verify they fail**
+- [x] **Step 2: Run the repository tests to verify they fail**
 
 Run: `flutter test test/features/browser/data/anki_card_browser_repository_test.dart`
 from `app/` in the Playground validation workflow.
 Expected: the action type and repository method are missing.
 
-- [ ] **Step 3: Implement the action type and repository mapping**
+- [x] **Step 3: Implement the action type and repository mapping**
 
 Add `CardBulkAction`, extend `CardBrowserRepository`, and serialize a
 `BuryOrSuspendCardsRequest` with `Int64` IDs and the selected mode. Return
 without calling Anki when the ID list is empty.
 
-- [ ] **Step 4: Re-run the repository tests**
+- [x] **Step 4: Re-run the repository tests**
 
 Expected: both repository tests pass and prior repository tests remain green.
 
-- [ ] **Step 5: Commit the repository change**
+- [x] **Step 5: Commit the repository change**
 
 Commit as `feat: expose Anki browser bulk actions`.
 
@@ -84,7 +84,7 @@ Commit as `feat: expose Anki browser bulk actions`.
   actions; successful actions refresh the active query, while canceled/failed
   actions keep selection.
 
-- [ ] **Step 1: Add failing widget tests**
+- [x] **Step 1: Add failing widget tests**
 
 Add tests named `confirms selected cards before suspending and refreshes the
 current query`, `canceling a bulk action keeps the selection`, `retains the
@@ -93,24 +93,24 @@ search is submitted`. Assert confirmation precedes the repository call, only
 selected IDs are sent, the active query is searched again after success,
 selection remains after cancel/failure, and a new query clears prior IDs.
 
-- [ ] **Step 2: Run browser widget tests to verify they fail**
+- [x] **Step 2: Run browser widget tests to verify they fail**
 
 Run: `flutter test test/features/browser` from `app/` in the Playground
 validation workflow.
 Expected: the page has no row selection or bulk-action controls.
 
-- [ ] **Step 3: Implement the shared browser interactions**
+- [x] **Step 3: Implement the shared browser interactions**
 
 Add per-row checkboxes, selected-count controls, suspend/bury confirmations,
 and an in-progress state. Clear selection when a new search is submitted or
 an action succeeds. Preserve the selected IDs and active query when canceled
 or when Anki returns an error. Update repository fakes for the new interface.
 
-- [ ] **Step 4: Run browser widget tests**
+- [x] **Step 4: Run browser widget tests**
 
 Expected: all browser tests pass, including existing note-edit navigation.
 
-- [ ] **Step 5: Commit the shared browser change**
+- [x] **Step 5: Commit the shared browser change**
 
 Commit as `feat: add confirmed card browser bulk actions`.
 
@@ -124,7 +124,7 @@ Commit as `feat: add confirmed card browser bulk actions`.
 - Produces: verified commit range on the existing `feat/mobile-and-core-parity`
   branch.
 
-- [ ] **Step 1: Run the full Flutter verification in Playground**
+- [x] **Step 1: Run the full Flutter verification in Playground**
 
 Run `flutter pub get --enforce-lockfile`, `flutter analyze`, and `flutter test`
 against the completed AnkiFlutter branch. Expected: all commands pass.
