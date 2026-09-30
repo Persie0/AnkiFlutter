@@ -30,7 +30,8 @@ enum BackendOperation {
   getNote(29),
   updateNotes(30),
   getCard(31),
-  removeCards(32);
+  removeCards(32),
+  allBrowserColumns(33);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
