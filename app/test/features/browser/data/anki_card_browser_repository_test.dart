@@ -84,6 +84,63 @@ void main() {
     },
   );
 
+  test('maps Anki card-sortable browser columns', () async {
+    final backend = _Backend([
+      search.BrowserColumns(
+        columns: [
+          search.BrowserColumns_Column(
+            key: 'noteFld',
+            cardsModeLabel: 'Sort field',
+            sortingCards: search.BrowserColumns_Sorting.SORTING_ASCENDING,
+          ),
+          search.BrowserColumns_Column(
+            key: 'cardDue',
+            cardsModeLabel: 'Due',
+            sortingCards: search.BrowserColumns_Sorting.SORTING_DESCENDING,
+          ),
+          search.BrowserColumns_Column(
+            key: 'question',
+            cardsModeLabel: 'Question',
+            sortingCards: search.BrowserColumns_Sorting.SORTING_NONE,
+          ),
+        ],
+      ).writeToBuffer(),
+    ]);
+
+    final options = await AnkiCardBrowserRepository(backend: backend)
+        .sortOptions();
+
+    expect(backend.calls.single.operation, BackendOperation.allBrowserColumns);
+    expect(options.map((option) => option.column), ['noteFld', 'cardDue']);
+    expect(options.map((option) => option.reverseByDefault), [false, true]);
+    expect(options.map((option) => option.label), ['Sort field', 'Due']);
+  });
+
+  test('encodes selected card sort in Anki search request', () async {
+    final backend = _Backend([
+      search.SearchResponse(ids: [Int64(21)]).writeToBuffer(),
+      _activeColumns(['noteFld']),
+      Uint8List(0),
+      search.BrowserRow(
+        cells: [search.BrowserRow_Cell(text: 'Card 21')],
+      ).writeToBuffer(),
+    ]);
+
+    await AnkiCardBrowserRepository(backend: backend).search(
+      'deck:Language',
+      sort: const CardBrowserSort(column: 'cardDue', reverse: true),
+    );
+
+    final request = search.SearchRequest.fromBuffer(
+      backend.calls.first.request,
+    );
+    expect(backend.calls.first.operation, BackendOperation.searchCards);
+    expect(request.search, 'deck:Language');
+    expect(request.order.value, search.SortOrder_Value.builtin);
+    expect(request.order.builtin.column, 'cardDue');
+    expect(request.order.builtin.reverse, isTrue);
+  });
+
   test(
     'loads only the first 50 browser rows and reports the full count',
     () async {
