@@ -136,7 +136,7 @@ void main() {
     );
     expect(backend.calls.first.operation, BackendOperation.searchCards);
     expect(request.search, 'deck:Language');
-    expect(request.order.value, search.SortOrder_Value.builtin);
+    expect(request.order.whichValue(), search.SortOrder_Value.builtin);
     expect(request.order.builtin.column, 'cardDue');
     expect(request.order.builtin.reverse, isTrue);
   });
