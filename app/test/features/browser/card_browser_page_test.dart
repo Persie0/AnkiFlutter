@@ -111,11 +111,16 @@ void main() {
       );
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('select-card-10')));
-      await tester.tap(find.byKey(const ValueKey('select-card-20')));
+      final firstCard = find.byKey(const ValueKey('select-card-10'));
+      final secondCard = find.byKey(const ValueKey('select-card-20'));
+      expect(firstCard, findsOneWidget);
+      expect(secondCard, findsOneWidget);
+      await tester.tap(firstCard);
+      await tester.tap(secondCard);
       await tester.pumpAndSettle();
 
       expect(find.text('2 cards selected'), findsOneWidget);
+      expect(find.text('Suspend selected'), findsOneWidget);
       await tester.tap(find.text('Suspend selected'));
       await tester.pumpAndSettle();
 
@@ -136,8 +141,11 @@ void main() {
     final repository = _SequenceRepository([_cards(10, 20)]);
     await tester.pumpWidget(_app(repository));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    final firstCard = find.byKey(const ValueKey('select-card-10'));
+    expect(firstCard, findsOneWidget);
+    await tester.tap(firstCard);
     await tester.pumpAndSettle();
+    expect(find.text('Bury selected'), findsOneWidget);
     await tester.tap(find.text('Bury selected'));
     await tester.pumpAndSettle();
 
@@ -155,8 +163,11 @@ void main() {
       ..bulkActionError = StateError('backend unavailable');
     await tester.pumpWidget(_app(repository));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    final firstCard = find.byKey(const ValueKey('select-card-10'));
+    expect(firstCard, findsOneWidget);
+    await tester.tap(firstCard);
     await tester.pumpAndSettle();
+    expect(find.text('Suspend selected'), findsOneWidget);
     await tester.tap(find.text('Suspend selected'));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('confirm-card-bulk-action')));
@@ -173,7 +184,9 @@ void main() {
     final repository = _SequenceRepository([_cards(10, 20), _cards(30, 40)]);
     await tester.pumpWidget(_app(repository));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('select-card-10')));
+    final firstCard = find.byKey(const ValueKey('select-card-10'));
+    expect(firstCard, findsOneWidget);
+    await tester.tap(firstCard);
     await tester.pumpAndSettle();
     expect(find.text('1 card selected'), findsOneWidget);
 
@@ -231,6 +244,7 @@ class _SequenceRepository implements CardBrowserRepository {
     return outcome as CardBrowserSearchResult;
   }
 
+  @override
   Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action) async {
     bulkActions.add(MapEntry(List.of(cardIds), action));
     if (bulkActionError case final error?) throw error;

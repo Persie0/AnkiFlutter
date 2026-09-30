@@ -1,4 +1,5 @@
-import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes;
+import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart'
+    as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
@@ -61,7 +62,8 @@ void main() {
 
     expect(find.text('Still usable row'), findsOneWidget);
     expect(
-      tester.widget<TextField>(find.byKey(const ValueKey('card-browser-search')))
+      tester
+          .widget<TextField>(find.byKey(const ValueKey('card-browser-search')))
           .controller
           ?.text,
       isEmpty,
@@ -75,7 +77,9 @@ Widget _app(_BrowserRepository browser, _NoteRepository notes) => MaterialApp(
 
 CardBrowserSearchResult _result(String cell) => CardBrowserSearchResult(
   totalCount: 1,
-  cards: [CardBrowserResult(cardId: 77, cells: [cell])],
+  cards: [
+    CardBrowserResult(cardId: 77, cells: [cell]),
+  ],
 );
 
 class _BrowserRepository implements CardBrowserRepository {
@@ -96,6 +100,12 @@ class _BrowserRepository implements CardBrowserRepository {
     requestedNoteCards.add(cardId);
     return 42;
   }
+
+  @override
+  Future<void> applyBulkAction(
+    List<int> cardIds,
+    CardBulkAction action,
+  ) async {}
 }
 
 class _NoteRepository implements NoteEntryRepository {
@@ -144,5 +154,6 @@ class _NoteRepository implements NoteEntryRepository {
       throw UnimplementedError();
 
   @override
-  Future<notes.Note> newNote(int notetypeId) async => throw UnimplementedError();
+  Future<notes.Note> newNote(int notetypeId) async =>
+      throw UnimplementedError();
 }
