@@ -6,7 +6,7 @@ use std::slice;
 
 use crate::backend::BridgeBackend;
 use crate::operations::{
-    OperationIndex, ADD_NOTE, ALL_TTS_VOICES, ANSWER_CARD, BROWSER_ROW_FOR_ID,
+    OperationIndex, ADD_NOTE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES, ANSWER_CARD, BROWSER_ROW_FOR_ID,
     BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES,
     ENCODE_IRI_PATHS, EXTRACT_AV_TAGS, GET_CARD, GET_CONFIG_JSON, GET_DECK_CONFIGS_FOR_UPDATE,
     GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS,
@@ -135,6 +135,7 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
         30 => Ok(UPDATE_NOTES),
         31 => Ok(GET_CARD),
         32 => Ok(REMOVE_CARDS),
+        33 => Ok(ALL_BROWSER_COLUMNS),
         _ => Err(format!("Unknown Anki bridge operation {operation}")),
     }
 }
