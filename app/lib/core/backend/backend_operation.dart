@@ -39,7 +39,10 @@ enum BackendOperation {
   removeNotetype(38),
   getImportAnkiPackagePresets(39),
   importAnkiPackage(40),
-  exportAnkiPackage(41);
+  exportAnkiPackage(41),
+  customStudyDefaults(42),
+  customStudy(43),
+  unburyDeck(44);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
