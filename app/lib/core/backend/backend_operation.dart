@@ -36,7 +36,10 @@ enum BackendOperation {
   addDeck(35),
   updateNotetype(36),
   addNotetype(37),
-  removeNotetype(38);
+  removeNotetype(38),
+  getImportAnkiPackagePresets(39),
+  importAnkiPackage(40),
+  exportAnkiPackage(41);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
