@@ -1,12 +1,14 @@
 import 'dart:async';
 
+import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
-import 'package:flutter/material.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
-import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/features/study/custom_study_page.dart';
+import 'package:anki_flutter/features/study/data/anki_custom_study_repository.dart';
+import 'package:flutter/material.dart';
 
 typedef ReviewControllerBuilder = ReviewController Function();
 
@@ -149,6 +151,21 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     await widget.onChanged?.call();
   }
 
+  Future<void> _customStudy() async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CustomStudyPage(
+          deckId: widget.deck.id,
+          deckName: widget.deck.name,
+          repository: AnkiCustomStudyRepository(backend: backend),
+          onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+
   ReviewController? _createDefaultReviewController() {
     final backend = widget.backend;
     if (backend == null) return null;
@@ -173,6 +190,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       appBar: AppBar(
         title: Text(deck.name),
         actions: [
+          if (widget.backend != null)
+            IconButton(
+              tooltip: 'Custom study',
+              onPressed: _mutating ? null : _customStudy,
+              icon: const Icon(Icons.tune),
+            ),
           if (widget.onAddNote != null)
             IconButton(
               tooltip: 'Add note',
