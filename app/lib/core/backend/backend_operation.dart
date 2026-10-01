@@ -56,7 +56,12 @@ enum BackendOperation {
   addMediaFile(55),
   addMediaFromUrl(56),
   checkMedia(57),
-  getAbsoluteMediaPath(58);
+  getAbsoluteMediaPath(58),
+  addNoteTags(59),
+  removeNoteTags(60),
+  setDeck(61),
+  setFlag(62),
+  allTags(63);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
