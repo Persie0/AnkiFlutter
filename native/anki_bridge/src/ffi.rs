@@ -6,13 +6,14 @@ use std::slice;
 
 use crate::backend::BridgeBackend;
 use crate::operations::{
-    OperationIndex, ADD_DECK, ADD_NOTE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES, ANSWER_CARD,
-    BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, DECK_TREE, DEFAULTS_FOR_ADDING,
-    DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXTRACT_AV_TAGS, GET_CARD, GET_CONFIG_JSON,
-    GET_DECK_CONFIGS_FOR_UPDATE, GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS,
-    GET_QUEUED_CARDS, GET_UNDO_STATUS, NEW_DECK, NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS,
-    REMOVE_DECKS, RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS,
-    SET_CURRENT_DECK, STATE_IS_LEECH, UNDO, UPDATE_NOTES, WRITE_TTS_STREAM,
+    OperationIndex, ADD_DECK, ADD_NOTE, ADD_NOTETYPE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES,
+    ANSWER_CARD, BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, DECK_TREE,
+    DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXTRACT_AV_TAGS, GET_CARD,
+    GET_CONFIG_JSON, GET_DECK_CONFIGS_FOR_UPDATE, GET_NOTE, GET_NOTETYPE,
+    GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS, NEW_DECK, NEW_NOTE,
+    OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS, REMOVE_NOTETYPE, RENAME_DECK,
+    RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, SET_CURRENT_DECK,
+    STATE_IS_LEECH, UNDO, UPDATE_NOTES, UPDATE_NOTETYPE, WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
@@ -138,6 +139,9 @@ fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
         33 => Ok(ALL_BROWSER_COLUMNS),
         34 => Ok(NEW_DECK),
         35 => Ok(ADD_DECK),
+        36 => Ok(UPDATE_NOTETYPE),
+        37 => Ok(ADD_NOTETYPE),
+        38 => Ok(REMOVE_NOTETYPE),
         _ => Err(format!("Unknown Anki bridge operation {operation}")),
     }
 }
@@ -234,8 +238,7 @@ pub unsafe extern "C" fn anki_bridge_free_buffer(buffer: ByteBuffer) {
 /// # Safety
 ///
 /// `handle` must either be null or a live handle returned by
-/// `anki_bridge_create` that has not already been destroyed. A non-null handle
-/// must be destroyed exactly once.
+/// `anki_bridge_create` that has not been destroyed. A non-null handle must be destroyed exactly once.
 #[no_mangle]
 pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
     let _ = catch_unwind(AssertUnwindSafe(|| {
@@ -251,9 +254,10 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ADD_DECK, ADD_NOTE, BROWSER_ROW_FOR_ID, DEFAULTS_FOR_ADDING, GET_CARD, GET_CONFIG_JSON,
-        GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, NEW_DECK, NEW_NOTE,
-        SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, UPDATE_NOTES,
+        ADD_DECK, ADD_NOTE, ADD_NOTETYPE, BROWSER_ROW_FOR_ID, DEFAULTS_FOR_ADDING, GET_CARD,
+        GET_CONFIG_JSON, GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, NEW_DECK,
+        NEW_NOTE, REMOVE_NOTETYPE, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, UPDATE_NOTES,
+        UPDATE_NOTETYPE,
     };
 
     #[test]
@@ -275,5 +279,8 @@ mod tests {
         assert_eq!(operation_from_id(31).unwrap(), GET_CARD);
         assert_eq!(operation_from_id(34).unwrap(), NEW_DECK);
         assert_eq!(operation_from_id(35).unwrap(), ADD_DECK);
+        assert_eq!(operation_from_id(36).unwrap(), UPDATE_NOTETYPE);
+        assert_eq!(operation_from_id(37).unwrap(), ADD_NOTETYPE);
+        assert_eq!(operation_from_id(38).unwrap(), REMOVE_NOTETYPE);
     }
 }
