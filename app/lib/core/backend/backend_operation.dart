@@ -42,7 +42,17 @@ enum BackendOperation {
   exportAnkiPackage(41),
   customStudyDefaults(42),
   customStudy(43),
-  unburyDeck(44);
+  unburyDeck(44),
+  updateDeckConfigs(45),
+  syncLogin(46),
+  syncStatus(47),
+  syncCollection(48),
+  fullUploadOrDownload(49),
+  syncMedia(50),
+  mediaSyncStatus(51),
+  abortSync(52),
+  abortMediaSync(53),
+  setCustomCertificate(54);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
