@@ -7,18 +7,18 @@ use std::slice;
 use crate::backend::BridgeBackend;
 use crate::operations::{
     OperationIndex, ABORT_MEDIA_SYNC, ABORT_SYNC, ADD_DECK, ADD_MEDIA_FILE, ADD_MEDIA_FROM_URL,
-    ADD_NOTE, ADD_NOTETYPE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES, ANSWER_CARD,
-    BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CHECK_MEDIA, CLOSE_COLLECTION, CUSTOM_STUDY,
-    CUSTOM_STUDY_DEFAULTS, DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES,
-    ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE, EXTRACT_AV_TAGS, FULL_UPLOAD_OR_DOWNLOAD, GET_CARD,
-    GET_CONFIG_JSON, GET_DECK_CONFIGS_FOR_UPDATE, GET_IMPORT_ANKI_PACKAGE_PRESETS,
-    GET_ABSOLUTE_MEDIA_PATH, GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS,
-    GET_QUEUED_CARDS, GET_UNDO_STATUS, IMPORT_ANKI_PACKAGE, MEDIA_SYNC_STATUS, NEW_DECK,
-    NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS, REMOVE_NOTETYPE, RENAME_DECK,
-    RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, SET_CURRENT_DECK,
-    SET_CUSTOM_CERTIFICATE, STATE_IS_LEECH, SYNC_COLLECTION, SYNC_LOGIN, SYNC_MEDIA,
-    SYNC_STATUS, UNBURY_DECK, UNDO, UPDATE_DECK_CONFIGS, UPDATE_NOTES, UPDATE_NOTETYPE,
-    WRITE_TTS_STREAM,
+    ADD_NOTE, ADD_NOTE_TAGS, ADD_NOTETYPE, ALL_BROWSER_COLUMNS, ALL_TAGS, ALL_TTS_VOICES,
+    ANSWER_CARD, BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CHECK_MEDIA, CLOSE_COLLECTION,
+    CUSTOM_STUDY, CUSTOM_STUDY_DEFAULTS, DECK_TREE, DEFAULTS_FOR_ADDING,
+    DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE, EXTRACT_AV_TAGS,
+    FULL_UPLOAD_OR_DOWNLOAD, GET_ABSOLUTE_MEDIA_PATH, GET_CARD, GET_CONFIG_JSON,
+    GET_DECK_CONFIGS_FOR_UPDATE, GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE,
+    GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS, IMPORT_ANKI_PACKAGE,
+    MEDIA_SYNC_STATUS, NEW_DECK, NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS,
+    REMOVE_NOTE_TAGS, REMOVE_NOTETYPE, RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS,
+    SET_ACTIVE_BROWSER_COLUMNS, SET_CURRENT_DECK, SET_CUSTOM_CERTIFICATE, SET_DECK, SET_FLAG,
+    STATE_IS_LEECH, SYNC_COLLECTION, SYNC_LOGIN, SYNC_MEDIA, SYNC_STATUS, UNBURY_DECK, UNDO,
+    UPDATE_DECK_CONFIGS, UPDATE_NOTES, UPDATE_NOTETYPE, WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
@@ -84,6 +84,11 @@ const OPERATIONS_BY_ID: &[OperationIndex] = &[
     ADD_MEDIA_FROM_URL,
     CHECK_MEDIA,
     GET_ABSOLUTE_MEDIA_PATH,
+    ADD_NOTE_TAGS,
+    REMOVE_NOTE_TAGS,
+    SET_DECK,
+    SET_FLAG,
+    ALL_TAGS,
 ];
 
 #[repr(C)]
@@ -286,32 +291,17 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ABORT_MEDIA_SYNC, ABORT_SYNC, ADD_MEDIA_FILE, ADD_MEDIA_FROM_URL, CHECK_MEDIA,
-        CUSTOM_STUDY, CUSTOM_STUDY_DEFAULTS, FULL_UPLOAD_OR_DOWNLOAD, GET_ABSOLUTE_MEDIA_PATH,
-        MEDIA_SYNC_STATUS, SET_CUSTOM_CERTIFICATE, SYNC_COLLECTION, SYNC_LOGIN, SYNC_MEDIA,
-        SYNC_STATUS, UNBURY_DECK, UPDATE_DECK_CONFIGS,
+        ADD_NOTE_TAGS, ALL_TAGS, REMOVE_NOTE_TAGS, SET_DECK, SET_FLAG,
     };
 
     #[test]
     fn extended_operation_ids_map_to_the_pinned_backend_descriptors() {
-        assert_eq!(operation_from_id(42).unwrap(), CUSTOM_STUDY_DEFAULTS);
-        assert_eq!(operation_from_id(43).unwrap(), CUSTOM_STUDY);
-        assert_eq!(operation_from_id(44).unwrap(), UNBURY_DECK);
-        assert_eq!(operation_from_id(45).unwrap(), UPDATE_DECK_CONFIGS);
-        assert_eq!(operation_from_id(46).unwrap(), SYNC_LOGIN);
-        assert_eq!(operation_from_id(47).unwrap(), SYNC_STATUS);
-        assert_eq!(operation_from_id(48).unwrap(), SYNC_COLLECTION);
-        assert_eq!(operation_from_id(49).unwrap(), FULL_UPLOAD_OR_DOWNLOAD);
-        assert_eq!(operation_from_id(50).unwrap(), SYNC_MEDIA);
-        assert_eq!(operation_from_id(51).unwrap(), MEDIA_SYNC_STATUS);
-        assert_eq!(operation_from_id(52).unwrap(), ABORT_SYNC);
-        assert_eq!(operation_from_id(53).unwrap(), ABORT_MEDIA_SYNC);
-        assert_eq!(operation_from_id(54).unwrap(), SET_CUSTOM_CERTIFICATE);
-        assert_eq!(operation_from_id(55).unwrap(), ADD_MEDIA_FILE);
-        assert_eq!(operation_from_id(56).unwrap(), ADD_MEDIA_FROM_URL);
-        assert_eq!(operation_from_id(57).unwrap(), CHECK_MEDIA);
-        assert_eq!(operation_from_id(58).unwrap(), GET_ABSOLUTE_MEDIA_PATH);
+        assert_eq!(operation_from_id(59).unwrap(), ADD_NOTE_TAGS);
+        assert_eq!(operation_from_id(60).unwrap(), REMOVE_NOTE_TAGS);
+        assert_eq!(operation_from_id(61).unwrap(), SET_DECK);
+        assert_eq!(operation_from_id(62).unwrap(), SET_FLAG);
+        assert_eq!(operation_from_id(63).unwrap(), ALL_TAGS);
         assert!(operation_from_id(0).is_err());
-        assert!(operation_from_id(59).is_err());
+        assert!(operation_from_id(64).is_err());
     }
 }
