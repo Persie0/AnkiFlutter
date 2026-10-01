@@ -54,6 +54,21 @@ fn main() -> Result<(), Box<dyn Error>> {
     let update_notetype = operation(&services, "BackendNotetypesService", "update_notetype")?;
     let add_notetype = operation(&services, "BackendNotetypesService", "add_notetype")?;
     let remove_notetype = operation(&services, "BackendNotetypesService", "remove_notetype")?;
+    let get_import_anki_package_presets = operation(
+        &services,
+        "BackendImportExportService",
+        "get_import_anki_package_presets",
+    )?;
+    let import_anki_package = operation(
+        &services,
+        "BackendImportExportService",
+        "import_anki_package",
+    )?;
+    let export_anki_package = operation(
+        &services,
+        "BackendImportExportService",
+        "export_anki_package",
+    )?;
     let defaults_for_adding = operation(&services, "BackendNotesService", "defaults_for_adding")?;
     let new_note = operation(&services, "BackendNotesService", "new_note")?;
     let add_note = operation(&services, "BackendNotesService", "add_note")?;
@@ -109,7 +124,10 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const ADD_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const UPDATE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const ADD_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const REMOVE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const REMOVE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const GET_IMPORT_ANKI_PACKAGE_PRESETS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const IMPORT_ANKI_PACKAGE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const EXPORT_ANKI_PACKAGE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -186,6 +204,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         add_notetype.1,
         remove_notetype.0,
         remove_notetype.1,
+        get_import_anki_package_presets.0,
+        get_import_anki_package_presets.1,
+        import_anki_package.0,
+        import_anki_package.1,
+        export_anki_package.0,
+        export_anki_package.1,
     );
 
     fs::write(
