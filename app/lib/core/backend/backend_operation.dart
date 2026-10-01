@@ -52,7 +52,11 @@ enum BackendOperation {
   mediaSyncStatus(51),
   abortSync(52),
   abortMediaSync(53),
-  setCustomCertificate(54);
+  setCustomCertificate(54),
+  addMediaFile(55),
+  addMediaFromUrl(56),
+  checkMedia(57),
+  getAbsoluteMediaPath(58);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
