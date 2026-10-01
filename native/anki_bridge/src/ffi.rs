@@ -6,16 +6,18 @@ use std::slice;
 
 use crate::backend::BridgeBackend;
 use crate::operations::{
-    OperationIndex, ADD_DECK, ADD_NOTE, ADD_NOTETYPE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES,
-    ANSWER_CARD, BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, CUSTOM_STUDY,
-    CUSTOM_STUDY_DEFAULTS, DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES,
-    ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE, EXTRACT_AV_TAGS, GET_CARD, GET_CONFIG_JSON,
+    OperationIndex, ABORT_MEDIA_SYNC, ABORT_SYNC, ADD_DECK, ADD_NOTE, ADD_NOTETYPE,
+    ALL_BROWSER_COLUMNS, ALL_TTS_VOICES, ANSWER_CARD, BROWSER_ROW_FOR_ID,
+    BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, CUSTOM_STUDY, CUSTOM_STUDY_DEFAULTS, DECK_TREE,
+    DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE,
+    EXTRACT_AV_TAGS, FULL_UPLOAD_OR_DOWNLOAD, GET_CARD, GET_CONFIG_JSON,
     GET_DECK_CONFIGS_FOR_UPDATE, GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE,
     GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS, IMPORT_ANKI_PACKAGE,
-    NEW_DECK, NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS, REMOVE_NOTETYPE,
-    RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS,
-    SET_CURRENT_DECK, STATE_IS_LEECH, UNBURY_DECK, UNDO, UPDATE_NOTES, UPDATE_NOTETYPE,
-    WRITE_TTS_STREAM,
+    MEDIA_SYNC_STATUS, NEW_DECK, NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS,
+    REMOVE_NOTETYPE, RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS,
+    SET_ACTIVE_BROWSER_COLUMNS, SET_CURRENT_DECK, SET_CUSTOM_CERTIFICATE, STATE_IS_LEECH,
+    SYNC_COLLECTION, SYNC_LOGIN, SYNC_MEDIA, SYNC_STATUS, UNBURY_DECK, UNDO,
+    UPDATE_DECK_CONFIGS, UPDATE_NOTES, UPDATE_NOTETYPE, WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
@@ -67,6 +69,16 @@ const OPERATIONS_BY_ID: &[OperationIndex] = &[
     CUSTOM_STUDY_DEFAULTS,
     CUSTOM_STUDY,
     UNBURY_DECK,
+    UPDATE_DECK_CONFIGS,
+    SYNC_LOGIN,
+    SYNC_STATUS,
+    SYNC_COLLECTION,
+    FULL_UPLOAD_OR_DOWNLOAD,
+    SYNC_MEDIA,
+    MEDIA_SYNC_STATUS,
+    ABORT_SYNC,
+    ABORT_MEDIA_SYNC,
+    SET_CUSTOM_CERTIFICATE,
 ];
 
 #[repr(C)]
@@ -269,40 +281,27 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ADD_DECK, ADD_NOTE, ADD_NOTETYPE, BROWSER_ROW_FOR_ID, CUSTOM_STUDY,
-        CUSTOM_STUDY_DEFAULTS, DEFAULTS_FOR_ADDING, EXPORT_ANKI_PACKAGE, GET_CARD,
-        GET_CONFIG_JSON, GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE,
-        GET_NOTETYPE_NAMES_AND_COUNTS, IMPORT_ANKI_PACKAGE, NEW_DECK, NEW_NOTE,
-        REMOVE_NOTETYPE, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, UNBURY_DECK, UPDATE_NOTES,
-        UPDATE_NOTETYPE,
+        ABORT_MEDIA_SYNC, ABORT_SYNC, CUSTOM_STUDY, CUSTOM_STUDY_DEFAULTS,
+        FULL_UPLOAD_OR_DOWNLOAD, MEDIA_SYNC_STATUS, SET_CUSTOM_CERTIFICATE, SYNC_COLLECTION,
+        SYNC_LOGIN, SYNC_MEDIA, SYNC_STATUS, UNBURY_DECK, UPDATE_DECK_CONFIGS,
     };
 
     #[test]
     fn extended_operation_ids_map_to_the_pinned_backend_descriptors() {
-        assert_eq!(operation_from_id(20).unwrap(), GET_NOTETYPE_NAMES_AND_COUNTS);
-        assert_eq!(operation_from_id(21).unwrap(), NEW_NOTE);
-        assert_eq!(operation_from_id(22).unwrap(), ADD_NOTE);
-        assert_eq!(operation_from_id(23).unwrap(), GET_NOTETYPE);
-        assert_eq!(operation_from_id(24).unwrap(), DEFAULTS_FOR_ADDING);
-        assert_eq!(operation_from_id(25).unwrap(), SEARCH_CARDS);
-        assert_eq!(operation_from_id(26).unwrap(), BROWSER_ROW_FOR_ID);
-        assert_eq!(operation_from_id(27).unwrap(), SET_ACTIVE_BROWSER_COLUMNS);
-        assert_eq!(operation_from_id(28).unwrap(), GET_CONFIG_JSON);
-        assert_eq!(operation_from_id(29).unwrap(), GET_NOTE);
-        assert_eq!(operation_from_id(30).unwrap(), UPDATE_NOTES);
-        assert_eq!(operation_from_id(31).unwrap(), GET_CARD);
-        assert_eq!(operation_from_id(34).unwrap(), NEW_DECK);
-        assert_eq!(operation_from_id(35).unwrap(), ADD_DECK);
-        assert_eq!(operation_from_id(36).unwrap(), UPDATE_NOTETYPE);
-        assert_eq!(operation_from_id(37).unwrap(), ADD_NOTETYPE);
-        assert_eq!(operation_from_id(38).unwrap(), REMOVE_NOTETYPE);
-        assert_eq!(operation_from_id(39).unwrap(), GET_IMPORT_ANKI_PACKAGE_PRESETS);
-        assert_eq!(operation_from_id(40).unwrap(), IMPORT_ANKI_PACKAGE);
-        assert_eq!(operation_from_id(41).unwrap(), EXPORT_ANKI_PACKAGE);
         assert_eq!(operation_from_id(42).unwrap(), CUSTOM_STUDY_DEFAULTS);
         assert_eq!(operation_from_id(43).unwrap(), CUSTOM_STUDY);
         assert_eq!(operation_from_id(44).unwrap(), UNBURY_DECK);
+        assert_eq!(operation_from_id(45).unwrap(), UPDATE_DECK_CONFIGS);
+        assert_eq!(operation_from_id(46).unwrap(), SYNC_LOGIN);
+        assert_eq!(operation_from_id(47).unwrap(), SYNC_STATUS);
+        assert_eq!(operation_from_id(48).unwrap(), SYNC_COLLECTION);
+        assert_eq!(operation_from_id(49).unwrap(), FULL_UPLOAD_OR_DOWNLOAD);
+        assert_eq!(operation_from_id(50).unwrap(), SYNC_MEDIA);
+        assert_eq!(operation_from_id(51).unwrap(), MEDIA_SYNC_STATUS);
+        assert_eq!(operation_from_id(52).unwrap(), ABORT_SYNC);
+        assert_eq!(operation_from_id(53).unwrap(), ABORT_MEDIA_SYNC);
+        assert_eq!(operation_from_id(54).unwrap(), SET_CUSTOM_CERTIFICATE);
         assert!(operation_from_id(0).is_err());
-        assert!(operation_from_id(45).is_err());
+        assert!(operation_from_id(55).is_err());
     }
 }
