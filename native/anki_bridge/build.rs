@@ -65,6 +65,11 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("ADD_MEDIA_FROM_URL", "BackendMediaService", "add_media_from_url"),
     ("CHECK_MEDIA", "BackendMediaService", "check_media"),
     ("GET_ABSOLUTE_MEDIA_PATH", "BackendMediaService", "get_absolute_media_path"),
+    ("ADD_NOTE_TAGS", "BackendTagsService", "add_note_tags"),
+    ("REMOVE_NOTE_TAGS", "BackendTagsService", "remove_note_tags"),
+    ("SET_DECK", "BackendCardsService", "set_deck"),
+    ("SET_FLAG", "BackendCardsService", "set_flag"),
+    ("ALL_TAGS", "BackendTagsService", "all_tags"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
