@@ -51,6 +51,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "get_notetype_names_and_counts",
     )?;
     let get_notetype = operation(&services, "BackendNotetypesService", "get_notetype")?;
+    let update_notetype = operation(&services, "BackendNotetypesService", "update_notetype")?;
+    let add_notetype = operation(&services, "BackendNotetypesService", "add_notetype")?;
+    let remove_notetype = operation(&services, "BackendNotetypesService", "remove_notetype")?;
     let defaults_for_adding = operation(&services, "BackendNotesService", "defaults_for_adding")?;
     let new_note = operation(&services, "BackendNotesService", "new_note")?;
     let add_note = operation(&services, "BackendNotesService", "add_note")?;
@@ -103,7 +106,10 @@ fn main() -> Result<(), Box<dyn Error>> {
          pub const REMOVE_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const ALL_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
          pub const NEW_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ADD_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
+         pub const ADD_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const UPDATE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const ADD_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
+         pub const REMOVE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
         open_collection.0,
         open_collection.1,
         close_collection.0,
@@ -174,6 +180,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         new_deck.1,
         add_deck.0,
         add_deck.1,
+        update_notetype.0,
+        update_notetype.1,
+        add_notetype.0,
+        add_notetype.1,
+        remove_notetype.0,
+        remove_notetype.1,
     );
 
     fs::write(
