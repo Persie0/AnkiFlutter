@@ -33,7 +33,10 @@ enum BackendOperation {
   removeCards(32),
   allBrowserColumns(33),
   newDeck(34),
-  addDeck(35);
+  addDeck(35),
+  updateNotetype(36),
+  addNotetype(37),
+  removeNotetype(38);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
