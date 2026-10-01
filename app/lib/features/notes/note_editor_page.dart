@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
+import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_fields_form.dart';
 import 'package:flutter/material.dart';
@@ -30,6 +31,13 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
   bool _loading = true;
   bool _saving = false;
   Object? _error;
+
+  MediaRepository? get _mediaRepository {
+    final repository = widget.repository;
+    return repository is AnkiNoteRepository
+        ? AnkiMediaRepository(backend: repository.backend)
+        : null;
+  }
 
   @override
   void initState() {
@@ -158,6 +166,7 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
           saveLabel: 'Save note',
           saveIcon: Icons.save,
           onSave: _save,
+          mediaRepository: _mediaRepository,
         ),
       ],
     );
