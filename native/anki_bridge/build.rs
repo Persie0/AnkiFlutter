@@ -1,9 +1,57 @@
 use std::error::Error;
+use std::fmt::Write as _;
 use std::fs;
 use std::path::PathBuf;
 
 use anki_proto_gen::{descriptors_path, get_services, BackendService, Method};
 use prost_reflect::DescriptorPool;
+
+const OPERATIONS: &[(&str, &str, &str)] = &[
+    ("OPEN_COLLECTION", "BackendCollectionService", "open_collection"),
+    ("CLOSE_COLLECTION", "BackendCollectionService", "close_collection"),
+    ("DECK_TREE", "BackendDecksService", "deck_tree"),
+    ("SET_CURRENT_DECK", "BackendDecksService", "set_current_deck"),
+    ("GET_QUEUED_CARDS", "BackendSchedulerService", "get_queued_cards"),
+    ("DESCRIBE_NEXT_STATES", "BackendSchedulerService", "describe_next_states"),
+    ("ANSWER_CARD", "BackendSchedulerService", "answer_card"),
+    ("STATE_IS_LEECH", "BackendSchedulerService", "state_is_leech"),
+    ("BURY_OR_SUSPEND_CARDS", "BackendSchedulerService", "bury_or_suspend_cards"),
+    ("GET_UNDO_STATUS", "BackendCollectionService", "get_undo_status"),
+    ("UNDO", "BackendCollectionService", "undo"),
+    ("RENDER_EXISTING_CARD", "BackendCardRenderingService", "render_existing_card"),
+    ("EXTRACT_AV_TAGS", "BackendCardRenderingService", "extract_av_tags"),
+    ("ALL_TTS_VOICES", "BackendCardRenderingService", "all_tts_voices"),
+    ("WRITE_TTS_STREAM", "BackendCardRenderingService", "write_tts_stream"),
+    ("GET_DECK_CONFIGS_FOR_UPDATE", "BackendDeckConfigService", "get_deck_configs_for_update"),
+    ("ENCODE_IRI_PATHS", "BackendCardRenderingService", "encode_iri_paths"),
+    ("RENAME_DECK", "BackendDecksService", "rename_deck"),
+    ("REMOVE_DECKS", "BackendDecksService", "remove_decks"),
+    ("GET_NOTETYPE_NAMES_AND_COUNTS", "BackendNotetypesService", "get_notetype_names_and_counts"),
+    ("NEW_NOTE", "BackendNotesService", "new_note"),
+    ("ADD_NOTE", "BackendNotesService", "add_note"),
+    ("GET_NOTETYPE", "BackendNotetypesService", "get_notetype"),
+    ("DEFAULTS_FOR_ADDING", "BackendNotesService", "defaults_for_adding"),
+    ("SEARCH_CARDS", "BackendSearchService", "search_cards"),
+    ("BROWSER_ROW_FOR_ID", "BackendSearchService", "browser_row_for_id"),
+    ("SET_ACTIVE_BROWSER_COLUMNS", "BackendSearchService", "set_active_browser_columns"),
+    ("GET_CONFIG_JSON", "BackendConfigService", "get_config_json"),
+    ("GET_NOTE", "BackendNotesService", "get_note"),
+    ("UPDATE_NOTES", "BackendNotesService", "update_notes"),
+    ("GET_CARD", "BackendCardsService", "get_card"),
+    ("REMOVE_CARDS", "BackendCardsService", "remove_cards"),
+    ("ALL_BROWSER_COLUMNS", "BackendSearchService", "all_browser_columns"),
+    ("NEW_DECK", "BackendDecksService", "new_deck"),
+    ("ADD_DECK", "BackendDecksService", "add_deck"),
+    ("UPDATE_NOTETYPE", "BackendNotetypesService", "update_notetype"),
+    ("ADD_NOTETYPE", "BackendNotetypesService", "add_notetype"),
+    ("REMOVE_NOTETYPE", "BackendNotetypesService", "remove_notetype"),
+    ("GET_IMPORT_ANKI_PACKAGE_PRESETS", "BackendImportExportService", "get_import_anki_package_presets"),
+    ("IMPORT_ANKI_PACKAGE", "BackendImportExportService", "import_anki_package"),
+    ("EXPORT_ANKI_PACKAGE", "BackendImportExportService", "export_anki_package"),
+    ("CUSTOM_STUDY_DEFAULTS", "BackendSchedulerService", "custom_study_defaults"),
+    ("CUSTOM_STUDY", "BackendSchedulerService", "custom_study"),
+    ("UNBURY_DECK", "BackendSchedulerService", "unbury_deck"),
+];
 
 fn main() -> Result<(), Box<dyn Error>> {
     let descriptors = descriptors_path();
@@ -11,206 +59,14 @@ fn main() -> Result<(), Box<dyn Error>> {
     let pool = DescriptorPool::decode(fs::read(descriptors)?.as_ref())?;
     let (_, services) = get_services(&pool);
 
-    let open_collection = operation(&services, "BackendCollectionService", "open_collection")?;
-    let close_collection = operation(&services, "BackendCollectionService", "close_collection")?;
-    let deck_tree = operation(&services, "BackendDecksService", "deck_tree")?;
-    let set_current_deck = operation(&services, "BackendDecksService", "set_current_deck")?;
-    let get_queued_cards = operation(&services, "BackendSchedulerService", "get_queued_cards")?;
-    let describe_next_states =
-        operation(&services, "BackendSchedulerService", "describe_next_states")?;
-    let answer_card = operation(&services, "BackendSchedulerService", "answer_card")?;
-    let state_is_leech = operation(&services, "BackendSchedulerService", "state_is_leech")?;
-    let bury_or_suspend_cards = operation(
-        &services,
-        "BackendSchedulerService",
-        "bury_or_suspend_cards",
-    )?;
-    let get_undo_status = operation(&services, "BackendCollectionService", "get_undo_status")?;
-    let undo = operation(&services, "BackendCollectionService", "undo")?;
-    let render_existing_card = operation(
-        &services,
-        "BackendCardRenderingService",
-        "render_existing_card",
-    )?;
-    let extract_av_tags = operation(&services, "BackendCardRenderingService", "extract_av_tags")?;
-    let all_tts_voices = operation(&services, "BackendCardRenderingService", "all_tts_voices")?;
-    let write_tts_stream = operation(&services, "BackendCardRenderingService", "write_tts_stream")?;
-    let get_deck_configs_for_update = operation(
-        &services,
-        "BackendDeckConfigService",
-        "get_deck_configs_for_update",
-    )?;
-    let encode_iri_paths = operation(&services, "BackendCardRenderingService", "encode_iri_paths")?;
-    let new_deck = operation(&services, "BackendDecksService", "new_deck")?;
-    let add_deck = operation(&services, "BackendDecksService", "add_deck")?;
-    let rename_deck = operation(&services, "BackendDecksService", "rename_deck")?;
-    let remove_decks = operation(&services, "BackendDecksService", "remove_decks")?;
-    let get_notetype_names_and_counts = operation(
-        &services,
-        "BackendNotetypesService",
-        "get_notetype_names_and_counts",
-    )?;
-    let get_notetype = operation(&services, "BackendNotetypesService", "get_notetype")?;
-    let update_notetype = operation(&services, "BackendNotetypesService", "update_notetype")?;
-    let add_notetype = operation(&services, "BackendNotetypesService", "add_notetype")?;
-    let remove_notetype = operation(&services, "BackendNotetypesService", "remove_notetype")?;
-    let get_import_anki_package_presets = operation(
-        &services,
-        "BackendImportExportService",
-        "get_import_anki_package_presets",
-    )?;
-    let import_anki_package = operation(
-        &services,
-        "BackendImportExportService",
-        "import_anki_package",
-    )?;
-    let export_anki_package = operation(
-        &services,
-        "BackendImportExportService",
-        "export_anki_package",
-    )?;
-    let defaults_for_adding = operation(&services, "BackendNotesService", "defaults_for_adding")?;
-    let new_note = operation(&services, "BackendNotesService", "new_note")?;
-    let add_note = operation(&services, "BackendNotesService", "add_note")?;
-    let search_cards = operation(&services, "BackendSearchService", "search_cards")?;
-    let browser_row_for_id = operation(&services, "BackendSearchService", "browser_row_for_id")?;
-    let set_active_browser_columns = operation(
-        &services,
-        "BackendSearchService",
-        "set_active_browser_columns",
-    )?;
-    let get_config_json = operation(&services, "BackendConfigService", "get_config_json")?;
-    let get_note = operation(&services, "BackendNotesService", "get_note")?;
-    let update_notes = operation(&services, "BackendNotesService", "update_notes")?;
-    let get_card = operation(&services, "BackendCardsService", "get_card")?;
-    let remove_cards = operation(&services, "BackendCardsService", "remove_cards")?;
-    let all_browser_columns = operation(&services, "BackendSearchService", "all_browser_columns")?;
-
-    let generated = format!(
-        "pub const OPEN_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const CLOSE_COLLECTION: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const DECK_TREE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const SET_CURRENT_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_QUEUED_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const DESCRIBE_NEXT_STATES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ANSWER_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const STATE_IS_LEECH: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const BURY_OR_SUSPEND_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_UNDO_STATUS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const UNDO: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const RENDER_EXISTING_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const EXTRACT_AV_TAGS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ALL_TTS_VOICES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const WRITE_TTS_STREAM: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_DECK_CONFIGS_FOR_UPDATE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ENCODE_IRI_PATHS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const RENAME_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const REMOVE_DECKS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_NOTETYPE_NAMES_AND_COUNTS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const NEW_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ADD_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const DEFAULTS_FOR_ADDING: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const SEARCH_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const BROWSER_ROW_FOR_ID: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const SET_ACTIVE_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_CONFIG_JSON: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_NOTE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const UPDATE_NOTES: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_CARD: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const REMOVE_CARDS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ALL_BROWSER_COLUMNS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const NEW_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ADD_DECK: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const UPDATE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const ADD_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const REMOVE_NOTETYPE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const GET_IMPORT_ANKI_PACKAGE_PRESETS: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const IMPORT_ANKI_PACKAGE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n\
-         pub const EXPORT_ANKI_PACKAGE: OperationIndex = OperationIndex {{ service: {}, method: {} }};\n",
-        open_collection.0,
-        open_collection.1,
-        close_collection.0,
-        close_collection.1,
-        deck_tree.0,
-        deck_tree.1,
-        set_current_deck.0,
-        set_current_deck.1,
-        get_queued_cards.0,
-        get_queued_cards.1,
-        describe_next_states.0,
-        describe_next_states.1,
-        answer_card.0,
-        answer_card.1,
-        state_is_leech.0,
-        state_is_leech.1,
-        bury_or_suspend_cards.0,
-        bury_or_suspend_cards.1,
-        get_undo_status.0,
-        get_undo_status.1,
-        undo.0,
-        undo.1,
-        render_existing_card.0,
-        render_existing_card.1,
-        extract_av_tags.0,
-        extract_av_tags.1,
-        all_tts_voices.0,
-        all_tts_voices.1,
-        write_tts_stream.0,
-        write_tts_stream.1,
-        get_deck_configs_for_update.0,
-        get_deck_configs_for_update.1,
-        encode_iri_paths.0,
-        encode_iri_paths.1,
-        rename_deck.0,
-        rename_deck.1,
-        remove_decks.0,
-        remove_decks.1,
-        get_notetype_names_and_counts.0,
-        get_notetype_names_and_counts.1,
-        new_note.0,
-        new_note.1,
-        add_note.0,
-        add_note.1,
-        get_notetype.0,
-        get_notetype.1,
-        defaults_for_adding.0,
-        defaults_for_adding.1,
-        search_cards.0,
-        search_cards.1,
-        browser_row_for_id.0,
-        browser_row_for_id.1,
-        set_active_browser_columns.0,
-        set_active_browser_columns.1,
-        get_config_json.0,
-        get_config_json.1,
-        get_note.0,
-        get_note.1,
-        update_notes.0,
-        update_notes.1,
-        get_card.0,
-        get_card.1,
-        remove_cards.0,
-        remove_cards.1,
-        all_browser_columns.0,
-        all_browser_columns.1,
-        new_deck.0,
-        new_deck.1,
-        add_deck.0,
-        add_deck.1,
-        update_notetype.0,
-        update_notetype.1,
-        add_notetype.0,
-        add_notetype.1,
-        remove_notetype.0,
-        remove_notetype.1,
-        get_import_anki_package_presets.0,
-        get_import_anki_package_presets.1,
-        import_anki_package.0,
-        import_anki_package.1,
-        export_anki_package.0,
-        export_anki_package.1,
-    );
+    let mut generated = String::new();
+    for &(constant, service, method) in OPERATIONS {
+        let (service_index, method_index) = operation(&services, service, method)?;
+        writeln!(
+            generated,
+            "pub const {constant}: OperationIndex = OperationIndex {{ service: {service_index}, method: {method_index} }};"
+        )?;
+    }
 
     fs::write(
         PathBuf::from(std::env::var("OUT_DIR")?).join("operations_generated.rs"),
