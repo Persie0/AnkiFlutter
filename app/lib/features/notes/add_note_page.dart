@@ -1,11 +1,12 @@
 import 'dart:async';
 
-import 'package:anki_flutter/features/decks/deck_node.dart';
-import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
-import 'package:anki_flutter/features/notes/note_fields_form.dart';
 import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
+import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
+import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
+import 'package:anki_flutter/features/notes/note_fields_form.dart';
 import 'package:flutter/material.dart';
 
 class AddNotePage extends StatefulWidget {
@@ -34,6 +35,13 @@ class _AddNotePageState extends State<AddNotePage> {
   bool _saving = false;
   bool _noNotetypes = false;
   Object? _error;
+
+  MediaRepository? get _mediaRepository {
+    final repository = widget.repository;
+    return repository is AnkiNoteRepository
+        ? AnkiMediaRepository(backend: repository.backend)
+        : null;
+  }
 
   @override
   void initState() {
@@ -239,6 +247,7 @@ class _AddNotePageState extends State<AddNotePage> {
           saveLabel: 'Add note',
           saveIcon: Icons.add,
           onSave: _save,
+          mediaRepository: _mediaRepository,
         ),
       ],
     );
