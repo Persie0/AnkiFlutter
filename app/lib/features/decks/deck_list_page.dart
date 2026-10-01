@@ -9,6 +9,9 @@ import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/import_export/data/anki_package_repository.dart';
+import 'package:anki_flutter/features/import_export/native_package_file_transfer.dart';
+import 'package:anki_flutter/features/import_export/package_transfer_page.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
@@ -301,6 +304,24 @@ class _DeckListPageState extends State<DeckListPage> {
                       repository: AnkiNotetypeRepository(
                         backend: widget.backend!,
                       ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Import & export',
+              icon: const Icon(Icons.import_export),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => PackageTransferPage(
+                      repository: AnkiPackageRepository(
+                        backend: widget.backend!,
+                      ),
+                      fileTransfer: const NativePackageFileTransfer(),
+                      onCollectionChanged: widget.controller.load,
                     ),
                   ),
                 );
