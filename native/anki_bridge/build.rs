@@ -51,6 +51,16 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("CUSTOM_STUDY_DEFAULTS", "BackendSchedulerService", "custom_study_defaults"),
     ("CUSTOM_STUDY", "BackendSchedulerService", "custom_study"),
     ("UNBURY_DECK", "BackendSchedulerService", "unbury_deck"),
+    ("UPDATE_DECK_CONFIGS", "BackendDeckConfigService", "update_deck_configs"),
+    ("SYNC_LOGIN", "BackendSyncService", "sync_login"),
+    ("SYNC_STATUS", "BackendSyncService", "sync_status"),
+    ("SYNC_COLLECTION", "BackendSyncService", "sync_collection"),
+    ("FULL_UPLOAD_OR_DOWNLOAD", "BackendSyncService", "full_upload_or_download"),
+    ("SYNC_MEDIA", "BackendSyncService", "sync_media"),
+    ("MEDIA_SYNC_STATUS", "BackendSyncService", "media_sync_status"),
+    ("ABORT_SYNC", "BackendSyncService", "abort_sync"),
+    ("ABORT_MEDIA_SYNC", "BackendSyncService", "abort_media_sync"),
+    ("SET_CUSTOM_CERTIFICATE", "BackendSyncService", "set_custom_certificate"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
