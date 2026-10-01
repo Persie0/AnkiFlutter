@@ -61,6 +61,10 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("ABORT_SYNC", "BackendSyncService", "abort_sync"),
     ("ABORT_MEDIA_SYNC", "BackendSyncService", "abort_media_sync"),
     ("SET_CUSTOM_CERTIFICATE", "BackendSyncService", "set_custom_certificate"),
+    ("ADD_MEDIA_FILE", "BackendMediaService", "add_media_file"),
+    ("ADD_MEDIA_FROM_URL", "BackendMediaService", "add_media_from_url"),
+    ("CHECK_MEDIA", "BackendMediaService", "check_media"),
+    ("GET_ABSOLUTE_MEDIA_PATH", "BackendMediaService", "get_absolute_media_path"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
