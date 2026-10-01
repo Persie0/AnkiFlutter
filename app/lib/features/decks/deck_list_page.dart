@@ -11,6 +11,8 @@ import 'package:anki_flutter/features/decks/deck_list_state.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
+import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
+import 'package:anki_flutter/features/notetypes/notetype_list_page.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -287,6 +289,22 @@ class _DeckListPageState extends State<DeckListPage> {
               tooltip: 'Create deck',
               icon: const Icon(Icons.add),
               onPressed: _opening ? null : _createDeck,
+            ),
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Manage note types',
+              icon: const Icon(Icons.view_agenda_outlined),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => NotetypeListPage(
+                      repository: AnkiNotetypeRepository(
+                        backend: widget.backend!,
+                      ),
+                    ),
+                  ),
+                );
+              },
             ),
           if (_collectionOpened && widget.backend != null)
             IconButton(
