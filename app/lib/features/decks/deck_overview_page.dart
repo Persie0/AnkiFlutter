@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
+import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
@@ -166,6 +168,20 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     );
   }
 
+  Future<void> _deckOptions() async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeckOptionsPage(
+          deckId: widget.deck.id,
+          repository: AnkiDeckOptionsRepository(backend: backend),
+          onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+
   ReviewController? _createDefaultReviewController() {
     final backend = widget.backend;
     if (backend == null) return null;
@@ -190,6 +206,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       appBar: AppBar(
         title: Text(deck.name),
         actions: [
+          if (widget.backend != null)
+            IconButton(
+              tooltip: 'Deck options',
+              onPressed: _mutating ? null : _deckOptions,
+              icon: const Icon(Icons.settings_outlined),
+            ),
           if (widget.backend != null)
             IconButton(
               tooltip: 'Custom study',
