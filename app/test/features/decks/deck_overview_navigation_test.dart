@@ -37,7 +37,6 @@ void main() {
     expect(find.text('New 12'), findsOneWidget);
     expect(find.text('Learn 3'), findsOneWidget);
     expect(find.text('Review 45'), findsOneWidget);
-    expect(find.byTooltip('Reviewer coming next'), findsOneWidget);
     final study = tester.widget<FilledButton>(find.widgetWithText(FilledButton, 'Study'));
     expect(study.onPressed, isNull);
 

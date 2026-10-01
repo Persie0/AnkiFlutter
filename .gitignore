@@ -1,0 +1,4 @@
+native/anki_bridge/target/
+native/anki_bridge_ios/target/
+native/anki_bridge_ios/Cargo.lock
+tool/__pycache__/

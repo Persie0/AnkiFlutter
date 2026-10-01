@@ -4,11 +4,9 @@ AnkiFlutter is an independent, open-source Flutter frontend for Anki. The projec
 
 This project is not affiliated with or endorsed by Ankitects Pty Ltd.
 
-## Current milestone
+## Current functionality
 
-The first desktop vertical slice supports opening a local `.anki2` collection through the official Anki backend, loading the real hierarchical deck tree with Anki's New/Learn/Review counts, opening a deck overview, and returning to the still-loaded deck list.
-
-The reviewer is the next vertical slice. Card queueing, question/answer rendering, grading, undo, bury, and suspend are intentionally not part of this milestone yet.
+The shared Flutter app opens local `.anki2` collections, remembers up to eight recent collections, and supports profile-folder selection on desktop and collection-file selection on Android and iOS. Mobile selections are copied into app storage before opening, along with adjacent media files when available. It loads Anki's deck tree and due counts, creates decks through Anki's native defaults, reviews cards through Anki's scheduler and renderer, and supports shared browser and note-editing flows. Build integration is present for Linux, macOS, Windows, Android, and iOS. Collection switching, review, browser, and authoring behavior stay in the shared Flutter code; the app remains an early port and does not yet implement every official Anki workflow.
 
 ## Toolchain
 
@@ -19,7 +17,7 @@ The repository and CI pin the development toolchain used for this slice:
 - `protoc_plugin` 25.1.0
 - the Anki git submodule revision recorded in `third_party/anki`
 
-Linux desktop development also requires the normal Flutter Linux toolchain (`clang`, CMake, Ninja, pkg-config, GTK 3 development headers) plus `protobuf-compiler`.
+Linux development requires the Flutter Linux toolchain (`clang`, CMake, Ninja, pkg-config, GTK 3 development headers) plus `protobuf-compiler`. Android builds additionally require Android SDK/NDK, Rust Android targets, and `cargo-ndk`. iOS builds require macOS with Xcode and Rust Apple targets.
 
 ## Development setup
 
@@ -78,6 +76,8 @@ python3 tool/run_desktop_dev.py --test
 ```
 
 The Linux CI build also creates the release Rust bridge and copies `libanki_flutter_bridge.so` beside the Flutter executable, matching the app's default native-library lookup path.
+
+Android packages the Rust bridge into ABI-specific JNI libraries. iOS statically links the Rust bridge into the app process to comply with iOS dynamic-library restrictions. Both platforms use the same Dart screens and business logic.
 
 ## Native backend troubleshooting
 

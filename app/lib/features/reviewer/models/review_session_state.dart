@@ -61,3 +61,8 @@ final class ReviewTransition extends ReviewSessionState {
 final class ReviewFinished extends ReviewSessionState {
   const ReviewFinished();
 }
+
+final class ReviewFailure extends ReviewSessionState {
+  const ReviewFailure(this.error);
+  final Object error;
+}

@@ -26,10 +26,30 @@ void main() {
         'writeTtsStream': 15,
         'getDeckConfigsForUpdate': 16,
         'encodeIriPaths': 17,
+        'renameDeck': 18,
+        'removeDecks': 19,
+        'getNotetypeNamesAndCounts': 20,
+        'newNote': 21,
+        'addNote': 22,
+        'getNotetype': 23,
+        'defaultsForAdding': 24,
+        'searchCards': 25,
+        'browserRowForId': 26,
+        'setActiveBrowserColumns': 27,
+        'getConfigJson': 28,
+        'getNote': 29,
+        'updateNotes': 30,
+        'getCard': 31,
+        'removeCards': 32,
+        'allBrowserColumns': 33,
+        'newDeck': 34,
+        'addDeck': 35,
       },
     );
 
-    final ids = BackendOperation.values.map((operation) => operation.nativeId).toList();
+    final ids = BackendOperation.values
+        .map((operation) => operation.nativeId)
+        .toList();
     expect(ids.toSet().length, ids.length);
   });
 }

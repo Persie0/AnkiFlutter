@@ -85,7 +85,7 @@ fn reviewer_operation_ids_are_recognized() {
     let created = unsafe { anki_bridge_create(init.as_ptr(), init.len()) };
     assert_eq!(created.status, STATUS_SUCCESS);
 
-    for operation in 4..=17 {
+    for operation in (4..=19).chain(34..=35) {
         let result = unsafe { anki_bridge_invoke(created.handle, operation, ptr::null(), 0) };
         let status = result.status;
         let bytes = unsafe { copy_and_free(result.data) };
@@ -93,7 +93,7 @@ fn reviewer_operation_ids_are_recognized() {
             let message = String::from_utf8(bytes).unwrap();
             assert!(
                 !message.contains("Unknown Anki bridge operation"),
-                "reviewer operation id {operation} was not mapped: {message}"
+                "operation id {operation} was not mapped: {message}"
             );
         }
     }
