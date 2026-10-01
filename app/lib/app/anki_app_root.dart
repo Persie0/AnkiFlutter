@@ -178,7 +178,7 @@ NativeAnkiBindings _loadNativeBindings() {
 
 Future<String?> _pickAnkiCollection() async {
   if (Platform.isAndroid || Platform.isIOS) {
-    final selection = await FilePicker.platform.pickFiles(
+    final selection = await FilePicker.pickFile(
       dialogTitle: 'Choose an Anki collection',
       type: FileType.custom,
       allowedExtensions: const ['anki2'],
@@ -186,13 +186,10 @@ Future<String?> _pickAnkiCollection() async {
     if (selection == null) {
       return null;
     }
-    final path = selection.files.single.path;
-    if (path == null) {
-      throw StateError('The selected collection could not be accessed.');
-    }
+    final selectedFile = await _materializePickedFile(selection);
     return MobileCollectionStorage(
       collectionsDirectory: ApplicationDataPaths.collectionsDirectory,
-    ).copySelectedCollection(File(path));
+    ).copySelectedCollection(selectedFile);
   }
 
   final directory = await FilePicker.getDirectoryPath(
@@ -205,6 +202,20 @@ Future<String?> _pickAnkiCollection() async {
     directory,
     pathSeparator: Platform.pathSeparator,
   );
+}
+
+Future<File> _materializePickedFile(PlatformFile selection) async {
+  final path = selection.path;
+  if (path != null && path.isNotEmpty) {
+    return File(path);
+  }
+
+  final directory = await Directory.systemTemp.createTemp('ankiflutter-pick-');
+  final fallback = File(
+    '${directory.path}${Platform.pathSeparator}${selection.name}',
+  );
+  await fallback.writeAsBytes(await selection.readAsBytes(), flush: true);
+  return fallback;
 }
 
 Future<void> _closeSessionAndDisposeClient(
