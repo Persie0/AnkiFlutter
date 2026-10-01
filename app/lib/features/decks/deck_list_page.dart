@@ -16,6 +16,9 @@ import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
 import 'package:anki_flutter/features/notetypes/notetype_list_page.dart';
+import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
+import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
+import 'package:anki_flutter/features/sync/sync_page.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -321,6 +324,22 @@ class _DeckListPageState extends State<DeckListPage> {
                         backend: widget.backend!,
                       ),
                       fileTransfer: const NativePackageFileTransfer(),
+                      onCollectionChanged: widget.controller.load,
+                    ),
+                  ),
+                );
+              },
+            ),
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Sync',
+              icon: const Icon(Icons.sync),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => SyncPage(
+                      repository: AnkiSyncRepository(backend: widget.backend!),
+                      authStore: FileSyncAuthStore(),
                       onCollectionChanged: widget.controller.load,
                     ),
                   ),
