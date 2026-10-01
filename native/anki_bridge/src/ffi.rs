@@ -7,19 +7,67 @@ use std::slice;
 use crate::backend::BridgeBackend;
 use crate::operations::{
     OperationIndex, ADD_DECK, ADD_NOTE, ADD_NOTETYPE, ALL_BROWSER_COLUMNS, ALL_TTS_VOICES,
-    ANSWER_CARD, BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, DECK_TREE,
-    DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES, ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE,
-    EXTRACT_AV_TAGS, GET_CARD, GET_CONFIG_JSON, GET_DECK_CONFIGS_FOR_UPDATE,
-    GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS,
-    GET_QUEUED_CARDS, GET_UNDO_STATUS, IMPORT_ANKI_PACKAGE, NEW_DECK, NEW_NOTE, OPEN_COLLECTION,
-    REMOVE_CARDS, REMOVE_DECKS, REMOVE_NOTETYPE, RENAME_DECK, RENDER_EXISTING_CARD,
-    SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, SET_CURRENT_DECK, STATE_IS_LEECH, UNDO,
-    UPDATE_NOTES, UPDATE_NOTETYPE, WRITE_TTS_STREAM,
+    ANSWER_CARD, BROWSER_ROW_FOR_ID, BURY_OR_SUSPEND_CARDS, CLOSE_COLLECTION, CUSTOM_STUDY,
+    CUSTOM_STUDY_DEFAULTS, DECK_TREE, DEFAULTS_FOR_ADDING, DESCRIBE_NEXT_STATES,
+    ENCODE_IRI_PATHS, EXPORT_ANKI_PACKAGE, EXTRACT_AV_TAGS, GET_CARD, GET_CONFIG_JSON,
+    GET_DECK_CONFIGS_FOR_UPDATE, GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE,
+    GET_NOTETYPE_NAMES_AND_COUNTS, GET_QUEUED_CARDS, GET_UNDO_STATUS, IMPORT_ANKI_PACKAGE,
+    NEW_DECK, NEW_NOTE, OPEN_COLLECTION, REMOVE_CARDS, REMOVE_DECKS, REMOVE_NOTETYPE,
+    RENAME_DECK, RENDER_EXISTING_CARD, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS,
+    SET_CURRENT_DECK, STATE_IS_LEECH, UNBURY_DECK, UNDO, UPDATE_NOTES, UPDATE_NOTETYPE,
+    WRITE_TTS_STREAM,
 };
 
 pub const STATUS_SUCCESS: u32 = 0;
 pub const STATUS_BACKEND_ERROR: u32 = 1;
 pub const STATUS_BRIDGE_ERROR: u32 = 2;
+
+const OPERATIONS_BY_ID: &[OperationIndex] = &[
+    OPEN_COLLECTION,
+    CLOSE_COLLECTION,
+    DECK_TREE,
+    SET_CURRENT_DECK,
+    GET_QUEUED_CARDS,
+    DESCRIBE_NEXT_STATES,
+    ANSWER_CARD,
+    STATE_IS_LEECH,
+    BURY_OR_SUSPEND_CARDS,
+    GET_UNDO_STATUS,
+    UNDO,
+    RENDER_EXISTING_CARD,
+    EXTRACT_AV_TAGS,
+    ALL_TTS_VOICES,
+    WRITE_TTS_STREAM,
+    GET_DECK_CONFIGS_FOR_UPDATE,
+    ENCODE_IRI_PATHS,
+    RENAME_DECK,
+    REMOVE_DECKS,
+    GET_NOTETYPE_NAMES_AND_COUNTS,
+    NEW_NOTE,
+    ADD_NOTE,
+    GET_NOTETYPE,
+    DEFAULTS_FOR_ADDING,
+    SEARCH_CARDS,
+    BROWSER_ROW_FOR_ID,
+    SET_ACTIVE_BROWSER_COLUMNS,
+    GET_CONFIG_JSON,
+    GET_NOTE,
+    UPDATE_NOTES,
+    GET_CARD,
+    REMOVE_CARDS,
+    ALL_BROWSER_COLUMNS,
+    NEW_DECK,
+    ADD_DECK,
+    UPDATE_NOTETYPE,
+    ADD_NOTETYPE,
+    REMOVE_NOTETYPE,
+    GET_IMPORT_ANKI_PACKAGE_PRESETS,
+    IMPORT_ANKI_PACKAGE,
+    EXPORT_ANKI_PACKAGE,
+    CUSTOM_STUDY_DEFAULTS,
+    CUSTOM_STUDY,
+    UNBURY_DECK,
+];
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
@@ -104,50 +152,13 @@ unsafe fn input_bytes<'a>(input_ptr: *const u8, input_len: usize) -> Result<&'a 
 }
 
 fn operation_from_id(operation: u32) -> Result<OperationIndex, String> {
-    match operation {
-        1 => Ok(OPEN_COLLECTION),
-        2 => Ok(CLOSE_COLLECTION),
-        3 => Ok(DECK_TREE),
-        4 => Ok(SET_CURRENT_DECK),
-        5 => Ok(GET_QUEUED_CARDS),
-        6 => Ok(DESCRIBE_NEXT_STATES),
-        7 => Ok(ANSWER_CARD),
-        8 => Ok(STATE_IS_LEECH),
-        9 => Ok(BURY_OR_SUSPEND_CARDS),
-        10 => Ok(GET_UNDO_STATUS),
-        11 => Ok(UNDO),
-        12 => Ok(RENDER_EXISTING_CARD),
-        13 => Ok(EXTRACT_AV_TAGS),
-        14 => Ok(ALL_TTS_VOICES),
-        15 => Ok(WRITE_TTS_STREAM),
-        16 => Ok(GET_DECK_CONFIGS_FOR_UPDATE),
-        17 => Ok(ENCODE_IRI_PATHS),
-        18 => Ok(RENAME_DECK),
-        19 => Ok(REMOVE_DECKS),
-        20 => Ok(GET_NOTETYPE_NAMES_AND_COUNTS),
-        21 => Ok(NEW_NOTE),
-        22 => Ok(ADD_NOTE),
-        23 => Ok(GET_NOTETYPE),
-        24 => Ok(DEFAULTS_FOR_ADDING),
-        25 => Ok(SEARCH_CARDS),
-        26 => Ok(BROWSER_ROW_FOR_ID),
-        27 => Ok(SET_ACTIVE_BROWSER_COLUMNS),
-        28 => Ok(GET_CONFIG_JSON),
-        29 => Ok(GET_NOTE),
-        30 => Ok(UPDATE_NOTES),
-        31 => Ok(GET_CARD),
-        32 => Ok(REMOVE_CARDS),
-        33 => Ok(ALL_BROWSER_COLUMNS),
-        34 => Ok(NEW_DECK),
-        35 => Ok(ADD_DECK),
-        36 => Ok(UPDATE_NOTETYPE),
-        37 => Ok(ADD_NOTETYPE),
-        38 => Ok(REMOVE_NOTETYPE),
-        39 => Ok(GET_IMPORT_ANKI_PACKAGE_PRESETS),
-        40 => Ok(IMPORT_ANKI_PACKAGE),
-        41 => Ok(EXPORT_ANKI_PACKAGE),
-        _ => Err(format!("Unknown Anki bridge operation {operation}")),
-    }
+    let index = operation
+        .checked_sub(1)
+        .ok_or_else(|| format!("Unknown Anki bridge operation {operation}"))? as usize;
+    OPERATIONS_BY_ID
+        .get(index)
+        .copied()
+        .ok_or_else(|| format!("Unknown Anki bridge operation {operation}"))
 }
 
 /// Creates a bridge backend from the protobuf bytes at `init_ptr`.
@@ -258,19 +269,17 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ADD_DECK, ADD_NOTE, ADD_NOTETYPE, BROWSER_ROW_FOR_ID, DEFAULTS_FOR_ADDING,
-        EXPORT_ANKI_PACKAGE, GET_CARD, GET_CONFIG_JSON, GET_IMPORT_ANKI_PACKAGE_PRESETS,
-        GET_NOTE, GET_NOTETYPE, GET_NOTETYPE_NAMES_AND_COUNTS, IMPORT_ANKI_PACKAGE, NEW_DECK,
-        NEW_NOTE, REMOVE_NOTETYPE, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, UPDATE_NOTES,
+        ADD_DECK, ADD_NOTE, ADD_NOTETYPE, BROWSER_ROW_FOR_ID, CUSTOM_STUDY,
+        CUSTOM_STUDY_DEFAULTS, DEFAULTS_FOR_ADDING, EXPORT_ANKI_PACKAGE, GET_CARD,
+        GET_CONFIG_JSON, GET_IMPORT_ANKI_PACKAGE_PRESETS, GET_NOTE, GET_NOTETYPE,
+        GET_NOTETYPE_NAMES_AND_COUNTS, IMPORT_ANKI_PACKAGE, NEW_DECK, NEW_NOTE,
+        REMOVE_NOTETYPE, SEARCH_CARDS, SET_ACTIVE_BROWSER_COLUMNS, UNBURY_DECK, UPDATE_NOTES,
         UPDATE_NOTETYPE,
     };
 
     #[test]
-    fn note_operation_ids_map_to_the_pinned_backend_descriptors() {
-        assert_eq!(
-            operation_from_id(20).unwrap(),
-            GET_NOTETYPE_NAMES_AND_COUNTS
-        );
+    fn extended_operation_ids_map_to_the_pinned_backend_descriptors() {
+        assert_eq!(operation_from_id(20).unwrap(), GET_NOTETYPE_NAMES_AND_COUNTS);
         assert_eq!(operation_from_id(21).unwrap(), NEW_NOTE);
         assert_eq!(operation_from_id(22).unwrap(), ADD_NOTE);
         assert_eq!(operation_from_id(23).unwrap(), GET_NOTETYPE);
@@ -287,11 +296,13 @@ mod tests {
         assert_eq!(operation_from_id(36).unwrap(), UPDATE_NOTETYPE);
         assert_eq!(operation_from_id(37).unwrap(), ADD_NOTETYPE);
         assert_eq!(operation_from_id(38).unwrap(), REMOVE_NOTETYPE);
-        assert_eq!(
-            operation_from_id(39).unwrap(),
-            GET_IMPORT_ANKI_PACKAGE_PRESETS
-        );
+        assert_eq!(operation_from_id(39).unwrap(), GET_IMPORT_ANKI_PACKAGE_PRESETS);
         assert_eq!(operation_from_id(40).unwrap(), IMPORT_ANKI_PACKAGE);
         assert_eq!(operation_from_id(41).unwrap(), EXPORT_ANKI_PACKAGE);
+        assert_eq!(operation_from_id(42).unwrap(), CUSTOM_STUDY_DEFAULTS);
+        assert_eq!(operation_from_id(43).unwrap(), CUSTOM_STUDY);
+        assert_eq!(operation_from_id(44).unwrap(), UNBURY_DECK);
+        assert!(operation_from_id(0).is_err());
+        assert!(operation_from_id(45).is_err());
     }
 }
