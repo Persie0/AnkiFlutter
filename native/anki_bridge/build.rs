@@ -71,6 +71,8 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("SET_FLAG", "BackendCardsService", "set_flag"),
     ("ALL_TAGS", "BackendTagsService", "all_tags"),
     ("GRAPHS", "BackendStatsService", "graphs"),
+    ("GET_PREFERENCES", "BackendConfigService", "get_preferences"),
+    ("SET_PREFERENCES", "BackendConfigService", "set_preferences"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
