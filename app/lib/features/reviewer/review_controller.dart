@@ -171,6 +171,65 @@ class ReviewController extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshCurrentCard() async {
+    final current = _state;
+    final ReviewCard card;
+    final int generationId;
+    final bool answerSide;
+    final ReviewDeckSettings settings;
+    final Object? answerError;
+    if (current is ReviewQuestion) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = false;
+      settings = current.settings;
+      answerError = null;
+    } else if (current is ReviewAnswer) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = true;
+      settings = current.settings;
+      answerError = current.error;
+    } else {
+      return;
+    }
+
+    final content = await _renderer.render(card.cardId);
+    if (!_isCurrentGeneration(generationId)) return;
+    final latest = _state;
+    final stillSameCard = switch (latest) {
+      ReviewQuestion(:final card, :final generationId) when !answerSide =>
+        card.cardId == current.card.cardId &&
+            generationId == current.generationId,
+      ReviewAnswer(:final card, :final generationId) when answerSide =>
+        card.cardId == current.card.cardId &&
+            generationId == current.generationId,
+      _ => false,
+    };
+    if (!stillSameCard) return;
+
+    if (answerSide) {
+      _setState(
+        ReviewAnswer(
+          card: card,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+          error: answerError,
+        ),
+      );
+    } else {
+      _setState(
+        ReviewQuestion(
+          card: card,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+        ),
+      );
+    }
+  }
+
   Future<void> rate(ReviewRating rating) async {
     final current = _state;
     if (current is! ReviewAnswer ||
