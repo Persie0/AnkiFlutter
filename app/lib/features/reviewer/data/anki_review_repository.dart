@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
     as collection_pb;
 import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
@@ -17,7 +18,7 @@ import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart'
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:fixnum/fixnum.dart';
 
-class AnkiReviewRepository implements ReviewRepository {
+class AnkiReviewRepository implements ReviewRepository, ReviewFlagRepository {
   AnkiReviewRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -80,6 +81,7 @@ class AnkiReviewRepository implements ReviewRepository {
       deckId: queued.card.deckId.toInt(),
       originalDeckId: queued.card.originalDeckId.toInt(),
       templateOrdinal: queued.card.templateIdx,
+      flag: queued.card.flags & 0x7,
       counts: ReviewCounts(
         newCount: queuedCards.newCount,
         learningCount: queuedCards.learningCount,
@@ -88,6 +90,18 @@ class AnkiReviewRepository implements ReviewRepository {
       currentStateBytes: Uint8List.fromList(currentState.writeToBuffer()),
       choices: choices,
       deckName: queued.context.deckName,
+    );
+  }
+
+  @override
+  Future<void> setFlag(ReviewCard card, int flag) async {
+    final request = cards_pb.SetFlagRequest(
+      cardIds: [Int64(card.cardId)],
+      flag: flag,
+    );
+    await backend.invoke(
+      BackendOperation.setFlag,
+      Uint8List.fromList(request.writeToBuffer()),
     );
   }
 
