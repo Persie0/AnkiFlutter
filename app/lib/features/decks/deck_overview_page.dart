@@ -8,6 +8,8 @@ import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
+import 'package:anki_flutter/features/statistics/data/anki_statistics_repository.dart';
+import 'package:anki_flutter/features/statistics/statistics_page.dart';
 import 'package:anki_flutter/features/study/custom_study_page.dart';
 import 'package:anki_flutter/features/study/data/anki_custom_study_repository.dart';
 import 'package:flutter/material.dart';
@@ -168,6 +170,19 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     );
   }
 
+  Future<void> _statistics() async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StatisticsPage(
+          repository: AnkiStatisticsRepository(backend: backend),
+          search: _deckStatsSearch(widget.deck.name),
+        ),
+      ),
+    );
+  }
+
   Future<void> _deckOptions() async {
     final backend = widget.backend;
     if (backend == null) return;
@@ -218,6 +233,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               onPressed: _mutating ? null : _customStudy,
               icon: const Icon(Icons.tune),
             ),
+          if (widget.backend != null)
+            IconButton(
+              tooltip: 'Deck statistics',
+              onPressed: _mutating ? null : _statistics,
+              icon: const Icon(Icons.bar_chart_outlined),
+            ),
           if (widget.onAddNote != null)
             IconButton(
               tooltip: 'Add note',
@@ -265,4 +286,9 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       ),
     );
   }
+}
+
+String _deckStatsSearch(String deckName) {
+  final escaped = deckName.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  return 'deck:"$escaped"';
 }
