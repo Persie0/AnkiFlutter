@@ -14,6 +14,8 @@ import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
+import 'package:anki_flutter/features/profiles/data/file_profile_repository.dart';
+import 'package:anki_flutter/features/profiles/profile_picker_dialog.dart';
 import 'package:anki_flutter/features/reviewer/audio/media_kit_review_audio_player_adapter.dart';
 import 'package:anki_flutter/features/reviewer/audio/native_media_kit_player_port.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
@@ -144,7 +146,8 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
           return baseUri.resolve(encodedFilename);
         },
       ),
-      pickCollection: widget.pickCollection ?? _pickAnkiCollection,
+      pickCollection:
+          widget.pickCollection ?? () => _pickAnkiCollection(context),
       recentCollectionsStore: FileRecentCollectionStore(),
       openCollection: (path) =>
           session.open(CollectionLocation.fromCollectionPath(path)),
@@ -177,7 +180,21 @@ NativeAnkiBindings _loadNativeBindings() {
   return FfiNativeAnkiBindings.fromLibrary(library);
 }
 
-Future<String?> _pickAnkiCollection() async {
+Future<String?> _pickAnkiCollection(BuildContext context) {
+  return showDialog<String>(
+    context: context,
+    builder: (_) => ProfilePickerDialog(
+      repository: FileProfileRepository(
+        profilesDirectory: ApplicationDataPaths.profilesDirectory,
+        registryFile: ApplicationDataPaths.profileRegistryFile,
+        pathSeparator: Platform.pathSeparator,
+      ),
+      pickExistingCollection: _browseAnkiCollection,
+    ),
+  );
+}
+
+Future<String?> _browseAnkiCollection() async {
   if (Platform.isAndroid || Platform.isIOS) {
     final selection = await FilePicker.pickFile(
       dialogTitle: 'Choose an Anki collection',
