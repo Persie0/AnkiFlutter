@@ -285,6 +285,7 @@ class _ReviewPageState extends State<ReviewPage> {
               _ => throw StateError('Unexpected reviewer state'),
             };
             final error = state is ReviewAnswer ? state.error : null;
+            final reminder = widget.controller.autoAdvanceReminder;
             return Scaffold(
               appBar: AppBar(
                 title: Text(card.deckName),
@@ -326,6 +327,16 @@ class _ReviewPageState extends State<ReviewPage> {
                         builder: widget.cardSurfaceBuilder,
                       ),
                     ),
+                    if (reminder != null)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: Text(
+                          reminder,
+                          key: const ValueKey('auto-advance-reminder'),
+                          style: Theme.of(context).textTheme.titleSmall,
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
                     if (error != null) Text('Could not answer card: $error'),
                     if (!isAnswer)
                       Padding(
