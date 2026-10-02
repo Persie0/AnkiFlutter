@@ -64,7 +64,8 @@ enum BackendOperation {
   allTags(63),
   graphs(64),
   getPreferences(65),
-  setPreferences(66);
+  setPreferences(66),
+  noteFieldsCheck(67);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
