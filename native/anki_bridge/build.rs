@@ -70,6 +70,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("SET_DECK", "BackendCardsService", "set_deck"),
     ("SET_FLAG", "BackendCardsService", "set_flag"),
     ("ALL_TAGS", "BackendTagsService", "all_tags"),
+    ("GRAPHS", "BackendStatsService", "graphs"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
