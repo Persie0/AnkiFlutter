@@ -37,6 +37,15 @@ class ApplicationDataPaths {
     '${applicationSupportDirectory.path}${Platform.pathSeparator}collections',
   );
 
+  static Directory get profilesDirectory => Directory(
+    '${applicationSupportDirectory.path}${Platform.pathSeparator}profiles',
+  );
+
+  static File get profileRegistryFile => File(
+    '${applicationSupportDirectory.path}${Platform.pathSeparator}'
+    'profiles.json',
+  );
+
   static File get recentCollectionsFile => File(
     '${applicationSupportDirectory.path}${Platform.pathSeparator}'
     'recent-collections.json',
