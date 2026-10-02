@@ -64,6 +64,14 @@ class ReviewController extends ChangeNotifier {
 
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
+  bool get isAudioPlaying => _audio?.isPlaying ?? false;
+  bool get hasReplayableAudio {
+    if (_audio == null) return false;
+    return _replayTagsForCurrentState().any((tag) => switch (tag) {
+      ReviewMediaTag() => _mediaUriFor != null,
+      ReviewTtsTag() => _tts != null,
+    });
+  }
 
   @override
   void dispose() {
@@ -229,6 +237,43 @@ class ReviewController extends ChangeNotifier {
     await _loadNextCard(++_generation);
   }
 
+  Future<void> replayAudio() async {
+    final generationId = _currentGenerationId();
+    if (generationId == null || _audio == null) return;
+    await _playTags(_replayTagsForCurrentState(), generationId);
+  }
+
+  Future<void> toggleAudioPause() async {
+    await _audio?.togglePause();
+  }
+
+  Future<void> seekAudio(Duration delta) async {
+    await _audio?.seekRelative(delta);
+  }
+
+  List<ReviewAudioTag> _replayTagsForCurrentState() {
+    final current = _state;
+    if (current is ReviewQuestion) {
+      return current.content.questionAudio;
+    }
+    if (current is ReviewAnswer) {
+      if (current.settings.skipQuestionWhenReplayingAnswer) {
+        return current.content.answerAudio;
+      }
+      return <ReviewAudioTag>[
+        ...current.content.questionAudio,
+        ...current.content.answerAudio,
+      ];
+    }
+    return const [];
+  }
+
+  int? _currentGenerationId() => switch (_state) {
+    ReviewQuestion(:final generationId) => generationId,
+    ReviewAnswer(:final generationId) => generationId,
+    _ => null,
+  };
+
   Future<void> toggleAutoAdvance() async {
     _autoAdvanceEnabled = !_autoAdvanceEnabled;
     _clearAutoAdvanceTimer();
@@ -362,15 +407,14 @@ class ReviewController extends ChangeNotifier {
   }
 
   void _onPlayingChanged(bool isPlaying) {
-    if (isPlaying) {
-      return;
+    if (!isPlaying) {
+      final deferred = _deferredAutoAdvance;
+      if (deferred != null) {
+        _deferredAutoAdvance = null;
+        unawaited(_onAutoAdvanceTimeout(deferred.side, deferred.generationId));
+      }
     }
-    final deferred = _deferredAutoAdvance;
-    if (deferred == null) {
-      return;
-    }
-    _deferredAutoAdvance = null;
-    unawaited(_onAutoAdvanceTimeout(deferred.side, deferred.generationId));
+    notifyListeners();
   }
 
   void _clearAutoAdvanceTimer() {
