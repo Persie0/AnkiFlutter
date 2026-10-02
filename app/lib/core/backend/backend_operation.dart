@@ -61,7 +61,8 @@ enum BackendOperation {
   removeNoteTags(60),
   setDeck(61),
   setFlag(62),
-  allTags(63);
+  allTags(63),
+  graphs(64);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
