@@ -79,6 +79,10 @@ The Linux CI build also creates the release Rust bridge and copies `libanki_flut
 
 Android packages the Rust bridge into ABI-specific JNI libraries. iOS statically links the Rust bridge into the app process to comply with iOS dynamic-library restrictions. Both platforms use the same Dart screens and business logic.
 
+## Release builds
+
+Platform signing, store bundle, and release packaging instructions are documented in [`docs/release-builds.md`](docs/release-builds.md). Release credentials and keystores must remain outside the repository.
+
 ## Native backend troubleshooting
 
 If the app shows **Anki backend unavailable**, first run it through `python3 tool/run_desktop_dev.py`; that is the supported development path and supplies the exact built library automatically.
