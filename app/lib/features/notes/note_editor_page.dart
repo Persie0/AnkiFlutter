@@ -6,6 +6,7 @@ import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
 import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_fields_form.dart';
+import 'package:anki_flutter/features/notes/note_validation.dart';
 import 'package:flutter/material.dart';
 
 class NoteEditorPage extends StatefulWidget {
@@ -95,6 +96,9 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
       ..clear()
       ..addAll(parseNoteTags(_tags.text));
     try {
+      if (!await _validateBeforeSave(updated)) {
+        return;
+      }
       await widget.repository.updateNote(updated);
       if (mounted) Navigator.of(context).pop(true);
     } catch (error) {
@@ -102,6 +106,43 @@ class _NoteEditorPageState extends State<NoteEditorPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<bool> _validateBeforeSave(notes.Note note) async {
+    final repository = widget.repository;
+    if (repository is! NoteValidationRepository) {
+      return true;
+    }
+    final state = await repository.checkNoteFields(note);
+    final validationError = noteValidationError(state);
+    if (validationError != null) {
+      if (mounted) setState(() => _error = validationError);
+      return false;
+    }
+    if (!noteValidationIsDuplicate(state)) {
+      return true;
+    }
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Duplicate note'),
+            content: const Text(
+              'Anki found another note with the same first field. Save this duplicate anyway?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Save anyway'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   bool _isCurrent(int generation) => mounted && generation == _generation;
