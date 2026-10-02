@@ -52,9 +52,31 @@ void main() {
     await tester.tap(find.text('Save note'));
     await tester.pumpAndSettle();
 
+    expect(repository.validatedNote?.fields.first, 'front updated');
     expect(repository.updateCount, 1);
     expect(repository.savedNote?.fields, ['front updated', 'back original']);
     expect(repository.savedNote?.tags, ['new-tag', 'second-tag']);
+    expect(results, [true]);
+  });
+
+  testWidgets('duplicate edit requires explicit confirmation', (tester) async {
+    final repository = _NoteRepository()
+      ..validationState = notes.NoteFieldsCheckResponse_State.DUPLICATE;
+    final results = await _openEditor(tester, repository);
+    await tester.enterText(
+      find.byKey(const ValueKey('note-field-0')),
+      'duplicate front',
+    );
+
+    await tester.tap(find.text('Save note'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Duplicate note'), findsOneWidget);
+    expect(repository.updateCount, 0);
+    await tester.tap(find.text('Save anyway'));
+    await tester.pumpAndSettle();
+
+    expect(repository.updateCount, 1);
     expect(results, [true]);
   });
 
@@ -121,10 +143,18 @@ Future<List<bool?>> _openEditor(
   return results;
 }
 
-class _NoteRepository implements NoteEntryRepository {
+class _NoteRepository implements NoteEntryRepository, NoteValidationRepository {
   bool failNextUpdate = false;
   int updateCount = 0;
   notes.Note? savedNote;
+  notes.Note? validatedNote;
+  var validationState = notes.NoteFieldsCheckResponse_State.NORMAL;
+
+  @override
+  Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(notes.Note note) async {
+    validatedNote = notes.Note.fromBuffer(note.writeToBuffer());
+    return validationState;
+  }
 
   @override
   Future<notes.Note> getNote(int noteId) async => notes.Note(

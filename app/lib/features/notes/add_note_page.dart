@@ -7,6 +7,7 @@ import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_fields_form.dart';
+import 'package:anki_flutter/features/notes/note_validation.dart';
 import 'package:flutter/material.dart';
 
 class AddNotePage extends StatefulWidget {
@@ -143,6 +144,9 @@ class _AddNotePageState extends State<AddNotePage> {
       ..addAll(parseNoteTags(_tags.text));
 
     try {
+      if (!await _validateBeforeSave(submittedNote)) {
+        return;
+      }
       await widget.repository.addNote(
         deckId: widget.deck.id,
         note: submittedNote,
@@ -159,6 +163,43 @@ class _AddNotePageState extends State<AddNotePage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<bool> _validateBeforeSave(notes.Note note) async {
+    final repository = widget.repository;
+    if (repository is! NoteValidationRepository) {
+      return true;
+    }
+    final state = await repository.checkNoteFields(note);
+    final validationError = noteValidationError(state);
+    if (validationError != null) {
+      if (mounted) setState(() => _error = validationError);
+      return false;
+    }
+    if (!noteValidationIsDuplicate(state)) {
+      return true;
+    }
+    if (!mounted) return false;
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Duplicate note'),
+            content: const Text(
+              'Anki found another note with the same first field. Add this duplicate anyway?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Add anyway'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   bool _isCurrent(int generation) => mounted && generation == _generation;

@@ -26,8 +26,13 @@ abstract interface class NoteEntryRepository {
   Future<void> updateNote(notes.Note note);
 }
 
+abstract interface class NoteValidationRepository {
+  Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(notes.Note note);
+}
+
 /// Sends note-entry requests through the shared native Anki backend.
-class AnkiNoteRepository implements NoteEntryRepository {
+class AnkiNoteRepository
+    implements NoteEntryRepository, NoteValidationRepository {
   const AnkiNoteRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -71,6 +76,17 @@ class AnkiNoteRepository implements NoteEntryRepository {
       Uint8List.fromList(request.writeToBuffer()),
     );
     return notes.Note.fromBuffer(response);
+  }
+
+  @override
+  Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(
+    notes.Note note,
+  ) async {
+    final response = await backend.invoke(
+      BackendOperation.noteFieldsCheck,
+      Uint8List.fromList(note.writeToBuffer()),
+    );
+    return notes.NoteFieldsCheckResponse.fromBuffer(response).state;
   }
 
   @override

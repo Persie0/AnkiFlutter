@@ -75,6 +75,7 @@ void main() {
     await tester.tap(find.text('Add note'));
     await tester.pumpAndSettle();
 
+    expect(repository.validatedNote!.fields, ['hola', 'hello']);
     expect(repository.savedDeckId, 72);
     expect(repository.savedNote!.fields, ['hola', 'hello']);
     expect(repository.savedNote!.tags, ['lesson-1']);
@@ -85,6 +86,38 @@ void main() {
       isEmpty,
     );
     expect(find.text('Note added'), findsOneWidget);
+  });
+
+  testWidgets('duplicate note requires explicit confirmation', (tester) async {
+    final repository = _NoteRepository()
+      ..validationState = notes.NoteFieldsCheckResponse_State.DUPLICATE;
+    await _showPage(tester, repository, deck);
+
+    await tester.enterText(find.byKey(const ValueKey('note-field-0')), 'same');
+    await tester.enterText(find.byKey(const ValueKey('note-field-1')), 'answer');
+    await tester.tap(find.text('Add note'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Duplicate note'), findsOneWidget);
+    expect(repository.savedNote, isNull);
+    await tester.tap(find.text('Add anyway'));
+    await tester.pumpAndSettle();
+
+    expect(repository.savedNote!.fields.first, 'same');
+  });
+
+  testWidgets('hard note validation errors block add', (tester) async {
+    final repository = _NoteRepository()
+      ..validationState = notes.NoteFieldsCheckResponse_State.EMPTY;
+    await _showPage(tester, repository, deck);
+
+    await tester.enterText(find.byKey(const ValueKey('note-field-1')), 'answer');
+    await tester.tap(find.text('Add note'));
+    await tester.pumpAndSettle();
+
+    expect(repository.savedNote, isNull);
+    expect(find.byKey(const ValueKey('add-note-error')), findsOneWidget);
+    expect(find.textContaining('first field is empty'), findsOneWidget);
   });
 
   testWidgets('locks note type selection while the save is pending', (
@@ -153,7 +186,7 @@ notetypes.NotetypeNameIdUseCount _typeChoice(int id, String name) =>
       useCount: 0,
     );
 
-class _NoteRepository implements NoteEntryRepository {
+class _NoteRepository implements NoteEntryRepository, NoteValidationRepository {
   _NoteRepository({
     List<notetypes.NotetypeNameIdUseCount>? notetypeChoices,
     this.defaultNotetypeId,
@@ -165,9 +198,17 @@ class _NoteRepository implements NoteEntryRepository {
   int? defaultsDeckId;
   int? savedDeckId;
   notes.Note? savedNote;
+  notes.Note? validatedNote;
   Completer<void>? pendingSave;
   bool failSave = false;
+  var validationState = notes.NoteFieldsCheckResponse_State.NORMAL;
   var _newNoteId = 0;
+
+  @override
+  Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(notes.Note note) async {
+    validatedNote = notes.Note.fromBuffer(note.writeToBuffer());
+    return validationState;
+  }
 
   @override
   Future<int> addNote({required int deckId, required notes.Note note}) async {
