@@ -16,6 +16,10 @@ import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
 import 'package:anki_flutter/features/notetypes/notetype_list_page.dart';
+import 'package:anki_flutter/features/preferences/data/anki_preferences_repository.dart';
+import 'package:anki_flutter/features/preferences/preferences_page.dart';
+import 'package:anki_flutter/features/statistics/data/anki_statistics_repository.dart';
+import 'package:anki_flutter/features/statistics/statistics_page.dart';
 import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
 import 'package:anki_flutter/features/sync/sync_page.dart';
@@ -233,6 +237,30 @@ class _DeckListPageState extends State<DeckListPage> {
     }
   }
 
+  void _openCollectionStatistics() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => StatisticsPage(
+          repository: AnkiStatisticsRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
+  void _openPreferences() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PreferencesPage(
+          repository: AnkiPreferencesRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
   void _openDeck(DeckNode deck) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -295,6 +323,18 @@ class _DeckListPageState extends State<DeckListPage> {
               tooltip: 'Create deck',
               icon: const Icon(Icons.add),
               onPressed: _opening ? null : _createDeck,
+            ),
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Collection statistics',
+              icon: const Icon(Icons.bar_chart_outlined),
+              onPressed: _opening ? null : _openCollectionStatistics,
+            ),
+          if (_collectionOpened && widget.backend != null)
+            IconButton(
+              tooltip: 'Preferences',
+              icon: const Icon(Icons.settings_outlined),
+              onPressed: _opening ? null : _openPreferences,
             ),
           if (_collectionOpened && widget.backend != null)
             IconButton(
@@ -392,6 +432,23 @@ class _DeckListPageState extends State<DeckListPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Icon(
+                  Icons.school_outlined,
+                  size: 52,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Open an Anki profile',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Choose an existing profile or collection, or create a new profile to get started.',
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
                 FilledButton.icon(
                   onPressed: _chooseCollection,
                   icon: const Icon(Icons.folder_open),
@@ -451,6 +508,7 @@ class _DeckListPageState extends State<DeckListPage> {
           DeckListReady(:final decks) => _DeckTree(
             decks: decks,
             onDeckTap: _openDeck,
+            onCreateDeck: widget.backend == null ? null : _createDeck,
           ),
         };
       },
@@ -578,10 +636,15 @@ class _CreateDeckDialogState extends State<_CreateDeckDialog> {
 }
 
 class _DeckTree extends StatelessWidget {
-  const _DeckTree({required this.decks, required this.onDeckTap});
+  const _DeckTree({
+    required this.decks,
+    required this.onDeckTap,
+    this.onCreateDeck,
+  });
 
   final List<DeckNode> decks;
   final ValueChanged<DeckNode> onDeckTap;
+  final VoidCallback? onCreateDeck;
 
   @override
   Widget build(BuildContext context) {
@@ -616,7 +679,18 @@ class _DeckTree extends StatelessWidget {
         const Divider(height: 1),
         Expanded(
           child: decks.isEmpty
-              ? const Center(child: Text('No decks'))
+              ? _CenteredMessage(
+                  icon: Icons.layers_outlined,
+                  title: 'No decks yet',
+                  message: 'Create a deck to start adding and studying cards.',
+                  action: onCreateDeck == null
+                      ? null
+                      : FilledButton.icon(
+                          onPressed: onCreateDeck,
+                          icon: const Icon(Icons.add),
+                          label: const Text('Create your first deck'),
+                        ),
+                )
               : ListView(children: _rows(decks, 0)),
         ),
       ],
