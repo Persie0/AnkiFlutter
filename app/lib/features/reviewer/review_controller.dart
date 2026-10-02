@@ -56,6 +56,7 @@ class ReviewController extends ChangeNotifier {
 
   ReviewSessionState _state = const ReviewInitial();
   Stopwatch? _answerStopwatch;
+  int? _frozenVisibleTimerMilliseconds;
   ReviewTimerHandle? _autoAdvanceTimer;
   _DeferredAutoAdvance? _deferredAutoAdvance;
   bool _autoAdvanceEnabled = false;
@@ -65,6 +66,33 @@ class ReviewController extends ChangeNotifier {
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
+  Duration get reviewTimerElapsed {
+    final current = _state;
+    final ReviewDeckSettings? settings = switch (current) {
+      ReviewQuestion(:final settings) => settings,
+      ReviewAnswer(:final settings) => settings,
+      ReviewTransition(:final settings) => settings,
+      _ => null,
+    };
+    if (settings == null) return Duration.zero;
+
+    final elapsed = switch (current) {
+      ReviewAnswer() when settings.stopTimerOnAnswer =>
+        _frozenVisibleTimerMilliseconds ??
+            (_answerStopwatch?.elapsedMilliseconds ?? 0),
+      ReviewTransition() =>
+        _frozenVisibleTimerMilliseconds ??
+            (_answerStopwatch?.elapsedMilliseconds ?? 0),
+      _ => _answerStopwatch?.elapsedMilliseconds ?? 0,
+    };
+    return Duration(
+      milliseconds: _capElapsedMilliseconds(
+        elapsed,
+        settings.answerTimeLimitSeconds,
+      ),
+    );
+  }
+
   bool get hasReplayableAudio {
     if (_audio == null) return false;
     return _replayTagsForCurrentState().any((tag) => switch (tag) {
@@ -88,6 +116,7 @@ class ReviewController extends ChangeNotifier {
     _selectedDeckId = deckId;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
+    _frozenVisibleTimerMilliseconds = null;
     final generationId = ++_generation;
     _setState(const ReviewLoading());
 
@@ -113,6 +142,10 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
+    if (current.settings.stopTimerOnAnswer) {
+      _frozenVisibleTimerMilliseconds =
+          _answerStopwatch?.elapsedMilliseconds ?? 0;
+    }
     _setState(
       ReviewAnswer(
         card: current.card,
@@ -144,6 +177,8 @@ class ReviewController extends ChangeNotifier {
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     final generationId = current.generationId;
+    final rawMillisecondsTaken = _answerStopwatch?.elapsedMilliseconds ?? 0;
+    _frozenVisibleTimerMilliseconds ??= rawMillisecondsTaken;
     _setState(
       ReviewTransition(
         card: current.card,
@@ -154,7 +189,10 @@ class ReviewController extends ChangeNotifier {
     );
 
     final answeredAtMillis = _wallClockMillis();
-    final millisecondsTaken = _answerStopwatch?.elapsedMilliseconds ?? 0;
+    final millisecondsTaken = _capElapsedMilliseconds(
+      rawMillisecondsTaken,
+      current.settings.answerTimeLimitSeconds,
+    );
 
     try {
       await _repository.answer(
@@ -295,6 +333,7 @@ class ReviewController extends ChangeNotifier {
         _clearAutoAdvanceTimer();
         _deferredAutoAdvance = null;
         _answerStopwatch = null;
+        _frozenVisibleTimerMilliseconds = null;
         _setState(const ReviewFinished());
         return;
       }
@@ -311,6 +350,7 @@ class ReviewController extends ChangeNotifier {
 
       final stopwatch = _stopwatchFactory()..start();
       _answerStopwatch = stopwatch;
+      _frozenVisibleTimerMilliseconds = null;
 
       _setState(
         ReviewQuestion(
@@ -328,6 +368,12 @@ class ReviewController extends ChangeNotifier {
     } catch (error) {
       if (_isCurrentGeneration(generationId)) _setState(ReviewFailure(error));
     }
+  }
+
+  int _capElapsedMilliseconds(int elapsed, int limitSeconds) {
+    if (limitSeconds <= 0) return elapsed;
+    final limitMilliseconds = limitSeconds * 1000;
+    return elapsed > limitMilliseconds ? limitMilliseconds : elapsed;
   }
 
   void _scheduleAutoAdvanceForCurrentState() {
