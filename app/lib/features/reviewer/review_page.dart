@@ -13,6 +13,10 @@ enum _ReviewAction {
   buryNote,
   suspendCard,
   suspendNote,
+  replayAudio,
+  toggleAudioPause,
+  seekAudioBack,
+  seekAudioForward,
   autoAdvance,
 }
 
@@ -103,6 +107,18 @@ class _ReviewPageState extends State<ReviewPage> {
         case _ReviewAction.suspendNote:
           await widget.controller.suspendCurrentNote();
           break;
+        case _ReviewAction.replayAudio:
+          await widget.controller.replayAudio();
+          break;
+        case _ReviewAction.toggleAudioPause:
+          await widget.controller.toggleAudioPause();
+          break;
+        case _ReviewAction.seekAudioBack:
+          await widget.controller.seekAudio(const Duration(seconds: -5));
+          break;
+        case _ReviewAction.seekAudioForward:
+          await widget.controller.seekAudio(const Duration(seconds: 5));
+          break;
         case _ReviewAction.autoAdvance:
           await widget.controller.toggleAutoAdvance();
           break;
@@ -160,6 +176,41 @@ class _ReviewPageState extends State<ReviewPage> {
         title: Text('Suspend note'),
       ),
     ),
+    if (widget.controller.hasReplayableAudio) ...[
+      const PopupMenuDivider(),
+      const PopupMenuItem(
+        value: _ReviewAction.replayAudio,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.replay),
+          title: Text('Replay audio'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _ReviewAction.toggleAudioPause,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.play_circle_outline),
+          title: Text('Play / pause audio'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _ReviewAction.seekAudioBack,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.fast_rewind),
+          title: Text('Back 5 seconds'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _ReviewAction.seekAudioForward,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.fast_forward),
+          title: Text('Forward 5 seconds'),
+        ),
+      ),
+    ],
     const PopupMenuDivider(),
     CheckedPopupMenuItem(
       value: _ReviewAction.autoAdvance,
