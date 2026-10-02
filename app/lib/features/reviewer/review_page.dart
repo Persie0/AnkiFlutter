@@ -11,6 +11,7 @@ typedef ReviewNoteEditor = Future<bool> Function(int noteId);
 
 enum _ReviewAction {
   editNote,
+  setFlag,
   undo,
   buryCard,
   buryNote,
@@ -66,6 +67,10 @@ class _ReviewPageState extends State<ReviewPage> {
     unawaited(_runReviewAction(action));
   }
 
+  void _flagShortcut(int flag) {
+    unawaited(_setFlag(flag));
+  }
+
   Map<ShortcutActivator, VoidCallback> get _shortcuts => {
     const SingleActivator(LogicalKeyboardKey.space): _defaultShortcut,
     const SingleActivator(LogicalKeyboardKey.enter): _defaultShortcut,
@@ -86,6 +91,20 @@ class _ReviewPageState extends State<ReviewPage> {
         _rateShortcut(ReviewRating.good),
     const SingleActivator(LogicalKeyboardKey.numpad4): () =>
         _rateShortcut(ReviewRating.easy),
+    const SingleActivator(LogicalKeyboardKey.digit1, control: true): () =>
+        _flagShortcut(1),
+    const SingleActivator(LogicalKeyboardKey.digit2, control: true): () =>
+        _flagShortcut(2),
+    const SingleActivator(LogicalKeyboardKey.digit3, control: true): () =>
+        _flagShortcut(3),
+    const SingleActivator(LogicalKeyboardKey.digit4, control: true): () =>
+        _flagShortcut(4),
+    const SingleActivator(LogicalKeyboardKey.digit5, control: true): () =>
+        _flagShortcut(5),
+    const SingleActivator(LogicalKeyboardKey.digit6, control: true): () =>
+        _flagShortcut(6),
+    const SingleActivator(LogicalKeyboardKey.digit7, control: true): () =>
+        _flagShortcut(7),
     const SingleActivator(LogicalKeyboardKey.keyE): () =>
         _actionShortcut(_ReviewAction.editNote),
     const SingleActivator(LogicalKeyboardKey.keyR): () =>
@@ -118,6 +137,40 @@ class _ReviewPageState extends State<ReviewPage> {
     _ => null,
   };
 
+  Future<void> _setFlag(int flag) async {
+    if (_manualActionInProgress || !widget.controller.supportsFlags) return;
+    setState(() => _manualActionInProgress = true);
+    try {
+      await widget.controller.setCurrentFlag(flag);
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not set flag: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _manualActionInProgress = false);
+    }
+  }
+
+  Future<int?> _chooseFlag() => showDialog<int>(
+    context: context,
+    builder: (dialogContext) => SimpleDialog(
+      title: const Text('Set flag'),
+      children: [
+        SimpleDialogOption(
+          onPressed: () => Navigator.of(dialogContext).pop(0),
+          child: const Text('Clear flag'),
+        ),
+        for (var flag = 1; flag <= 7; flag++)
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(flag),
+            child: Text('Flag $flag'),
+          ),
+      ],
+    ),
+  );
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
@@ -139,6 +192,10 @@ class _ReviewPageState extends State<ReviewPage> {
               await widget.controller.toggleAutoAdvance();
             }
           }
+          break;
+        case _ReviewAction.setFlag:
+          final flag = await _chooseFlag();
+          if (flag != null) await widget.controller.setCurrentFlag(flag);
           break;
         case _ReviewAction.undo:
           if (!await widget.controller.canUndo()) {
@@ -198,6 +255,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.edit_outlined),
           title: Text('Edit note'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.controller.supportsFlags) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.setFlag,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.flag_outlined),
+          title: Text('Set flag…'),
         ),
       ),
       const PopupMenuDivider(),
@@ -353,12 +421,20 @@ class _ReviewPageState extends State<ReviewPage> {
             };
             final error = state is ReviewAnswer ? state.error : null;
             final reminder = widget.controller.autoAdvanceReminder;
+            final flag = widget.controller.currentFlag;
             return Scaffold(
               appBar: AppBar(
                 title: Text(card.deckName),
                 actions: [
                   if (settings.showTimer) ...[
                     Center(child: _ReviewTimer(controller: widget.controller)),
+                    const SizedBox(width: 12),
+                  ],
+                  if (flag != 0) ...[
+                    Tooltip(
+                      message: 'Flag $flag',
+                      child: const Icon(Icons.flag),
+                    ),
                     const SizedBox(width: 12),
                   ],
                   Center(

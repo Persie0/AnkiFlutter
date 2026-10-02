@@ -31,3 +31,7 @@ abstract interface class ReviewRepository {
 
   Future<ReviewDeckSettings> settingsForDeck(int deckId);
 }
+
+abstract interface class ReviewFlagRepository {
+  Future<void> setFlag(ReviewCard card, int flag);
+}
