@@ -13,6 +13,7 @@ import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -61,6 +62,65 @@ void main() {
     );
     expect(find.text('Show Answer'), findsOneWidget);
     expect(find.textContaining('Again'), findsNothing);
+  });
+
+  testWidgets('space reveals answer and then selects Good', (tester) async {
+    final controller = _controller();
+    await controller.start(4);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, _) => const Text('Fake surface'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(controller.state, isA<ReviewAnswer>());
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(controller.state, isA<ReviewFinished>());
+  });
+
+  testWidgets('number keys map to the four answer ratings', (tester) async {
+    for (final key in <LogicalKeyboardKey>[
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+    ]) {
+      final repository = _Repository();
+      final controller = ReviewController(
+        repository: repository,
+        renderer: _Renderer(),
+        wallClockMillis: () => 100,
+        stopwatchFactory: Stopwatch.new,
+      );
+      await controller.start(4);
+      await controller.showAnswer();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: ReviewPage(
+            controller: controller,
+            onFinished: () {},
+            cardSurfaceBuilder: (_, _) => const Text('Fake surface'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.sendKeyEvent(key);
+      await tester.pumpAndSettle();
+
+      expect(controller.state, isA<ReviewFinished>());
+      expect(repository.lastRating, ReviewRating.values[key.keyId - LogicalKeyboardKey.digit1.keyId]);
+      controller.dispose();
+    }
   });
 
   testWidgets('answer renders all four ratings and sends selected rating', (
@@ -122,6 +182,8 @@ ReviewController _controller() => ReviewController(
 class _Repository implements ReviewRepository {
   bool _returned = false;
   bool failNextCard = false;
+  ReviewRating? lastRating;
+
   @override
   Future<void> selectDeck(int deckId) async {}
   @override
@@ -155,7 +217,9 @@ class _Repository implements ReviewRepository {
     ReviewRating rating, {
     required int answeredAtMillis,
     required int millisecondsTaken,
-  }) async {}
+  }) async {
+    lastRating = rating;
+  }
   @override
   Future<bool> stateIsLeech(ReviewAnswerChoice choice) async => false;
   @override
