@@ -4,6 +4,8 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/preferences/data/anki_preferences_repository.dart';
+import 'package:anki_flutter/features/preferences/preferences_page.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
@@ -183,6 +185,18 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     );
   }
 
+  Future<void> _preferences() async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PreferencesPage(
+          repository: AnkiPreferencesRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
   Future<void> _deckOptions() async {
     final backend = widget.backend;
     if (backend == null) return;
@@ -226,6 +240,12 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               tooltip: 'Deck options',
               onPressed: _mutating ? null : _deckOptions,
               icon: const Icon(Icons.settings_outlined),
+            ),
+          if (widget.backend != null)
+            IconButton(
+              tooltip: 'Preferences',
+              onPressed: _mutating ? null : _preferences,
+              icon: const Icon(Icons.settings_suggest_outlined),
             ),
           if (widget.backend != null)
             IconButton(
@@ -289,6 +309,6 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
 }
 
 String _deckStatsSearch(String deckName) {
-  final escaped = deckName.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  final escaped = deckName.replaceAll('\\', '\\\\').replaceAll('"', '\\"');
   return 'deck:"$escaped"';
 }
