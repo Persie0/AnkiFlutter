@@ -9,9 +9,13 @@ void main() {
       'android/app/src/main/AndroidManifest.xml',
     ).readAsString();
     final linuxCmake = await File('linux/CMakeLists.txt').readAsString();
+    final linuxWindow = await File(
+      'linux/runner/my_application.cc',
+    ).readAsString();
     final macAppInfo = await File(
       'macos/Runner/Configs/AppInfo.xcconfig',
     ).readAsString();
+    final windowsMain = await File('windows/runner/main.cpp').readAsString();
     final windowsResources = await File(
       'windows/runner/Runner.rc',
     ).readAsString();
@@ -30,10 +34,13 @@ void main() {
       linuxCmake,
       contains('set(APPLICATION_ID "dev.persie0.anki_flutter")'),
     );
+    expect(linuxWindow, contains('gtk_header_bar_set_title(header_bar, "AnkiFlutter")'));
+    expect(linuxWindow, contains('gtk_window_set_title(window, "AnkiFlutter")'));
 
     expect(macAppInfo, contains('PRODUCT_NAME = AnkiFlutter'));
     expect(macAppInfo, contains('PRODUCT_COPYRIGHT = Copyright © 2026 Persie0.'));
 
+    expect(windowsMain, contains('window.Create(L"AnkiFlutter"'));
     expect(windowsResources, contains('VALUE "CompanyName", "Persie0"'));
     expect(windowsResources, contains('VALUE "ProductName", "AnkiFlutter"'));
     expect(windowsResources, contains('VALUE "FileDescription", "AnkiFlutter"'));
