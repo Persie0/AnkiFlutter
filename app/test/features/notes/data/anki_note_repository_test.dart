@@ -90,6 +90,26 @@ void main() {
     expect(note.fields, ['front', 'back']);
   });
 
+  test('checks note fields with Anki before committing changes', () async {
+    final note = notes.Note(
+      id: Int64(100),
+      notetypeId: Int64(12),
+      fields: ['front text', 'back text'],
+    );
+    final backend = _Backend(
+      notes.NoteFieldsCheckResponse(
+        state: notes.NoteFieldsCheckResponse_State.DUPLICATE,
+      ).writeToBuffer(),
+    );
+    final repository = AnkiNoteRepository(backend: backend);
+
+    final state = await repository.checkNoteFields(note);
+
+    expect(backend.calls.single.operation, BackendOperation.noteFieldsCheck);
+    expect(notes.Note.fromBuffer(backend.calls.single.request), note);
+    expect(state, notes.NoteFieldsCheckResponse_State.DUPLICATE);
+  });
+
   test('adds the supplied note to the selected deck and returns its ID', () async {
     final note = notes.Note(
       id: Int64(100),
