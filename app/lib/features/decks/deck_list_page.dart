@@ -29,6 +29,15 @@ typedef CollectionPicker = Future<String?> Function();
 typedef CollectionOpener = Future<void> Function(String path);
 typedef CollectionCloser = Future<void> Function();
 
+enum _CollectionAction {
+  statistics,
+  preferences,
+  noteTypes,
+  importExport,
+  sync,
+  browse,
+}
+
 class DeckListPage extends StatefulWidget {
   const DeckListPage({
     required this.controller,
@@ -261,6 +270,76 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
+  void _openNotetypes() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotetypeListPage(
+          repository: AnkiNotetypeRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
+  void _openImportExport() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PackageTransferPage(
+          repository: AnkiPackageRepository(backend: backend),
+          fileTransfer: const NativePackageFileTransfer(),
+          onCollectionChanged: widget.controller.load,
+        ),
+      ),
+    );
+  }
+
+  void _openSync() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => SyncPage(
+          repository: AnkiSyncRepository(backend: backend),
+          authStore: FileSyncAuthStore(),
+          onCollectionChanged: widget.controller.load,
+        ),
+      ),
+    );
+  }
+
+  void _openBrowser() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CardBrowserPage(
+          repository: AnkiCardBrowserRepository(backend: backend),
+          noteRepository: AnkiNoteRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
+  void _runCollectionAction(_CollectionAction action) {
+    switch (action) {
+      case _CollectionAction.statistics:
+        _openCollectionStatistics();
+      case _CollectionAction.preferences:
+        _openPreferences();
+      case _CollectionAction.noteTypes:
+        _openNotetypes();
+      case _CollectionAction.importExport:
+        _openImportExport();
+      case _CollectionAction.sync:
+        _openSync();
+      case _CollectionAction.browse:
+        _openBrowser();
+    }
+  }
+
   void _openDeck(DeckNode deck) {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -301,6 +380,7 @@ class _DeckListPageState extends State<DeckListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final compactToolbar = MediaQuery.sizeOf(context).width < 700;
     return Scaffold(
       appBar: AppBar(
         title: const Text('AnkiFlutter'),
@@ -324,87 +404,97 @@ class _DeckListPageState extends State<DeckListPage> {
               icon: const Icon(Icons.add),
               onPressed: _opening ? null : _createDeck,
             ),
-          if (_collectionOpened && widget.backend != null)
+          if (_collectionOpened && widget.backend != null && compactToolbar)
+            PopupMenuButton<_CollectionAction>(
+              tooltip: 'More actions',
+              icon: const Icon(Icons.more_vert),
+              enabled: !_opening,
+              onSelected: _runCollectionAction,
+              itemBuilder: (context) => const [
+                PopupMenuItem(
+                  value: _CollectionAction.statistics,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.bar_chart_outlined),
+                    title: Text('Collection statistics'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CollectionAction.preferences,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.settings_outlined),
+                    title: Text('Preferences'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CollectionAction.noteTypes,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.view_agenda_outlined),
+                    title: Text('Manage note types'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CollectionAction.importExport,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.import_export),
+                    title: Text('Import & export'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CollectionAction.sync,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.sync),
+                    title: Text('Sync'),
+                  ),
+                ),
+                PopupMenuItem(
+                  value: _CollectionAction.browse,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.search),
+                    title: Text('Browse cards'),
+                  ),
+                ),
+              ],
+            ),
+          if (_collectionOpened &&
+              widget.backend != null &&
+              !compactToolbar) ...[
             IconButton(
               tooltip: 'Collection statistics',
               icon: const Icon(Icons.bar_chart_outlined),
               onPressed: _opening ? null : _openCollectionStatistics,
             ),
-          if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Preferences',
               icon: const Icon(Icons.settings_outlined),
               onPressed: _opening ? null : _openPreferences,
             ),
-          if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Manage note types',
               icon: const Icon(Icons.view_agenda_outlined),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => NotetypeListPage(
-                      repository: AnkiNotetypeRepository(
-                        backend: widget.backend!,
-                      ),
-                    ),
-                  ),
-                );
-              },
+              onPressed: _opening ? null : _openNotetypes,
             ),
-          if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Import & export',
               icon: const Icon(Icons.import_export),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => PackageTransferPage(
-                      repository: AnkiPackageRepository(
-                        backend: widget.backend!,
-                      ),
-                      fileTransfer: const NativePackageFileTransfer(),
-                      onCollectionChanged: widget.controller.load,
-                    ),
-                  ),
-                );
-              },
+              onPressed: _opening ? null : _openImportExport,
             ),
-          if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Sync',
               icon: const Icon(Icons.sync),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => SyncPage(
-                      repository: AnkiSyncRepository(backend: widget.backend!),
-                      authStore: FileSyncAuthStore(),
-                      onCollectionChanged: widget.controller.load,
-                    ),
-                  ),
-                );
-              },
+              onPressed: _opening ? null : _openSync,
             ),
-          if (_collectionOpened && widget.backend != null)
             IconButton(
               tooltip: 'Browse cards',
               icon: const Icon(Icons.search),
-              onPressed: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => CardBrowserPage(
-                      repository: AnkiCardBrowserRepository(
-                        backend: widget.backend!,
-                      ),
-                      noteRepository: AnkiNoteRepository(
-                        backend: widget.backend!,
-                      ),
-                    ),
-                  ),
-                );
-              },
+              onPressed: _opening ? null : _openBrowser,
             ),
+          ],
         ],
       ),
       body: SafeArea(child: _buildBody()),
