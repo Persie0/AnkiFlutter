@@ -130,8 +130,15 @@ class _ReviewPageState extends State<ReviewPage> {
                 title: Text(card.deckName),
                 actions: [
                   Center(
-                    child: Text(
-                      'New ${card.counts.newCount}  Learn ${card.counts.learningCount}  Review ${card.counts.reviewCount}',
+                    child: Semantics(
+                      label:
+                          '${card.counts.newCount} new, '
+                          '${card.counts.learningCount} learning, '
+                          '${card.counts.reviewCount} review cards remaining',
+                      excludeSemantics: true,
+                      child: Text(
+                        'New ${card.counts.newCount}  Learn ${card.counts.learningCount}  Review ${card.counts.reviewCount}',
+                      ),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -152,10 +159,16 @@ class _ReviewPageState extends State<ReviewPage> {
                     if (!isAnswer)
                       Padding(
                         padding: const EdgeInsets.all(16),
-                        child: FilledButton(
-                          onPressed: () =>
-                              unawaited(widget.controller.showAnswer()),
-                          child: const Text('Show Answer'),
+                        child: Semantics(
+                          label:
+                              'Show answer, keyboard shortcut Space or Enter',
+                          button: true,
+                          excludeSemantics: true,
+                          child: FilledButton(
+                            onPressed: () =>
+                                unawaited(widget.controller.showAnswer()),
+                            child: const Text('Show Answer'),
+                          ),
                         ),
                       )
                     else
@@ -166,20 +179,32 @@ class _ReviewPageState extends State<ReviewPage> {
                           spacing: 8,
                           children: [
                             for (final rating in ReviewRating.values)
-                              FilledButton.tonal(
-                                onPressed: state is ReviewTransition
-                                    ? null
-                                    : () => unawaited(
-                                        widget.controller.rate(rating),
-                                      ),
-                                child: Text(
-                                  _label(
-                                    rating,
-                                    card.choices
-                                        .firstWhere(
-                                          (choice) => choice.rating == rating,
-                                        )
-                                        .intervalLabel,
+                              Semantics(
+                                label: _ratingSemantics(
+                                  rating,
+                                  card.choices
+                                      .firstWhere(
+                                        (choice) => choice.rating == rating,
+                                      )
+                                      .intervalLabel,
+                                ),
+                                button: true,
+                                excludeSemantics: true,
+                                child: FilledButton.tonal(
+                                  onPressed: state is ReviewTransition
+                                      ? null
+                                      : () => unawaited(
+                                          widget.controller.rate(rating),
+                                        ),
+                                  child: Text(
+                                    _label(
+                                      rating,
+                                      card.choices
+                                          .firstWhere(
+                                            (choice) => choice.rating == rating,
+                                          )
+                                          .intervalLabel,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -199,11 +224,23 @@ class _ReviewPageState extends State<ReviewPage> {
     ),
   );
 
+  String _ratingName(ReviewRating rating) => switch (rating) {
+    ReviewRating.again => 'Again',
+    ReviewRating.hard => 'Hard',
+    ReviewRating.good => 'Good',
+    ReviewRating.easy => 'Easy',
+  };
+
+  int _ratingShortcut(ReviewRating rating) => switch (rating) {
+    ReviewRating.again => 1,
+    ReviewRating.hard => 2,
+    ReviewRating.good => 3,
+    ReviewRating.easy => 4,
+  };
+
+  String _ratingSemantics(ReviewRating rating, String interval) =>
+      '${_ratingName(rating)}, next interval $interval, keyboard shortcut ${_ratingShortcut(rating)}';
+
   String _label(ReviewRating rating, String interval) =>
-      '${switch (rating) {
-        ReviewRating.again => 'Again',
-        ReviewRating.hard => 'Hard',
-        ReviewRating.good => 'Good',
-        ReviewRating.easy => 'Easy',
-      }}\n$interval';
+      '${_ratingName(rating)}\n$interval';
 }
