@@ -7,6 +7,15 @@ import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+enum _ReviewAction {
+  undo,
+  buryCard,
+  buryNote,
+  suspendCard,
+  suspendNote,
+  autoAdvance,
+}
+
 class ReviewPage extends StatefulWidget {
   const ReviewPage({
     required this.controller,
@@ -27,6 +36,7 @@ class ReviewPage extends StatefulWidget {
 
 class _ReviewPageState extends State<ReviewPage> {
   bool _finishedNotified = false;
+  bool _manualActionInProgress = false;
 
   void _defaultShortcut() {
     final state = widget.controller.state;
@@ -64,6 +74,99 @@ class _ReviewPageState extends State<ReviewPage> {
     const SingleActivator(LogicalKeyboardKey.numpad4): () =>
         _rateShortcut(ReviewRating.easy),
   };
+
+  Future<void> _runReviewAction(_ReviewAction action) async {
+    if (_manualActionInProgress) return;
+    setState(() => _manualActionInProgress = true);
+    try {
+      switch (action) {
+        case _ReviewAction.undo:
+          if (!await widget.controller.canUndo()) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Nothing to undo.')),
+              );
+            }
+            return;
+          }
+          await widget.controller.undo();
+          break;
+        case _ReviewAction.buryCard:
+          await widget.controller.buryCurrentCard();
+          break;
+        case _ReviewAction.buryNote:
+          await widget.controller.buryCurrentNote();
+          break;
+        case _ReviewAction.suspendCard:
+          await widget.controller.suspendCurrentCard();
+          break;
+        case _ReviewAction.suspendNote:
+          await widget.controller.suspendCurrentNote();
+          break;
+        case _ReviewAction.autoAdvance:
+          await widget.controller.toggleAutoAdvance();
+          break;
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not apply review action: $error')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _manualActionInProgress = false);
+    }
+  }
+
+  List<PopupMenuEntry<_ReviewAction>> _reviewActionItems() => [
+    const PopupMenuItem(
+      value: _ReviewAction.undo,
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.undo),
+        title: Text('Undo'),
+      ),
+    ),
+    const PopupMenuDivider(),
+    const PopupMenuItem(
+      value: _ReviewAction.buryCard,
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.visibility_off_outlined),
+        title: Text('Bury card'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: _ReviewAction.buryNote,
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.layers_clear_outlined),
+        title: Text('Bury note'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: _ReviewAction.suspendCard,
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.pause_circle_outline),
+        title: Text('Suspend card'),
+      ),
+    ),
+    const PopupMenuItem(
+      value: _ReviewAction.suspendNote,
+      child: ListTile(
+        dense: true,
+        leading: Icon(Icons.pause_circle_filled_outlined),
+        title: Text('Suspend note'),
+      ),
+    ),
+    const PopupMenuDivider(),
+    CheckedPopupMenuItem(
+      value: _ReviewAction.autoAdvance,
+      checked: widget.controller.autoAdvanceEnabled,
+      child: const Text('Auto advance'),
+    ),
+  ];
 
   @override
   Widget build(BuildContext context) => CallbackShortcuts(
@@ -141,7 +244,14 @@ class _ReviewPageState extends State<ReviewPage> {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  PopupMenuButton<_ReviewAction>(
+                    tooltip: 'Review actions',
+                    enabled: !_manualActionInProgress &&
+                        state is! ReviewTransition,
+                    onSelected: (action) => unawaited(_runReviewAction(action)),
+                    itemBuilder: (_) => _reviewActionItems(),
+                  ),
+                  const SizedBox(width: 8),
                 ],
               ),
               body: SafeArea(
@@ -165,8 +275,11 @@ class _ReviewPageState extends State<ReviewPage> {
                           button: true,
                           excludeSemantics: true,
                           child: FilledButton(
-                            onPressed: () =>
-                                unawaited(widget.controller.showAnswer()),
+                            onPressed: _manualActionInProgress
+                                ? null
+                                : () => unawaited(
+                                    widget.controller.showAnswer(),
+                                  ),
                             child: const Text('Show Answer'),
                           ),
                         ),
@@ -191,7 +304,8 @@ class _ReviewPageState extends State<ReviewPage> {
                                 button: true,
                                 excludeSemantics: true,
                                 child: FilledButton.tonal(
-                                  onPressed: state is ReviewTransition
+                                  onPressed: state is ReviewTransition ||
+                                          _manualActionInProgress
                                       ? null
                                       : () => unawaited(
                                           widget.controller.rate(rating),
