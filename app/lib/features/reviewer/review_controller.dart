@@ -60,11 +60,13 @@ class ReviewController extends ChangeNotifier {
   ReviewTimerHandle? _autoAdvanceTimer;
   _DeferredAutoAdvance? _deferredAutoAdvance;
   bool _autoAdvanceEnabled = false;
+  String? _autoAdvanceReminder;
   int _generation = 0;
   int? _selectedDeckId;
 
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
+  String? get autoAdvanceReminder => _autoAdvanceReminder;
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
   Duration get reviewTimerElapsed {
     final current = _state;
@@ -117,6 +119,7 @@ class ReviewController extends ChangeNotifier {
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     _frozenVisibleTimerMilliseconds = null;
+    _autoAdvanceReminder = null;
     final generationId = ++_generation;
     _setState(const ReviewLoading());
 
@@ -142,6 +145,7 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
+    _autoAdvanceReminder = null;
     if (current.settings.stopTimerOnAnswer) {
       _frozenVisibleTimerMilliseconds =
           _answerStopwatch?.elapsedMilliseconds ?? 0;
@@ -174,6 +178,7 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
+    _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     final generationId = current.generationId;
@@ -228,6 +233,7 @@ class ReviewController extends ChangeNotifier {
   Future<bool> canUndo() => _repository.canUndo();
 
   Future<void> undo() async {
+    _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     await _repository.undo();
@@ -261,6 +267,7 @@ class ReviewController extends ChangeNotifier {
     }
     if (!_isCurrentGeneration(generationId)) return;
 
+    _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     try {
@@ -314,6 +321,7 @@ class ReviewController extends ChangeNotifier {
 
   Future<void> toggleAutoAdvance() async {
     _autoAdvanceEnabled = !_autoAdvanceEnabled;
+    _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
     if (_autoAdvanceEnabled) {
@@ -334,6 +342,7 @@ class ReviewController extends ChangeNotifier {
         _deferredAutoAdvance = null;
         _answerStopwatch = null;
         _frozenVisibleTimerMilliseconds = null;
+        _autoAdvanceReminder = null;
         _setState(const ReviewFinished());
         return;
       }
@@ -351,6 +360,7 @@ class ReviewController extends ChangeNotifier {
       final stopwatch = _stopwatchFactory()..start();
       _answerStopwatch = stopwatch;
       _frozenVisibleTimerMilliseconds = null;
+      _autoAdvanceReminder = null;
 
       _setState(
         ReviewQuestion(
@@ -443,13 +453,34 @@ class ReviewController extends ChangeNotifier {
     if (side == _AutoAdvanceSide.question) {
       if (settings.questionAction == ReviewQuestionAction.showAnswer) {
         await showAnswer();
+      } else {
+        _showAutoAdvanceReminder('Question time elapsed');
       }
       return;
     }
 
-    if (settings.answerAction == ReviewAnswerAction.answerGood) {
-      await rate(ReviewRating.good);
+    switch (settings.answerAction) {
+      case ReviewAnswerAction.buryCard:
+        await buryCurrentCard();
+        break;
+      case ReviewAnswerAction.answerAgain:
+        await rate(ReviewRating.again);
+        break;
+      case ReviewAnswerAction.answerGood:
+        await rate(ReviewRating.good);
+        break;
+      case ReviewAnswerAction.answerHard:
+        await rate(ReviewRating.hard);
+        break;
+      case ReviewAnswerAction.showReminder:
+        _showAutoAdvanceReminder('Answer time elapsed');
+        break;
     }
+  }
+
+  void _showAutoAdvanceReminder(String message) {
+    _autoAdvanceReminder = message;
+    notifyListeners();
   }
 
   void _onPlayingChanged(bool isPlaying) {
