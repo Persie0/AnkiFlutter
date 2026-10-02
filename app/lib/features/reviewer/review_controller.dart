@@ -198,12 +198,16 @@ class ReviewController extends ChangeNotifier {
     if (!_isCurrentGeneration(generationId)) return;
     final latest = _state;
     final stillSameCard = switch (latest) {
-      ReviewQuestion(:final card, :final generationId) when !answerSide =>
-        card.cardId == current.card.cardId &&
-            generationId == current.generationId,
-      ReviewAnswer(:final card, :final generationId) when answerSide =>
-        card.cardId == current.card.cardId &&
-            generationId == current.generationId,
+      ReviewQuestion(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when !answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
+      ReviewAnswer(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
       _ => false,
     };
     if (!stillSameCard) return;
