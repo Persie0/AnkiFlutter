@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
@@ -9,11 +10,13 @@ class CardBrowserPage extends StatefulWidget {
   const CardBrowserPage({
     required this.repository,
     required this.noteRepository,
+    this.stateStore,
     super.key,
   });
 
   final CardBrowserRepository repository;
   final NoteEntryRepository noteRepository;
+  final BrowserStateStore? stateStore;
 
   @override
   State<CardBrowserPage> createState() => _CardBrowserPageState();
@@ -21,6 +24,7 @@ class CardBrowserPage extends StatefulWidget {
 
 class _CardBrowserPageState extends State<CardBrowserPage> {
   final TextEditingController _queryController = TextEditingController();
+  late final BrowserStateStore _stateStore;
   CardBrowserSearchResult? _result;
   Object? _error;
   int _generation = 0;
@@ -34,17 +38,63 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   @override
   void initState() {
     super.initState();
-    unawaited(_loadSortOptions());
-    unawaited(_search());
+    _stateStore = widget.stateStore ?? FileBrowserStateStore();
+    unawaited(_initialize());
   }
 
-  Future<void> _loadSortOptions() async {
+  Future<void> _initialize() async {
+    CardBrowserState? savedState;
+    List<CardBrowserSortOption> options = const [];
     try {
-      final options = await widget.repository.sortOptions();
-      if (!mounted) return;
-      setState(() => _sortOptions = options);
+      savedState = await _stateStore.load();
+    } catch (_) {
+      // Browser state is a convenience; browsing must still work without it.
+    }
+    try {
+      options = await widget.repository.sortOptions();
     } catch (_) {
       // Keep searching with Anki's default ordering if metadata is unavailable.
+    }
+    if (!mounted) return;
+
+    CardBrowserSortOption? selectedSortOption;
+    CardBrowserSort? restoredSort;
+    if (savedState case final state?) {
+      _queryController.text = state.query;
+      final sortColumn = state.sortColumn;
+      if (sortColumn != null) {
+        for (final option in options) {
+          if (option.column == sortColumn) {
+            selectedSortOption = option;
+            restoredSort = CardBrowserSort(
+              column: option.column,
+              reverse: state.reverse,
+            );
+            break;
+          }
+        }
+      }
+    }
+
+    setState(() {
+      _sortOptions = options;
+      _selectedSortOption = selectedSortOption;
+      _sort = restoredSort;
+    });
+    await _search(persistState: false);
+  }
+
+  Future<void> _persistState() async {
+    try {
+      await _stateStore.save(
+        CardBrowserState(
+          query: _queryController.text,
+          sortColumn: _sort?.column,
+          reverse: _sort?.reverse ?? false,
+        ),
+      );
+    } catch (_) {
+      // Persisted browser state must never block browsing.
     }
   }
 
@@ -73,8 +123,12 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     unawaited(_search(clearSelection: true));
   }
 
-  Future<void> _search({bool clearSelection = false}) async {
+  Future<void> _search({
+    bool clearSelection = false,
+    bool persistState = true,
+  }) async {
     if (_bulkActionInProgress) return;
+    if (persistState) await _persistState();
     final generation = ++_generation;
     setState(() {
       if (clearSelection) _selectedCardIds.clear();

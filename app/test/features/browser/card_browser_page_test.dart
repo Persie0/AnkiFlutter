@@ -1,3 +1,4 @@
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart'
@@ -331,6 +332,7 @@ Widget _app(CardBrowserRepository repository) => MaterialApp(
   home: CardBrowserPage(
     repository: repository,
     noteRepository: _EmptyNoteRepository(),
+    stateStore: _MemoryBrowserStateStore(),
   ),
 );
 
@@ -350,6 +352,18 @@ CardBrowserSearchResult _cards(int firstId, int secondId) =>
         CardBrowserResult(cardId: secondId, cells: ['Card $secondId']),
       ],
     );
+
+class _MemoryBrowserStateStore implements BrowserStateStore {
+  CardBrowserState? state;
+
+  @override
+  Future<CardBrowserState?> load() async => state;
+
+  @override
+  Future<void> save(CardBrowserState state) async {
+    this.state = state;
+  }
+}
 
 class _SequenceRepository implements CardBrowserRepository {
   _SequenceRepository(this.outcomes, {this.options = const []});
