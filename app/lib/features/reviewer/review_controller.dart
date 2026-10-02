@@ -4,6 +4,7 @@ import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
@@ -62,6 +63,7 @@ class ReviewController extends ChangeNotifier {
   int? _selectedDeckId;
 
   ReviewSessionState get state => _state;
+  bool get autoAdvanceEnabled => _autoAdvanceEnabled;
 
   @override
   void dispose() {
@@ -177,6 +179,56 @@ class ReviewController extends ChangeNotifier {
     await _loadNextCard(++_generation);
   }
 
+  Future<bool> canUndo() => _repository.canUndo();
+
+  Future<void> undo() async {
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
+    await _repository.undo();
+    await _loadNextCard(++_generation);
+  }
+
+  Future<void> buryCurrentCard() => _runCurrentCardAction(_repository.buryCard);
+
+  Future<void> buryCurrentNote() => _runCurrentCardAction(_repository.buryNote);
+
+  Future<void> suspendCurrentCard() =>
+      _runCurrentCardAction(_repository.suspendCard);
+
+  Future<void> suspendCurrentNote() =>
+      _runCurrentCardAction(_repository.suspendNote);
+
+  Future<void> _runCurrentCardAction(
+    Future<void> Function(ReviewCard card) action,
+  ) async {
+    final current = _state;
+    final ReviewCard card;
+    final int generationId;
+    if (current is ReviewQuestion) {
+      card = current.card;
+      generationId = current.generationId;
+    } else if (current is ReviewAnswer) {
+      card = current.card;
+      generationId = current.generationId;
+    } else {
+      return;
+    }
+    if (!_isCurrentGeneration(generationId)) return;
+
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
+    try {
+      await action(card);
+    } catch (_) {
+      if (_isCurrentGeneration(generationId)) {
+        _scheduleAutoAdvanceForCurrentState();
+      }
+      rethrow;
+    }
+    if (!_isCurrentGeneration(generationId)) return;
+    await _loadNextCard(++_generation);
+  }
+
   Future<void> toggleAutoAdvance() async {
     _autoAdvanceEnabled = !_autoAdvanceEnabled;
     _clearAutoAdvanceTimer();
@@ -184,6 +236,7 @@ class ReviewController extends ChangeNotifier {
     if (_autoAdvanceEnabled) {
       _scheduleAutoAdvanceForCurrentState();
     }
+    notifyListeners();
   }
 
   Future<void> _loadNextCard(int generationId) async {
