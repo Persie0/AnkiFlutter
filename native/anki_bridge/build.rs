@@ -73,6 +73,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ("GRAPHS", "BackendStatsService", "graphs"),
     ("GET_PREFERENCES", "BackendConfigService", "get_preferences"),
     ("SET_PREFERENCES", "BackendConfigService", "set_preferences"),
+    ("NOTE_FIELDS_CHECK", "BackendNotesService", "note_fields_check"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
