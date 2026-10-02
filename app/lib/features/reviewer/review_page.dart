@@ -57,6 +57,10 @@ class _ReviewPageState extends State<ReviewPage> {
     }
   }
 
+  void _actionShortcut(_ReviewAction action) {
+    unawaited(_runReviewAction(action));
+  }
+
   Map<ShortcutActivator, VoidCallback> get _shortcuts => {
     const SingleActivator(LogicalKeyboardKey.space): _defaultShortcut,
     const SingleActivator(LogicalKeyboardKey.enter): _defaultShortcut,
@@ -77,6 +81,28 @@ class _ReviewPageState extends State<ReviewPage> {
         _rateShortcut(ReviewRating.good),
     const SingleActivator(LogicalKeyboardKey.numpad4): () =>
         _rateShortcut(ReviewRating.easy),
+    const SingleActivator(LogicalKeyboardKey.keyR): () =>
+        _actionShortcut(_ReviewAction.replayAudio),
+    const SingleActivator(LogicalKeyboardKey.f5): () =>
+        _actionShortcut(_ReviewAction.replayAudio),
+    const SingleActivator(LogicalKeyboardKey.digit5): () =>
+        _actionShortcut(_ReviewAction.toggleAudioPause),
+    const SingleActivator(LogicalKeyboardKey.digit6): () =>
+        _actionShortcut(_ReviewAction.seekAudioBack),
+    const SingleActivator(LogicalKeyboardKey.digit7): () =>
+        _actionShortcut(_ReviewAction.seekAudioForward),
+    const SingleActivator(LogicalKeyboardKey.keyA, shift: true): () =>
+        _actionShortcut(_ReviewAction.autoAdvance),
+    const SingleActivator(LogicalKeyboardKey.keyU): () =>
+        _actionShortcut(_ReviewAction.undo),
+    const SingleActivator(LogicalKeyboardKey.minus): () =>
+        _actionShortcut(_ReviewAction.buryCard),
+    const SingleActivator(LogicalKeyboardKey.equal): () =>
+        _actionShortcut(_ReviewAction.buryNote),
+    const SingleActivator(LogicalKeyboardKey.digit1, shift: true): () =>
+        _actionShortcut(_ReviewAction.suspendNote),
+    const SingleActivator(LogicalKeyboardKey.digit2, shift: true): () =>
+        _actionShortcut(_ReviewAction.suspendCard),
   };
 
   Future<void> _runReviewAction(_ReviewAction action) async {
