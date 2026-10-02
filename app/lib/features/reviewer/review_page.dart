@@ -7,7 +7,10 @@ import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+typedef ReviewNoteEditor = Future<bool> Function(int noteId);
+
 enum _ReviewAction {
+  editNote,
   undo,
   buryCard,
   buryNote,
@@ -26,6 +29,7 @@ class ReviewPage extends StatefulWidget {
     required this.onFinished,
     this.cardSurfaceBuilder,
     this.mediaBaseUri,
+    this.onEditNote,
     super.key,
   });
 
@@ -33,6 +37,7 @@ class ReviewPage extends StatefulWidget {
   final VoidCallback onFinished;
   final Widget Function(BuildContext context, String html)? cardSurfaceBuilder;
   final Uri? mediaBaseUri;
+  final ReviewNoteEditor? onEditNote;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -81,6 +86,8 @@ class _ReviewPageState extends State<ReviewPage> {
         _rateShortcut(ReviewRating.good),
     const SingleActivator(LogicalKeyboardKey.numpad4): () =>
         _rateShortcut(ReviewRating.easy),
+    const SingleActivator(LogicalKeyboardKey.keyE): () =>
+        _actionShortcut(_ReviewAction.editNote),
     const SingleActivator(LogicalKeyboardKey.keyR): () =>
         _actionShortcut(_ReviewAction.replayAudio),
     const SingleActivator(LogicalKeyboardKey.f5): () =>
@@ -105,11 +112,34 @@ class _ReviewPageState extends State<ReviewPage> {
         _actionShortcut(_ReviewAction.suspendCard),
   };
 
+  int? _currentNoteId() => switch (widget.controller.state) {
+    ReviewQuestion(:final card) => card.noteId,
+    ReviewAnswer(:final card) => card.noteId,
+    _ => null,
+  };
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
     try {
       switch (action) {
+        case _ReviewAction.editNote:
+          final editor = widget.onEditNote;
+          final noteId = _currentNoteId();
+          if (editor == null || noteId == null) return;
+          final autoAdvanceWasEnabled = widget.controller.autoAdvanceEnabled;
+          if (autoAdvanceWasEnabled) {
+            await widget.controller.toggleAutoAdvance();
+          }
+          try {
+            final changed = await editor(noteId);
+            if (changed) await widget.controller.refreshCurrentCard();
+          } finally {
+            if (autoAdvanceWasEnabled && !widget.controller.autoAdvanceEnabled) {
+              await widget.controller.toggleAutoAdvance();
+            }
+          }
+          break;
         case _ReviewAction.undo:
           if (!await widget.controller.canUndo()) {
             if (mounted) {
@@ -161,6 +191,17 @@ class _ReviewPageState extends State<ReviewPage> {
   }
 
   List<PopupMenuEntry<_ReviewAction>> _reviewActionItems() => [
+    if (widget.onEditNote != null) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.editNote,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.edit_outlined),
+          title: Text('Edit note'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
     const PopupMenuItem(
       value: _ReviewAction.undo,
       child: ListTile(

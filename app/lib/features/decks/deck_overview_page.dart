@@ -4,6 +4,8 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
+import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:anki_flutter/features/preferences/data/anki_preferences_repository.dart';
 import 'package:anki_flutter/features/preferences/preferences_page.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
@@ -135,6 +137,7 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               builder: (_) => ReviewPage(
                 controller: controller,
                 mediaBaseUri: widget.mediaBaseUri,
+                onEditNote: widget.backend == null ? null : _editReviewNote,
                 onFinished: () {
                   unawaited(widget.onChanged?.call());
                   Navigator.of(context).maybePop();
@@ -150,6 +153,20 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
           }),
     );
     unawaited(controller.start(widget.deck.id));
+  }
+
+  Future<bool> _editReviewNote(int noteId) async {
+    final backend = widget.backend;
+    if (backend == null) return false;
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => NoteEditorPage.edit(
+          noteId: noteId,
+          repository: AnkiNoteRepository(backend: backend),
+        ),
+      ),
+    );
+    return saved == true;
   }
 
   Future<void> _addNote() async {
