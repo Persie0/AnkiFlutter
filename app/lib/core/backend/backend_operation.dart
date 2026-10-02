@@ -62,7 +62,9 @@ enum BackendOperation {
   setDeck(61),
   setFlag(62),
   allTags(63),
-  graphs(64);
+  graphs(64),
+  getPreferences(65),
+  setPreferences(66);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
