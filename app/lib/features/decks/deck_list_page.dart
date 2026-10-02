@@ -327,16 +327,22 @@ class _DeckListPageState extends State<DeckListPage> {
     switch (action) {
       case _CollectionAction.statistics:
         _openCollectionStatistics();
+        break;
       case _CollectionAction.preferences:
         _openPreferences();
+        break;
       case _CollectionAction.noteTypes:
         _openNotetypes();
+        break;
       case _CollectionAction.importExport:
         _openImportExport();
+        break;
       case _CollectionAction.sync:
         _openSync();
+        break;
       case _CollectionAction.browse:
         _openBrowser();
+        break;
     }
   }
 
