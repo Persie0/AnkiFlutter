@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "dev.persie0" "\0"
-            VALUE "FileDescription", "anki_flutter" "\0"
+            VALUE "CompanyName", "Persie0" "\0"
+            VALUE "FileDescription", "AnkiFlutter" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
             VALUE "InternalName", "anki_flutter" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 dev.persie0. All rights reserved." "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Persie0. All rights reserved." "\0"
             VALUE "OriginalFilename", "anki_flutter.exe" "\0"
-            VALUE "ProductName", "anki_flutter" "\0"
+            VALUE "ProductName", "AnkiFlutter" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END
