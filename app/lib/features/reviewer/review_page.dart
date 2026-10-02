@@ -278,11 +278,21 @@ class _ReviewPageState extends State<ReviewPage> {
               ReviewTransition(:final content) => content,
               _ => throw StateError('Unexpected reviewer state'),
             };
+            final settings = switch (state) {
+              ReviewQuestion(:final settings) => settings,
+              ReviewAnswer(:final settings) => settings,
+              ReviewTransition(:final settings) => settings,
+              _ => throw StateError('Unexpected reviewer state'),
+            };
             final error = state is ReviewAnswer ? state.error : null;
             return Scaffold(
               appBar: AppBar(
                 title: Text(card.deckName),
                 actions: [
+                  if (settings.showTimer) ...[
+                    Center(child: _ReviewTimer(controller: widget.controller)),
+                    const SizedBox(width: 12),
+                  ],
                   Center(
                     child: Semantics(
                       label:
@@ -408,4 +418,45 @@ class _ReviewPageState extends State<ReviewPage> {
 
   String _label(ReviewRating rating, String interval) =>
       '${_ratingName(rating)}\n$interval';
+}
+
+class _ReviewTimer extends StatefulWidget {
+  const _ReviewTimer({required this.controller});
+
+  final ReviewController controller;
+
+  @override
+  State<_ReviewTimer> createState() => _ReviewTimerState();
+}
+
+class _ReviewTimerState extends State<_ReviewTimer> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = widget.controller.reviewTimerElapsed;
+    final totalSeconds = elapsed.inSeconds;
+    final minutes = totalSeconds ~/ 60;
+    final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+    final label = '$minutes:$seconds';
+    return Semantics(
+      label: 'Review time $label',
+      excludeSemantics: true,
+      child: Text(label, key: const ValueKey('review-timer')),
+    );
+  }
 }
