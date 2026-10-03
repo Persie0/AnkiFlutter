@@ -52,13 +52,11 @@ void main() {
       find.byKey(const ValueKey('pref-rollover')),
       '5',
     );
-    final showIntervals = find.byKey(const ValueKey('pref-show-intervals'));
-    await tester.drag(
-      find.byType(SingleChildScrollView),
-      const Offset(0, -450),
+    final showIntervals = tester.widget<SwitchListTile>(
+      find.byKey(const ValueKey('pref-show-intervals')),
     );
-    await tester.pumpAndSettle();
-    await tester.tap(showIntervals);
+    showIntervals.onChanged!(true);
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('preferences-save')));
     await tester.pumpAndSettle();
 
