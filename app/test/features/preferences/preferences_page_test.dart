@@ -53,7 +53,10 @@ void main() {
       '5',
     );
     final showIntervals = find.byKey(const ValueKey('pref-show-intervals'));
-    await tester.ensureVisible(showIntervals);
+    await tester.drag(
+      find.byType(SingleChildScrollView),
+      const Offset(0, -450),
+    );
     await tester.pumpAndSettle();
     await tester.tap(showIntervals);
     await tester.tap(find.byKey(const ValueKey('preferences-save')));
