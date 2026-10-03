@@ -80,6 +80,7 @@ class ReviewController extends ChangeNotifier {
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
   bool get supportsFlags => _repository is ReviewFlagRepository;
   bool get supportsMarking => _repository is ReviewMarkRepository;
+  bool get supportsDeleteNote => _repository is ReviewDeleteNoteRepository;
   bool get currentMarked => _currentMarked;
   ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
   bool get hasTypedAnswerInput {
@@ -406,6 +407,13 @@ class ReviewController extends ChangeNotifier {
 
   Future<void> suspendCurrentNote() =>
       _runCurrentCardAction(_repository.suspendNote);
+
+  Future<void> deleteCurrentNote() {
+    if (_repository case final ReviewDeleteNoteRepository repository) {
+      return _runCurrentCardAction(repository.deleteNote);
+    }
+    return Future<void>.value();
+  }
 
   Future<void> setCurrentFlag(int flag) async {
     if (flag < 0 || flag > 7) {
