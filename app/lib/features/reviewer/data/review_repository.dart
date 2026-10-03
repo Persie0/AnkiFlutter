@@ -2,7 +2,7 @@ import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart'
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
-import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_preparation.dart';
 
 abstract interface class ReviewRepository {
   Future<void> selectDeck(int deckId);
@@ -38,7 +38,7 @@ abstract interface class ReviewFlagRepository {
 }
 
 abstract interface class ReviewTypedAnswerRepository {
-  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+  Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
     String pattern,
   );
@@ -51,14 +51,14 @@ abstract interface class ReviewTypedAnswerRepository {
 }
 
 extension ReviewTypedAnswerCapability on ReviewRepository {
-  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+  Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
     String pattern,
   ) {
     if (this case final ReviewTypedAnswerRepository repository) {
       return repository.prepareTypedAnswer(card, pattern);
     }
-    return Future.value();
+    throw UnsupportedError('Typed answers are not supported by this repository');
   }
 
   Future<String> compareTypedAnswer({

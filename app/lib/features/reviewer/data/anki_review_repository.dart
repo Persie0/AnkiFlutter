@@ -21,6 +21,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_preparation.dart';
 import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:fixnum/fixnum.dart';
 
@@ -113,7 +114,7 @@ class AnkiReviewRepository
   }
 
   @override
-  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+  Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
     String pattern,
   ) async {
@@ -149,11 +150,17 @@ class AnkiReviewRepository
     final matchingFields = notetype.fields.where(
       (field) => field.name == fieldName,
     );
-    if (matchingFields.isEmpty) return null;
+    if (matchingFields.isEmpty) {
+      return cloze
+          ? const ReviewTypedAnswerWarning('Please run Tools>Empty Cards')
+          : ReviewTypedAnswerWarning('Type answer: unknown field $fieldName');
+    }
 
     final field = matchingFields.first;
     final fieldOrdinal = field.ord.val;
-    if (fieldOrdinal >= note.fields.length) return null;
+    if (fieldOrdinal >= note.fields.length) {
+      return const ReviewTypedAnswerEmpty();
+    }
 
     var expected = note.fields[fieldOrdinal];
     if (cloze) {
@@ -166,16 +173,22 @@ class AnkiReviewRepository
         Uint8List.fromList(request.writeToBuffer()),
       );
       expected = generic_pb.String.fromBuffer(response).val;
+      if (expected.isEmpty) {
+        return const ReviewTypedAnswerWarning('Please run Tools>Empty Cards');
+      }
+    } else if (expected.isEmpty) {
+      return const ReviewTypedAnswerEmpty();
     }
-    if (expected.isEmpty) return null;
 
-    return ReviewTypedAnswerPrompt(
-      pattern: pattern,
-      fieldName: fieldName,
-      expected: expected,
-      combining: combining,
-      fontName: field.config.fontName,
-      fontSize: field.config.fontSize,
+    return ReviewTypedAnswerReady(
+      ReviewTypedAnswerPrompt(
+        pattern: pattern,
+        fieldName: fieldName,
+        expected: expected,
+        combining: combining,
+        fontName: field.config.fontName,
+        fontSize: field.config.fontSize,
+      ),
     );
   }
 

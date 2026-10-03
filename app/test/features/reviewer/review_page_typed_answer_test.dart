@@ -8,6 +8,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_preparation.dart';
 import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
@@ -131,6 +132,70 @@ void main() {
     expect(separatorIndex, lessThan(comparisonIndex));
   });
 
+  testWidgets('unknown typed-answer field renders Anki warning without input', (
+    tester,
+  ) async {
+    final controller = ReviewController(
+      repository: _TypedRepository(
+        preparation: const ReviewTypedAnswerWarning(
+          'Type answer: unknown field Missing',
+        ),
+      ),
+      renderer: _Renderer('Capital: [[type:Missing]]'),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    await controller.start(7);
+
+    String? cardHtml;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, html) {
+            cardHtml = html;
+            return const SizedBox.expand();
+          },
+        ),
+      ),
+    );
+
+    expect(cardHtml, contains('Type answer: unknown field Missing'));
+    expect(cardHtml, isNot(contains('[[type:Missing]]')));
+    expect(find.byKey(const ValueKey('typed-answer-input')), findsNothing);
+  });
+
+  testWidgets('empty typed-answer field removes marker silently', (tester) async {
+    final controller = ReviewController(
+      repository: _TypedRepository(
+        preparation: const ReviewTypedAnswerEmpty(),
+      ),
+      renderer: _Renderer('Capital: [[type:Front]]'),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    await controller.start(7);
+
+    String? cardHtml;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, html) {
+            cardHtml = html;
+            return const SizedBox.expand();
+          },
+        ),
+      ),
+    );
+
+    expect(cardHtml, isNot(contains('[[type:Front]]')));
+    expect(cardHtml, isNot(contains('Type answer:')));
+    expect(find.byKey(const ValueKey('typed-answer-input')), findsNothing);
+  });
+
   testWidgets('ordinary cards do not show a typed-answer input', (tester) async {
     final controller = ReviewController(
       repository: _Repository(),
@@ -229,23 +294,29 @@ class _Repository implements ReviewRepository {
 
 class _TypedRepository extends _Repository
     implements ReviewTypedAnswerRepository {
+  _TypedRepository({ReviewTypedAnswerPreparation? preparation})
+      : preparation = preparation ??
+            ReviewTypedAnswerReady(
+              const ReviewTypedAnswerPrompt(
+                pattern: 'Front',
+                fieldName: 'Front',
+                expected: 'Paris',
+                combining: true,
+                fontName: 'Arial',
+                fontSize: 24,
+              ),
+            );
+
+  final ReviewTypedAnswerPreparation preparation;
   String? lastExpected;
   String? lastProvided;
   bool? lastCombining;
 
   @override
-  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+  Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
     String pattern,
-  ) async =>
-      const ReviewTypedAnswerPrompt(
-        pattern: 'Front',
-        fieldName: 'Front',
-        expected: 'Paris',
-        combining: true,
-        fontName: 'Arial',
-        fontSize: 24,
-      );
+  ) async => preparation;
 
   @override
   Future<String> compareTypedAnswer({
