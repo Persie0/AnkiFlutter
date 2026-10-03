@@ -87,6 +87,50 @@ void main() {
     expect(input, findsNothing);
   });
 
+  testWidgets('FrontSide separator stays before typed answer comparison', (
+    tester,
+  ) async {
+    final repository = _TypedRepository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer(
+        'Capital: [[type:Front]]',
+        answer: 'Capital: [[type:Front]]<hr id=answer>Paris',
+      ),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    await controller.start(7);
+
+    String? cardHtml;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, html) {
+            cardHtml = html;
+            return const SizedBox.expand();
+          },
+        ),
+      ),
+    );
+
+    await tester.enterText(
+      find.byKey(const ValueKey('typed-answer-input')),
+      'Paris',
+    );
+    await tester.tap(find.text('Show Answer'));
+    await tester.pump();
+
+    final html = cardHtml!;
+    final separatorIndex = html.indexOf('<hr id=answer>');
+    final comparisonIndex = html.indexOf('<code id=typeans>');
+    expect(separatorIndex, greaterThanOrEqualTo(0));
+    expect(comparisonIndex, greaterThanOrEqualTo(0));
+    expect(separatorIndex, lessThan(comparisonIndex));
+  });
+
   testWidgets('ordinary cards do not show a typed-answer input', (tester) async {
     final controller = ReviewController(
       repository: _Repository(),
@@ -217,14 +261,15 @@ class _TypedRepository extends _Repository
 }
 
 class _Renderer implements CardRenderRepository {
-  _Renderer(this.question);
+  _Renderer(this.question, {this.answer = 'Answer [[type:Front]]'});
 
   final String question;
+  final String answer;
 
   @override
   Future<ReviewCardContent> render(int cardId) async => ReviewCardContent(
     questionHtml: question,
-    answerHtml: 'Answer [[type:Front]]',
+    answerHtml: answer,
     css: '',
     questionAudio: const [],
     answerAudio: const [],
