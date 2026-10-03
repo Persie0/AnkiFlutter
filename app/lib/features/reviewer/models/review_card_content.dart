@@ -45,7 +45,7 @@ class ReviewCardContent {
 
 String _normalizeTypedAnswerSeparator(String html) {
   const separator = '<hr id=answer>';
-  const comparisonWrapper = '<div style="font-family: \' ';
+  const comparisonWrapper = '<div style="font-family: \'';
   const typedAnswerCode = '<code id=typeans>';
 
   final separatorIndex = html.indexOf(separator);
