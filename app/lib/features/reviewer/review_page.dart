@@ -12,6 +12,7 @@ typedef ReviewNoteEditor = Future<bool> Function(int noteId);
 enum _ReviewAction {
   editNote,
   setFlag,
+  toggleMark,
   undo,
   buryCard,
   buryNote,
@@ -139,6 +140,8 @@ class _ReviewPageState extends State<ReviewPage> {
           _actionShortcut(_ReviewAction.seekAudioBack),
       const SingleActivator(LogicalKeyboardKey.digit7): () =>
           _actionShortcut(_ReviewAction.seekAudioForward),
+      const SingleActivator(LogicalKeyboardKey.digit8, shift: true): () =>
+          _actionShortcut(_ReviewAction.toggleMark),
       const SingleActivator(LogicalKeyboardKey.keyA, shift: true): () =>
           _actionShortcut(_ReviewAction.autoAdvance),
       const SingleActivator(LogicalKeyboardKey.keyU): () =>
@@ -220,6 +223,9 @@ class _ReviewPageState extends State<ReviewPage> {
           final flag = await _chooseFlag();
           if (flag != null) await widget.controller.setCurrentFlag(flag);
           break;
+        case _ReviewAction.toggleMark:
+          await widget.controller.toggleCurrentMarked();
+          break;
         case _ReviewAction.undo:
           if (!await widget.controller.canUndo()) {
             if (mounted) {
@@ -278,6 +284,21 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.edit_outlined),
           title: Text('Edit note'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.controller.supportsMarking) ...[
+      PopupMenuItem(
+        value: _ReviewAction.toggleMark,
+        child: ListTile(
+          dense: true,
+          leading: Icon(
+            widget.controller.currentMarked ? Icons.star : Icons.star_border,
+          ),
+          title: Text(
+            widget.controller.currentMarked ? 'Unmark note' : 'Mark note',
+          ),
         ),
       ),
       const PopupMenuDivider(),
@@ -452,6 +473,13 @@ class _ReviewPageState extends State<ReviewPage> {
                 actions: [
                   if (settings.showTimer) ...[
                     Center(child: _ReviewTimer(controller: widget.controller)),
+                    const SizedBox(width: 12),
+                  ],
+                  if (widget.controller.currentMarked) ...[
+                    const Tooltip(
+                      message: 'Marked note',
+                      child: Icon(Icons.star),
+                    ),
                     const SizedBox(width: 12),
                   ],
                   if (flag != 0) ...[

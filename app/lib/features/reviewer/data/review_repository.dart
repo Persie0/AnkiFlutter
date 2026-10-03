@@ -37,6 +37,12 @@ abstract interface class ReviewFlagRepository {
   Future<void> setFlag(ReviewCard card, int flag);
 }
 
+abstract interface class ReviewMarkRepository {
+  Future<bool> isMarked(ReviewCard card);
+
+  Future<void> setMarked(ReviewCard card, bool marked);
+}
+
 abstract interface class ReviewTypedAnswerRepository {
   Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
