@@ -186,7 +186,7 @@ class _NotetypeListPageState extends State<NotetypeListPage> {
               ? const Center(child: Text('No note types'))
               : ListView.separated(
                   itemCount: entries.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final entry = entries[index];
                     return ListTile(

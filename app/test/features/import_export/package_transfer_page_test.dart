@@ -40,10 +40,14 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('export-apkg')));
+    final exportButton = find.byKey(const ValueKey('export-apkg'));
+    await tester.scrollUntilVisible(exportButton, 300);
+    await tester.tap(exportButton);
     await tester.pumpAndSettle();
 
     expect(transfer.exportCalled, isTrue);
+    await tester.drag(find.byType(ListView), const Offset(0, 1200));
+    await tester.pumpAndSettle();
     expect(find.textContaining('2 media files included'), findsOneWidget);
   });
 }

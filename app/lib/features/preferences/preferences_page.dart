@@ -205,7 +205,7 @@ class _PreferencesPageState extends State<PreferencesPage> {
                       config.Preferences_Scheduling_NewReviewMix
                     >(
                       key: const ValueKey('pref-new-review-mix'),
-                      value: preferences.scheduling.newReviewMix,
+                      initialValue: preferences.scheduling.newReviewMix,
                       decoration: const InputDecoration(
                         labelText: 'New/review card order',
                       ),

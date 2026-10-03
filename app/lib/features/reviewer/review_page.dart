@@ -45,8 +45,26 @@ class ReviewPage extends StatefulWidget {
 }
 
 class _ReviewPageState extends State<ReviewPage> {
+  final FocusNode _typedAnswerFocusNode = FocusNode();
   bool _finishedNotified = false;
   bool _manualActionInProgress = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _typedAnswerFocusNode.addListener(_onTypedAnswerFocusChanged);
+  }
+
+  void _onTypedAnswerFocusChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _typedAnswerFocusNode.removeListener(_onTypedAnswerFocusChanged);
+    _typedAnswerFocusNode.dispose();
+    super.dispose();
+  }
 
   void _defaultShortcut() {
     final state = widget.controller.state;
@@ -71,65 +89,70 @@ class _ReviewPageState extends State<ReviewPage> {
     unawaited(_setFlag(flag));
   }
 
-  Map<ShortcutActivator, VoidCallback> get _shortcuts => {
-    const SingleActivator(LogicalKeyboardKey.space): _defaultShortcut,
-    const SingleActivator(LogicalKeyboardKey.enter): _defaultShortcut,
-    const SingleActivator(LogicalKeyboardKey.numpadEnter): _defaultShortcut,
-    const SingleActivator(LogicalKeyboardKey.digit1): () =>
-        _rateShortcut(ReviewRating.again),
-    const SingleActivator(LogicalKeyboardKey.digit2): () =>
-        _rateShortcut(ReviewRating.hard),
-    const SingleActivator(LogicalKeyboardKey.digit3): () =>
-        _rateShortcut(ReviewRating.good),
-    const SingleActivator(LogicalKeyboardKey.digit4): () =>
-        _rateShortcut(ReviewRating.easy),
-    const SingleActivator(LogicalKeyboardKey.numpad1): () =>
-        _rateShortcut(ReviewRating.again),
-    const SingleActivator(LogicalKeyboardKey.numpad2): () =>
-        _rateShortcut(ReviewRating.hard),
-    const SingleActivator(LogicalKeyboardKey.numpad3): () =>
-        _rateShortcut(ReviewRating.good),
-    const SingleActivator(LogicalKeyboardKey.numpad4): () =>
-        _rateShortcut(ReviewRating.easy),
-    const SingleActivator(LogicalKeyboardKey.digit1, control: true): () =>
-        _flagShortcut(1),
-    const SingleActivator(LogicalKeyboardKey.digit2, control: true): () =>
-        _flagShortcut(2),
-    const SingleActivator(LogicalKeyboardKey.digit3, control: true): () =>
-        _flagShortcut(3),
-    const SingleActivator(LogicalKeyboardKey.digit4, control: true): () =>
-        _flagShortcut(4),
-    const SingleActivator(LogicalKeyboardKey.digit5, control: true): () =>
-        _flagShortcut(5),
-    const SingleActivator(LogicalKeyboardKey.digit6, control: true): () =>
-        _flagShortcut(6),
-    const SingleActivator(LogicalKeyboardKey.digit7, control: true): () =>
-        _flagShortcut(7),
-    const SingleActivator(LogicalKeyboardKey.keyE): () =>
-        _actionShortcut(_ReviewAction.editNote),
-    const SingleActivator(LogicalKeyboardKey.keyR): () =>
-        _actionShortcut(_ReviewAction.replayAudio),
-    const SingleActivator(LogicalKeyboardKey.f5): () =>
-        _actionShortcut(_ReviewAction.replayAudio),
-    const SingleActivator(LogicalKeyboardKey.digit5): () =>
-        _actionShortcut(_ReviewAction.toggleAudioPause),
-    const SingleActivator(LogicalKeyboardKey.digit6): () =>
-        _actionShortcut(_ReviewAction.seekAudioBack),
-    const SingleActivator(LogicalKeyboardKey.digit7): () =>
-        _actionShortcut(_ReviewAction.seekAudioForward),
-    const SingleActivator(LogicalKeyboardKey.keyA, shift: true): () =>
-        _actionShortcut(_ReviewAction.autoAdvance),
-    const SingleActivator(LogicalKeyboardKey.keyU): () =>
-        _actionShortcut(_ReviewAction.undo),
-    const SingleActivator(LogicalKeyboardKey.minus): () =>
-        _actionShortcut(_ReviewAction.buryCard),
-    const SingleActivator(LogicalKeyboardKey.equal): () =>
-        _actionShortcut(_ReviewAction.buryNote),
-    const SingleActivator(LogicalKeyboardKey.digit1, shift: true): () =>
-        _actionShortcut(_ReviewAction.suspendNote),
-    const SingleActivator(LogicalKeyboardKey.digit2, shift: true): () =>
-        _actionShortcut(_ReviewAction.suspendCard),
-  };
+  Map<ShortcutActivator, VoidCallback> get _shortcuts {
+    if (_typedAnswerFocusNode.hasFocus) {
+      return const {};
+    }
+    return {
+      const SingleActivator(LogicalKeyboardKey.space): _defaultShortcut,
+      const SingleActivator(LogicalKeyboardKey.enter): _defaultShortcut,
+      const SingleActivator(LogicalKeyboardKey.numpadEnter): _defaultShortcut,
+      const SingleActivator(LogicalKeyboardKey.digit1): () =>
+          _rateShortcut(ReviewRating.again),
+      const SingleActivator(LogicalKeyboardKey.digit2): () =>
+          _rateShortcut(ReviewRating.hard),
+      const SingleActivator(LogicalKeyboardKey.digit3): () =>
+          _rateShortcut(ReviewRating.good),
+      const SingleActivator(LogicalKeyboardKey.digit4): () =>
+          _rateShortcut(ReviewRating.easy),
+      const SingleActivator(LogicalKeyboardKey.numpad1): () =>
+          _rateShortcut(ReviewRating.again),
+      const SingleActivator(LogicalKeyboardKey.numpad2): () =>
+          _rateShortcut(ReviewRating.hard),
+      const SingleActivator(LogicalKeyboardKey.numpad3): () =>
+          _rateShortcut(ReviewRating.good),
+      const SingleActivator(LogicalKeyboardKey.numpad4): () =>
+          _rateShortcut(ReviewRating.easy),
+      const SingleActivator(LogicalKeyboardKey.digit1, control: true): () =>
+          _flagShortcut(1),
+      const SingleActivator(LogicalKeyboardKey.digit2, control: true): () =>
+          _flagShortcut(2),
+      const SingleActivator(LogicalKeyboardKey.digit3, control: true): () =>
+          _flagShortcut(3),
+      const SingleActivator(LogicalKeyboardKey.digit4, control: true): () =>
+          _flagShortcut(4),
+      const SingleActivator(LogicalKeyboardKey.digit5, control: true): () =>
+          _flagShortcut(5),
+      const SingleActivator(LogicalKeyboardKey.digit6, control: true): () =>
+          _flagShortcut(6),
+      const SingleActivator(LogicalKeyboardKey.digit7, control: true): () =>
+          _flagShortcut(7),
+      const SingleActivator(LogicalKeyboardKey.keyE): () =>
+          _actionShortcut(_ReviewAction.editNote),
+      const SingleActivator(LogicalKeyboardKey.keyR): () =>
+          _actionShortcut(_ReviewAction.replayAudio),
+      const SingleActivator(LogicalKeyboardKey.f5): () =>
+          _actionShortcut(_ReviewAction.replayAudio),
+      const SingleActivator(LogicalKeyboardKey.digit5): () =>
+          _actionShortcut(_ReviewAction.toggleAudioPause),
+      const SingleActivator(LogicalKeyboardKey.digit6): () =>
+          _actionShortcut(_ReviewAction.seekAudioBack),
+      const SingleActivator(LogicalKeyboardKey.digit7): () =>
+          _actionShortcut(_ReviewAction.seekAudioForward),
+      const SingleActivator(LogicalKeyboardKey.keyA, shift: true): () =>
+          _actionShortcut(_ReviewAction.autoAdvance),
+      const SingleActivator(LogicalKeyboardKey.keyU): () =>
+          _actionShortcut(_ReviewAction.undo),
+      const SingleActivator(LogicalKeyboardKey.minus): () =>
+          _actionShortcut(_ReviewAction.buryCard),
+      const SingleActivator(LogicalKeyboardKey.equal): () =>
+          _actionShortcut(_ReviewAction.buryNote),
+      const SingleActivator(LogicalKeyboardKey.digit1, shift: true): () =>
+          _actionShortcut(_ReviewAction.suspendNote),
+      const SingleActivator(LogicalKeyboardKey.digit2, shift: true): () =>
+          _actionShortcut(_ReviewAction.suspendCard),
+    };
+  }
 
   int? _currentNoteId() => switch (widget.controller.state) {
     ReviewQuestion(:final card) => card.noteId,
@@ -422,6 +445,7 @@ class _ReviewPageState extends State<ReviewPage> {
             final error = state is ReviewAnswer ? state.error : null;
             final reminder = widget.controller.autoAdvanceReminder;
             final flag = widget.controller.currentFlag;
+            final typedPrompt = widget.controller.typedAnswerPrompt;
             return Scaffold(
               appBar: AppBar(
                 title: Text(card.deckName),
@@ -470,6 +494,37 @@ class _ReviewPageState extends State<ReviewPage> {
                         builder: widget.cardSurfaceBuilder,
                       ),
                     ),
+                    if (!isAnswer && widget.controller.hasTypedAnswerInput)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 720),
+                          child: TextField(
+                            key: const ValueKey('typed-answer-input'),
+                            focusNode: _typedAnswerFocusNode,
+                            autofocus: true,
+                            textAlign: TextAlign.center,
+                            textInputAction: TextInputAction.done,
+                            style: TextStyle(
+                              fontFamily: typedPrompt != null &&
+                                      typedPrompt.fontName.isNotEmpty
+                                  ? typedPrompt.fontName
+                                  : null,
+                              fontSize: typedPrompt != null &&
+                                      typedPrompt.fontSize > 0
+                                  ? typedPrompt.fontSize.toDouble()
+                                  : null,
+                            ),
+                            decoration: const InputDecoration(
+                              labelText: 'Type your answer',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: widget.controller.updateTypedAnswer,
+                            onSubmitted: (_) =>
+                                unawaited(widget.controller.showAnswer()),
+                          ),
+                        ),
+                      ),
                     if (reminder != null)
                       Padding(
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),

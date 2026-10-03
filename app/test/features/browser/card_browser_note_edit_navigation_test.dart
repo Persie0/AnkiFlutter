@@ -2,6 +2,7 @@ import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart'
     as notes;
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes;
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
@@ -72,7 +73,11 @@ void main() {
 }
 
 Widget _app(_BrowserRepository browser, _NoteRepository notes) => MaterialApp(
-  home: CardBrowserPage(repository: browser, noteRepository: notes),
+  home: CardBrowserPage(
+    repository: browser,
+    noteRepository: notes,
+    stateStore: _StateStore(),
+  ),
 );
 
 CardBrowserSearchResult _result(String cell) => CardBrowserSearchResult(
@@ -81,6 +86,14 @@ CardBrowserSearchResult _result(String cell) => CardBrowserSearchResult(
     CardBrowserResult(cardId: 77, cells: [cell]),
   ],
 );
+
+class _StateStore implements BrowserStateStore {
+  @override
+  Future<CardBrowserState?> load() async => null;
+
+  @override
+  Future<void> save(CardBrowserState state) async {}
+}
 
 class _BrowserRepository implements CardBrowserRepository {
   _BrowserRepository(this.results);

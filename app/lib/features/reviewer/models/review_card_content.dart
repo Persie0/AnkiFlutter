@@ -28,11 +28,12 @@ final class ReviewTtsTag extends ReviewAudioTag {
 class ReviewCardContent {
   ReviewCardContent({
     required this.questionHtml,
-    required this.answerHtml,
+    required String answerHtml,
     required this.css,
     required List<ReviewAudioTag> questionAudio,
     required List<ReviewAudioTag> answerAudio,
-  })  : questionAudio = List.unmodifiable(questionAudio),
+  })  : answerHtml = _normalizeTypedAnswerSeparator(answerHtml),
+        questionAudio = List.unmodifiable(questionAudio),
         answerAudio = List.unmodifiable(answerAudio);
 
   final String questionHtml;
@@ -40,4 +41,34 @@ class ReviewCardContent {
   final String css;
   final List<ReviewAudioTag> questionAudio;
   final List<ReviewAudioTag> answerAudio;
+}
+
+String _normalizeTypedAnswerSeparator(String html) {
+  const separator = '<hr id=answer>';
+  const comparisonWrapper = '<div style="font-family: \'';
+  const typedAnswerCode = '<code id=typeans>';
+
+  final separatorIndex = html.indexOf(separator);
+  final typedAnswerIndex = html.indexOf(typedAnswerCode);
+  if (separatorIndex < 0 ||
+      typedAnswerIndex < 0 ||
+      separatorIndex < typedAnswerIndex) {
+    return html;
+  }
+
+  var comparisonIndex = html.lastIndexOf(comparisonWrapper, typedAnswerIndex);
+  if (comparisonIndex < 0) {
+    comparisonIndex = typedAnswerIndex;
+  }
+
+  final withoutSeparator = html.replaceRange(
+    separatorIndex,
+    separatorIndex + separator.length,
+    '',
+  );
+  return withoutSeparator.replaceRange(
+    comparisonIndex,
+    comparisonIndex,
+    separator,
+  );
 }

@@ -30,6 +30,17 @@ abstract interface class NoteValidationRepository {
   Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(notes.Note note);
 }
 
+extension NoteValidationCapability on NoteEntryRepository {
+  Future<notes.NoteFieldsCheckResponse_State> checkNoteFields(
+    notes.Note note,
+  ) {
+    if (this case final NoteValidationRepository repository) {
+      return repository.checkNoteFields(note);
+    }
+    throw UnsupportedError('Note validation is not supported by this repository');
+  }
+}
+
 /// Sends note-entry requests through the shared native Anki backend.
 class AnkiNoteRepository
     implements NoteEntryRepository, NoteValidationRepository {

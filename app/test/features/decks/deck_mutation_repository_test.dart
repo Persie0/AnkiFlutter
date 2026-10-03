@@ -4,7 +4,8 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart';
-import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart';
+import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
+    as generic_pb;
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -21,7 +22,10 @@ void main() {
       backend.calls.map((call) => call.operation),
       [BackendOperation.newDeck, BackendOperation.addDeck],
     );
-    expect(Empty.fromBuffer(backend.calls.first.request), Empty());
+    expect(
+      generic_pb.Empty.fromBuffer(backend.calls.first.request),
+      generic_pb.Empty(),
+    );
     final deck = Deck.fromBuffer(backend.calls.last.request);
     expect(deck.name, 'Language::Norwegian');
     expect(deck.hasCommon(), isTrue);

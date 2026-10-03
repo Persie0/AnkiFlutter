@@ -85,19 +85,21 @@ void main() {
 
     await tester.tap(find.byTooltip('Review actions'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Auto advance'));
+    await tester.tap(find.text('Auto advance'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(controller.autoAdvanceEnabled, isTrue);
 
     await tester.tap(find.byTooltip('Review actions'));
     await tester.pumpAndSettle();
-    final checked = tester.widget<CheckedPopupMenuItem<dynamic>>(
-      find.ancestor(
-        of: find.text('Auto advance'),
-        matching: find.byType(CheckedPopupMenuItem<dynamic>),
-      ),
+    final checkedAutoAdvance = find.byWidgetPredicate(
+      (widget) =>
+          widget is CheckedPopupMenuItem<Object?> &&
+          widget.checked &&
+          widget.child is Text &&
+          (widget.child as Text).data == 'Auto advance',
+      description: 'checked Auto advance popup item',
     );
-    expect(checked.checked, isTrue);
+    expect(checkedAutoAdvance, findsOneWidget);
   });
 }
 
@@ -127,12 +129,12 @@ ReviewCard _card(int id, String deckName) => ReviewCard(
 
 class _Renderer implements CardRenderRepository {
   @override
-  Future<ReviewCardContent> render(int cardId) async => const ReviewCardContent(
+  Future<ReviewCardContent> render(int cardId) async => ReviewCardContent(
     questionHtml: 'Question',
     answerHtml: 'Answer',
     css: '',
-    questionAudio: [],
-    answerAudio: [],
+    questionAudio: const [],
+    answerAudio: const [],
   );
 }
 

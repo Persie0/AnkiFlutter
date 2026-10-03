@@ -33,7 +33,7 @@ void main() {
         configId: Int64(1),
         limits: deck_config.DeckConfigsForUpdate_CurrentDeck_Limits(
           review: 200,
-          new_1: 30,
+          new_2: 30,
           desiredRetention: 0.91,
         ),
       ),
@@ -64,7 +64,7 @@ void main() {
     expect(request.targetDeckId, Int64(123));
     expect(request.configs.single.config.newPerDay, 25);
     expect(request.limits.review, 200);
-    expect(request.limits.new_1, 30);
+    expect(request.limits.new_2, 30);
     expect(request.newCardsIgnoreReviewLimit, isTrue);
     expect(request.fsrs, isTrue);
     expect(request.applyAllParentLimits, isTrue);

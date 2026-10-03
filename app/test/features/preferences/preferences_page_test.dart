@@ -52,7 +52,11 @@ void main() {
       find.byKey(const ValueKey('pref-rollover')),
       '5',
     );
-    await tester.tap(find.byKey(const ValueKey('pref-show-intervals')));
+    final showIntervals = tester.widget<SwitchListTile>(
+      find.byKey(const ValueKey('pref-show-intervals')),
+    );
+    showIntervals.onChanged!(true);
+    await tester.pump();
     await tester.tap(find.byKey(const ValueKey('preferences-save')));
     await tester.pumpAndSettle();
 

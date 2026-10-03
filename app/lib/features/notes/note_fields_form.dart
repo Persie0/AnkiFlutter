@@ -153,40 +153,10 @@ Future<void> _attachUrl(
   MediaRepository repository,
   TextEditingController controller,
 ) async {
-  final urlController = TextEditingController();
   try {
     final url = await showDialog<String>(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Attach media from URL'),
-        content: TextField(
-          key: const ValueKey('media-url'),
-          controller: urlController,
-          autofocus: true,
-          keyboardType: TextInputType.url,
-          decoration: const InputDecoration(
-            labelText: 'https://…',
-            border: OutlineInputBorder(),
-          ),
-          onSubmitted: (_) {
-            final value = urlController.text.trim();
-            if (value.isNotEmpty) Navigator.of(dialogContext).pop(value);
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = urlController.text.trim();
-              if (value.isNotEmpty) Navigator.of(dialogContext).pop(value);
-            },
-            child: const Text('Attach'),
-          ),
-        ],
-      ),
+      builder: (_) => const _MediaUrlDialog(),
     );
     if (url == null || !context.mounted) return;
     final filename = await repository.addFromUrl(url);
@@ -198,8 +168,56 @@ Future<void> _attachUrl(
         SnackBar(content: Text('Could not attach media: $error')),
       );
     }
-  } finally {
-    urlController.dispose();
+  }
+}
+
+class _MediaUrlDialog extends StatefulWidget {
+  const _MediaUrlDialog();
+
+  @override
+  State<_MediaUrlDialog> createState() => _MediaUrlDialogState();
+}
+
+class _MediaUrlDialogState extends State<_MediaUrlDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final value = _controller.text.trim();
+    if (value.isNotEmpty) Navigator.of(context).pop(value);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Attach media from URL'),
+      content: TextField(
+        key: const ValueKey('media-url'),
+        controller: _controller,
+        autofocus: true,
+        keyboardType: TextInputType.url,
+        decoration: const InputDecoration(
+          labelText: 'https://…',
+          border: OutlineInputBorder(),
+        ),
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('Attach'),
+        ),
+      ],
+    );
   }
 }
 

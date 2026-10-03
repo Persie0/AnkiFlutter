@@ -20,7 +20,7 @@ class ApplicationDataPaths {
     }
     if (Platform.isLinux) {
       final data =
-          environment['XDG_DATA_HOME'] ?? '$home${separator}.local${separator}share';
+          environment['XDG_DATA_HOME'] ?? '$home$separator.local${separator}share';
       return Directory('$data${separator}ankiflutter');
     }
 
@@ -29,7 +29,7 @@ class ApplicationDataPaths {
         ? 'Library${separator}Application Support'
         : 'files';
     return Directory(
-      '$appRoot${separator}$appSupport${separator}AnkiFlutter',
+      '$appRoot$separator$appSupport${separator}AnkiFlutter',
     );
   }
 

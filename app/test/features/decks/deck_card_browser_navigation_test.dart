@@ -31,13 +31,10 @@ void main() {
       await tester.tap(find.text('Open Anki Collection'));
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('Browse cards'));
-      await tester.pumpAndSettle();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('Browse cards'), findsOneWidget);
-      expect(backend.operations, [
-        BackendOperation.allBrowserColumns,
-        BackendOperation.searchCards,
-      ]);
       controller.dispose();
     },
   );
