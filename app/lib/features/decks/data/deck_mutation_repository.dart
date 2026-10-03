@@ -4,7 +4,8 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart';
-import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart';
+import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
+    as generic_pb;
 import 'package:fixnum/fixnum.dart';
 
 /// Runs deck mutations through Anki's native backend operations.
@@ -21,7 +22,7 @@ class DeckMutationRepository {
 
     final deckBytes = await backend.invoke(
       BackendOperation.newDeck,
-      Uint8List.fromList(Empty().writeToBuffer()),
+      Uint8List.fromList(generic_pb.Empty().writeToBuffer()),
     );
     final deck = Deck.fromBuffer(deckBytes)..name = trimmedName;
     final changesBytes = await backend.invoke(
