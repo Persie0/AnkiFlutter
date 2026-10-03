@@ -65,6 +65,7 @@ class ReviewController extends ChangeNotifier {
   _DeferredAutoAdvance? _deferredAutoAdvance;
   bool _autoAdvanceEnabled = false;
   String? _autoAdvanceReminder;
+  bool _currentMarked = false;
   int _generation = 0;
   int? _selectedDeckId;
   String? _typedAnswerPattern;
@@ -78,6 +79,8 @@ class ReviewController extends ChangeNotifier {
   String? get autoAdvanceReminder => _autoAdvanceReminder;
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
   bool get supportsFlags => _repository is ReviewFlagRepository;
+  bool get supportsMarking => _repository is ReviewMarkRepository;
+  bool get currentMarked => _currentMarked;
   ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
   bool get hasTypedAnswerInput {
     if (_state is! ReviewQuestion || _typedAnswerPattern == null) return false;
@@ -146,6 +149,7 @@ class ReviewController extends ChangeNotifier {
     _deferredAutoAdvance = null;
     _frozenVisibleTimerMilliseconds = null;
     _autoAdvanceReminder = null;
+    _currentMarked = false;
     _resetTypedAnswer();
     final generationId = ++_generation;
     _setState(const ReviewLoading());
@@ -279,6 +283,12 @@ class ReviewController extends ChangeNotifier {
       content = prepared;
     }
 
+    var marked = _currentMarked;
+    if (_repository case final ReviewMarkRepository repository) {
+      marked = await repository.isMarked(card);
+      if (!_isCurrentGeneration(generationId)) return;
+    }
+
     final latest = _state;
     final stillSameCard = switch (latest) {
       ReviewQuestion(
@@ -295,6 +305,7 @@ class ReviewController extends ChangeNotifier {
     };
     if (!stillSameCard) return;
 
+    _currentMarked = marked;
     if (answerSide) {
       _setState(
         ReviewAnswer(
@@ -473,6 +484,49 @@ class ReviewController extends ChangeNotifier {
     }
   }
 
+  Future<void> toggleCurrentMarked() async {
+    final ReviewMarkRepository markRepository;
+    if (_repository case final ReviewMarkRepository repository) {
+      markRepository = repository;
+    } else {
+      return;
+    }
+
+    final current = _state;
+    final ReviewCard card;
+    final int generationId;
+    if (current is ReviewQuestion) {
+      card = current.card;
+      generationId = current.generationId;
+    } else if (current is ReviewAnswer) {
+      card = current.card;
+      generationId = current.generationId;
+    } else {
+      return;
+    }
+    if (!_isCurrentGeneration(generationId)) return;
+
+    final marked = !_currentMarked;
+    await markRepository.setMarked(card, marked);
+    if (!_isCurrentGeneration(generationId)) return;
+    final latest = _state;
+    final stillSameCard = switch (latest) {
+      ReviewQuestion(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) => latestCard.cardId == card.cardId && latestGeneration == generationId,
+      ReviewAnswer(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) => latestCard.cardId == card.cardId && latestGeneration == generationId,
+      _ => false,
+    };
+    if (!stillSameCard) return;
+
+    _currentMarked = marked;
+    notifyListeners();
+  }
+
   Future<void> _runCurrentCardAction(
     Future<void> Function(ReviewCard card) action,
   ) async {
@@ -566,9 +620,16 @@ class ReviewController extends ChangeNotifier {
         _answerStopwatch = null;
         _frozenVisibleTimerMilliseconds = null;
         _autoAdvanceReminder = null;
+        _currentMarked = false;
         _resetTypedAnswer();
         _setState(const ReviewFinished());
         return;
+      }
+
+      var marked = false;
+      if (_repository case final ReviewMarkRepository repository) {
+        marked = await repository.isMarked(card);
+        if (!_isCurrentGeneration(generationId)) return;
       }
 
       final settings = await _repository.settingsForDeck(card.currentDeckId);
@@ -593,6 +654,7 @@ class ReviewController extends ChangeNotifier {
       _answerStopwatch = stopwatch;
       _frozenVisibleTimerMilliseconds = null;
       _autoAdvanceReminder = null;
+      _currentMarked = marked;
 
       _setState(
         ReviewQuestion(
