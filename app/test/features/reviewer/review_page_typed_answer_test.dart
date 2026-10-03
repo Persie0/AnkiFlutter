@@ -8,6 +8,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/review_page.dart';
 import 'package:flutter/material.dart';
@@ -41,6 +42,47 @@ void main() {
 
     expect(find.byKey(const ValueKey('typed-answer-input')), findsOneWidget);
     expect(cardHtml, isNot(contains('[[type:Front]]')));
+  });
+
+  testWidgets('typed answer uses Anki comparison HTML when answer is revealed', (
+    tester,
+  ) async {
+    final repository = _TypedRepository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer('Capital: [[type:Front]]'),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    await controller.start(7);
+
+    String? cardHtml;
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, html) {
+            cardHtml = html;
+            return const SizedBox.expand();
+          },
+        ),
+      ),
+    );
+
+    final input = find.byKey(const ValueKey('typed-answer-input'));
+    expect(input, findsOneWidget);
+    await tester.enterText(input, 'Pari');
+    await tester.tap(find.text('Show Answer'));
+    await tester.pump();
+
+    expect(repository.lastProvided, 'Pari');
+    expect(repository.lastExpected, 'Paris');
+    expect(repository.lastCombining, isTrue);
+    expect(cardHtml, contains('<code id=typeans>'));
+    expect(cardHtml, contains('typeGood'));
+    expect(cardHtml, isNot(contains('[[type:Front]]')));
+    expect(input, findsNothing);
   });
 
   testWidgets('ordinary cards do not show a typed-answer input', (tester) async {
@@ -137,6 +179,39 @@ class _Repository implements ReviewRepository {
 
   @override
   Future<void> suspendNote(ReviewCard card) async {}
+}
+
+class _TypedRepository extends _Repository
+    implements ReviewTypedAnswerRepository {
+  String? lastExpected;
+  String? lastProvided;
+  bool? lastCombining;
+
+  @override
+  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+    ReviewCard card,
+    String pattern,
+  ) async =>
+      const ReviewTypedAnswerPrompt(
+        pattern: 'Front',
+        fieldName: 'Front',
+        expected: 'Paris',
+        combining: true,
+        fontName: 'Arial',
+        fontSize: 24,
+      );
+
+  @override
+  Future<String> compareTypedAnswer({
+    required String expected,
+    required String provided,
+    required bool combining,
+  }) async {
+    lastExpected = expected;
+    lastProvided = provided;
+    lastCombining = combining;
+    return '<code id=typeans><span class=typeGood>Paris</span></code>';
+  }
 }
 
 class _Renderer implements CardRenderRepository {
