@@ -19,6 +19,8 @@ void main() {
     expect(find.text('83%'), findsOneWidget);
     expect(find.text('New'), findsOneWidget);
     expect(find.text('120'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('True retention'), 200);
     expect(find.text('True retention'), findsOneWidget);
     expect(find.text('90%'), findsOneWidget);
 
