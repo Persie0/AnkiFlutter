@@ -69,7 +69,8 @@ void main() {
     );
 
     await tester.tap(find.text('Save note'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Duplicate note'), findsOneWidget);
     expect(repository.updateCount, 0);
