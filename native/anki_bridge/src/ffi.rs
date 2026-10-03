@@ -311,7 +311,9 @@ mod tests {
         assert_eq!(operation_from_id(65).unwrap(), GET_PREFERENCES);
         assert_eq!(operation_from_id(66).unwrap(), SET_PREFERENCES);
         assert_eq!(operation_from_id(67).unwrap(), NOTE_FIELDS_CHECK);
+        assert!(operation_from_id(68).is_ok());
+        assert!(operation_from_id(69).is_ok());
         assert!(operation_from_id(0).is_err());
-        assert!(operation_from_id(68).is_err());
+        assert!(operation_from_id(70).is_err());
     }
 }
