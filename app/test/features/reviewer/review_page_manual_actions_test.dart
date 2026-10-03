@@ -85,24 +85,21 @@ void main() {
 
     await tester.tap(find.byTooltip('Review actions'));
     await tester.pumpAndSettle();
-    var autoAdvanceItem = find.ancestor(
-      of: find.text('Auto advance'),
-      matching: find.byType(CheckedPopupMenuItem<dynamic>),
-    );
-    await tester.tap(autoAdvanceItem);
+    await tester.tap(find.text('Auto advance'), warnIfMissed: false);
     await tester.pumpAndSettle();
     expect(controller.autoAdvanceEnabled, isTrue);
 
     await tester.tap(find.byTooltip('Review actions'));
     await tester.pumpAndSettle();
-    autoAdvanceItem = find.ancestor(
-      of: find.text('Auto advance'),
-      matching: find.byType(CheckedPopupMenuItem<dynamic>),
+    final checkedAutoAdvance = find.byWidgetPredicate(
+      (widget) =>
+          widget is CheckedPopupMenuItem<Object?> &&
+          widget.checked &&
+          widget.child is Text &&
+          (widget.child as Text).data == 'Auto advance',
+      description: 'checked Auto advance popup item',
     );
-    final checked = tester.widget<CheckedPopupMenuItem<dynamic>>(
-      autoAdvanceItem,
-    );
-    expect(checked.checked, isTrue);
+    expect(checkedAutoAdvance, findsOneWidget);
   });
 }
 
