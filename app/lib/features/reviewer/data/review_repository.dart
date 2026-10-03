@@ -2,6 +2,7 @@ import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart'
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 
 abstract interface class ReviewRepository {
   Future<void> selectDeck(int deckId);
@@ -34,4 +35,17 @@ abstract interface class ReviewRepository {
 
 abstract interface class ReviewFlagRepository {
   Future<void> setFlag(ReviewCard card, int flag);
+}
+
+abstract interface class ReviewTypedAnswerRepository {
+  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+    ReviewCard card,
+    String pattern,
+  );
+
+  Future<String> compareTypedAnswer({
+    required String expected,
+    required String provided,
+    required bool combining,
+  });
 }
