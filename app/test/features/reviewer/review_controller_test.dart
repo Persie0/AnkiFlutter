@@ -109,8 +109,8 @@ void main() {
     expect(answer.content.questionHtml, question.content.questionHtml);
     expect(answer.content.answerHtml, question.content.answerHtml);
     expect(answer.content.css, question.content.css);
-    expect(answer.content.questionAudio, same(question.content.questionAudio));
-    expect(answer.content.answerAudio, same(question.content.answerAudio));
+    expect(answer.content.questionAudio, question.content.questionAudio);
+    expect(answer.content.answerAudio, question.content.answerAudio);
     expect(answer.settings, same(question.settings));
     expect(answer.generationId, question.generationId);
     expect(repository.nextCardCalls, callsBeforeReveal.nextCard);
