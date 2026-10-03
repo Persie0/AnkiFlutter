@@ -46,6 +46,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(transfer.exportCalled, isTrue);
+    await tester.drag(find.byType(ListView), const Offset(0, 1200));
+    await tester.pumpAndSettle();
     expect(find.textContaining('2 media files included'), findsOneWidget);
   });
 }
