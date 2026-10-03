@@ -40,7 +40,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.byKey(const ValueKey('export-apkg')));
+    final exportButton = find.byKey(const ValueKey('export-apkg'));
+    await tester.scrollUntilVisible(exportButton, 300);
+    await tester.tap(exportButton);
     await tester.pumpAndSettle();
 
     expect(transfer.exportCalled, isTrue);
