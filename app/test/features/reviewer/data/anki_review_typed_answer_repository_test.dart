@@ -12,6 +12,7 @@ import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
 import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_preparation.dart';
 import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -29,11 +30,13 @@ void main() {
     );
     final dynamic repository = AnkiReviewRepository(backend: backend);
 
-    final dynamic prompt = await repository.prepareTypedAnswer(
+    final preparation = await repository.prepareTypedAnswer(
       _card(),
       'Front',
     );
 
+    expect(preparation, isA<ReviewTypedAnswerReady>());
+    final prompt = (preparation as ReviewTypedAnswerReady).prompt;
     expect(prompt.pattern, 'Front');
     expect(prompt.fieldName, 'Front');
     expect(prompt.expected, 'Paris');
@@ -52,11 +55,12 @@ void main() {
     );
     final dynamic repository = AnkiReviewRepository(backend: backend);
 
-    final dynamic prompt = await repository.prepareTypedAnswer(
+    final preparation = await repository.prepareTypedAnswer(
       _card(),
       'nc:Front',
     );
 
+    final prompt = (preparation as ReviewTypedAnswerReady).prompt;
     expect(prompt.fieldName, 'Front');
     expect(prompt.expected, 'Paris');
     expect(prompt.combining, isFalse);
@@ -73,11 +77,12 @@ void main() {
     );
     final dynamic repository = AnkiReviewRepository(backend: backend);
 
-    final dynamic prompt = await repository.prepareTypedAnswer(
+    final preparation = await repository.prepareTypedAnswer(
       _card(templateOrdinal: 1),
       'cloze:Text',
     );
 
+    final prompt = (preparation as ReviewTypedAnswerReady).prompt;
     expect(prompt.fieldName, 'Text');
     expect(prompt.expected, 'world');
     expect(prompt.combining, isTrue);
@@ -87,6 +92,67 @@ void main() {
     );
     expect(request.text, fieldText);
     expect(request.ordinal, 2);
+  });
+
+  test('prepareTypedAnswer returns Anki unknown-field warning', () async {
+    final backend = _FakeBackend(
+      responsesById: {
+        29: _note(fields: const ['Paris']).writeToBuffer(),
+        23: _notetype(fieldName: 'Front').writeToBuffer(),
+      },
+    );
+    final dynamic repository = AnkiReviewRepository(backend: backend);
+
+    final preparation = await repository.prepareTypedAnswer(
+      _card(),
+      'Missing',
+    );
+
+    expect(preparation, isA<ReviewTypedAnswerWarning>());
+    expect(
+      (preparation as ReviewTypedAnswerWarning).message,
+      'Type answer: unknown field Missing',
+    );
+  });
+
+  test('prepareTypedAnswer treats existing empty field as silent empty', () async {
+    final backend = _FakeBackend(
+      responsesById: {
+        29: _note(fields: const ['']).writeToBuffer(),
+        23: _notetype(fieldName: 'Front').writeToBuffer(),
+      },
+    );
+    final dynamic repository = AnkiReviewRepository(backend: backend);
+
+    final preparation = await repository.prepareTypedAnswer(
+      _card(),
+      'Front',
+    );
+
+    expect(preparation, isA<ReviewTypedAnswerEmpty>());
+  });
+
+  test('prepareTypedAnswer warns when active cloze is missing', () async {
+    const fieldText = 'hello {{c1::world}}';
+    final backend = _FakeBackend(
+      responsesById: {
+        29: _note(fields: const [fieldText]).writeToBuffer(),
+        23: _notetype(fieldName: 'Text').writeToBuffer(),
+        69: generic_pb.String(val: '').writeToBuffer(),
+      },
+    );
+    final dynamic repository = AnkiReviewRepository(backend: backend);
+
+    final preparation = await repository.prepareTypedAnswer(
+      _card(templateOrdinal: 1),
+      'cloze:Text',
+    );
+
+    expect(preparation, isA<ReviewTypedAnswerWarning>());
+    expect(
+      (preparation as ReviewTypedAnswerWarning).message,
+      'Please run Tools>Empty Cards',
+    );
   });
 
   test('compareTypedAnswer delegates comparison to Anki backend', () async {
