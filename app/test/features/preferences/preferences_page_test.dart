@@ -52,7 +52,10 @@ void main() {
       find.byKey(const ValueKey('pref-rollover')),
       '5',
     );
-    await tester.tap(find.byKey(const ValueKey('pref-show-intervals')));
+    final showIntervals = find.byKey(const ValueKey('pref-show-intervals'));
+    await tester.ensureVisible(showIntervals);
+    await tester.pumpAndSettle();
+    await tester.tap(showIntervals);
     await tester.tap(find.byKey(const ValueKey('preferences-save')));
     await tester.pumpAndSettle();
 
