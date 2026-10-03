@@ -17,8 +17,6 @@ void main() {
   testWidgets('question exposes meaningful remaining counts and show-answer shortcut', (
     tester,
   ) async {
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     final controller = _controller();
     await controller.start(4);
 
@@ -33,18 +31,19 @@ void main() {
     );
 
     expect(
-      find.bySemanticsLabel('1 new, 2 learning, 3 review cards remaining'),
+      _semanticsWithLabel('1 new, 2 learning, 3 review cards remaining'),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('Show answer, keyboard shortcut Space or Enter'),
+      _semanticsWithLabel(
+        'Show answer, keyboard shortcut Space or Enter',
+        button: true,
+      ),
       findsOneWidget,
     );
   });
 
   testWidgets('answer ratings expose interval and numeric shortcut', (tester) async {
-    final semantics = tester.ensureSemantics();
-    addTearDown(semantics.dispose);
     final controller = _controller();
     await controller.start(4);
     await controller.showAnswer();
@@ -60,23 +59,44 @@ void main() {
     );
 
     expect(
-      find.bySemanticsLabel('Again, next interval 1m, keyboard shortcut 1'),
+      _semanticsWithLabel(
+        'Again, next interval 1m, keyboard shortcut 1',
+        button: true,
+      ),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('Hard, next interval 6m, keyboard shortcut 2'),
+      _semanticsWithLabel(
+        'Hard, next interval 6m, keyboard shortcut 2',
+        button: true,
+      ),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('Good, next interval 1d, keyboard shortcut 3'),
+      _semanticsWithLabel(
+        'Good, next interval 1d, keyboard shortcut 3',
+        button: true,
+      ),
       findsOneWidget,
     );
     expect(
-      find.bySemanticsLabel('Easy, next interval 4d, keyboard shortcut 4'),
+      _semanticsWithLabel(
+        'Easy, next interval 4d, keyboard shortcut 4',
+        button: true,
+      ),
       findsOneWidget,
     );
   });
 }
+
+Finder _semanticsWithLabel(String label, {bool button = false}) =>
+    find.byWidgetPredicate(
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.label == label &&
+          (!button || widget.properties.button == true),
+      description: 'Semantics(label: $label, button: $button)',
+    );
 
 ReviewController _controller() => ReviewController(
   repository: _Repository(),
