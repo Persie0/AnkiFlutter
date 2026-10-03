@@ -6,7 +6,6 @@ import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart';
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart';
 import 'package:anki_flutter/features/collection/recent_collection_store.dart';
-import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
