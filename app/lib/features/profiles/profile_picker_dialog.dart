@@ -155,50 +155,15 @@ class _ProfilePickerDialogState extends State<ProfilePickerDialog> {
     required String title,
     required String actionLabel,
     String initialName = '',
-  }) async {
-    final controller = TextEditingController(text: initialName);
-    final formKey = GlobalKey<FormState>();
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(title),
-          content: Form(
-            key: formKey,
-            child: TextFormField(
-              key: const ValueKey('profile-name'),
-              controller: controller,
-              autofocus: true,
-              decoration: const InputDecoration(labelText: 'Profile name'),
-              validator: (value) => value == null || value.trim().isEmpty
-                  ? 'Enter a profile name'
-                  : null,
-              onFieldSubmitted: (_) {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(dialogContext).pop(controller.text.trim());
-                }
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() ?? false) {
-                  Navigator.of(dialogContext).pop(controller.text.trim());
-                }
-              },
-              child: Text(actionLabel),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+  }) {
+    return showDialog<String>(
+      context: context,
+      builder: (_) => _ProfileNameDialog(
+        title: title,
+        actionLabel: actionLabel,
+        initialName: initialName,
+      ),
+    );
   }
 
   @override
@@ -297,6 +262,74 @@ class _ProfilePickerDialogState extends State<ProfilePickerDialog> {
           ),
         );
       },
+    );
+  }
+}
+
+class _ProfileNameDialog extends StatefulWidget {
+  const _ProfileNameDialog({
+    required this.title,
+    required this.actionLabel,
+    required this.initialName,
+  });
+
+  final String title;
+  final String actionLabel;
+  final String initialName;
+
+  @override
+  State<_ProfileNameDialog> createState() => _ProfileNameDialogState();
+}
+
+class _ProfileNameDialogState extends State<_ProfileNameDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() ?? false) {
+      Navigator.of(context).pop(_controller.text.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: Form(
+        key: _formKey,
+        child: TextFormField(
+          key: const ValueKey('profile-name'),
+          controller: _controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Profile name'),
+          validator: (value) => value == null || value.trim().isEmpty
+              ? 'Enter a profile name'
+              : null,
+          onFieldSubmitted: (_) => _submit(),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: Text(widget.actionLabel),
+        ),
+      ],
     );
   }
 }
