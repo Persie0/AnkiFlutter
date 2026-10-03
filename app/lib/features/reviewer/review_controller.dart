@@ -191,12 +191,14 @@ class ReviewController extends ChangeNotifier {
       if (_typedAnswerPattern != null &&
           prompt != null &&
           repository is ReviewTypedAnswerRepository) {
-        comparison = await repository.compareTypedAnswer(
+        final compared = await repository.compareTypedAnswer(
           expected: prompt.expected,
           provided: _typedAnswerProvided,
           combining: prompt.combining,
         );
         if (!_isCurrentQuestion(current)) return;
+        comparison =
+            '<div style="font-family: \'${prompt.fontName}\'; font-size: ${prompt.fontSize}px">$compared</div>';
       }
       _typedAnswerComparisonHtml = comparison;
 
