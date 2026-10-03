@@ -51,14 +51,14 @@ abstract interface class ReviewTypedAnswerRepository {
 }
 
 extension ReviewTypedAnswerCapability on ReviewRepository {
-  Future<ReviewTypedAnswerPreparation?> prepareTypedAnswerIfSupported(
+  Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
     String pattern,
   ) {
     if (this case final ReviewTypedAnswerRepository repository) {
       return repository.prepareTypedAnswer(card, pattern);
     }
-    return Future.value();
+    throw UnsupportedError('Typed answers are not supported by this repository');
   }
 
   Future<String> compareTypedAnswer({
