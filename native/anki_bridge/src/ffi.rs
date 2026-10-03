@@ -206,7 +206,6 @@ pub unsafe extern "C" fn anki_bridge_create(
 ) -> BridgeCreateResult {
     match catch_unwind(AssertUnwindSafe(|| {
         let input = unsafe { input_bytes(init_ptr, init_len) }?;
-        backend::init_backend(input).map_err(|err| err.to_string())?;
         let backend = BridgeBackend::from_init_bytes(input)?;
         Ok::<_, String>(BridgeCreateResult {
             status: STATUS_SUCCESS,
