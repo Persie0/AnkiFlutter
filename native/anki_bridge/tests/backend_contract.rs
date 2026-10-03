@@ -210,9 +210,10 @@ fn real_backend_creates_a_deck_from_anki_defaults_through_ffi() {
     assert!(result.id > 1, "new deck should receive a non-default id");
 
     let tree = fetch_tree(&backend);
-    assert!(tree.children.iter().any(|node| {
-        node.deck_id == result.id && node.name == "Created by AnkiFlutter"
-    }));
+    assert!(tree
+        .children
+        .iter()
+        .any(|node| { node.deck_id == result.id && node.name == "Created by AnkiFlutter" }));
 }
 
 #[test]
