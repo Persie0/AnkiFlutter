@@ -81,6 +81,8 @@ void main() {
     expect(repository.lastCombining, isTrue);
     expect(cardHtml, contains('<code id=typeans>'));
     expect(cardHtml, contains('typeGood'));
+    expect(cardHtml, contains("font-family: 'Arial'"));
+    expect(cardHtml, contains('font-size: 24px'));
     expect(cardHtml, isNot(contains('[[type:Front]]')));
     expect(input, findsNothing);
   });
