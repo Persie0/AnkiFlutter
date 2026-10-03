@@ -15,6 +15,7 @@ import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes
 import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
     as notetypes_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
+import 'package:anki_flutter/core/backend/generated/anki/tags.pb.dart' as tags_pb;
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
@@ -26,7 +27,11 @@ import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt
 import 'package:fixnum/fixnum.dart';
 
 class AnkiReviewRepository
-    implements ReviewRepository, ReviewFlagRepository, ReviewTypedAnswerRepository {
+    implements
+        ReviewRepository,
+        ReviewFlagRepository,
+        ReviewMarkRepository,
+        ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -109,6 +114,29 @@ class AnkiReviewRepository
     );
     await backend.invoke(
       BackendOperation.setFlag,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<bool> isMarked(ReviewCard card) async {
+    final response = await backend.invoke(
+      BackendOperation.getNote,
+      Uint8List.fromList(
+        notes_pb.NoteId(nid: Int64(card.noteId)).writeToBuffer(),
+      ),
+    );
+    return notes_pb.Note.fromBuffer(response).tags.contains('marked');
+  }
+
+  @override
+  Future<void> setMarked(ReviewCard card, bool marked) async {
+    final request = tags_pb.NoteIdsAndTagsRequest(
+      noteIds: [Int64(card.noteId)],
+      tags: 'marked',
+    );
+    await backend.invoke(
+      marked ? BackendOperation.addNoteTags : BackendOperation.removeNoteTags,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
