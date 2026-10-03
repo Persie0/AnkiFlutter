@@ -75,7 +75,6 @@ class ReviewController extends ChangeNotifier {
     ReviewTransition(:final card) => card.flag,
     _ => 0,
   };
-
   Duration get reviewTimerElapsed {
     final current = _state;
     final ReviewDeckSettings? settings = switch (current) {
@@ -242,79 +241,6 @@ class ReviewController extends ChangeNotifier {
     }
   }
 
-  Future<void> setCurrentFlag(int flag) async {
-    if (flag < 0 || flag > 7) {
-      throw ArgumentError.value(flag, 'flag', 'must be between 0 and 7');
-    }
-    final repository = _repository;
-    if (repository is! ReviewFlagRepository) return;
-
-    final current = _state;
-    final ReviewCard card;
-    final int generationId;
-    final bool answerSide;
-    final ReviewCardContent content;
-    final ReviewDeckSettings settings;
-    final Object? answerError;
-    if (current is ReviewQuestion) {
-      card = current.card;
-      generationId = current.generationId;
-      answerSide = false;
-      content = current.content;
-      settings = current.settings;
-      answerError = null;
-    } else if (current is ReviewAnswer) {
-      card = current.card;
-      generationId = current.generationId;
-      answerSide = true;
-      content = current.content;
-      settings = current.settings;
-      answerError = current.error;
-    } else {
-      return;
-    }
-
-    await repository.setFlag(card, flag);
-    if (!_isCurrentGeneration(generationId)) return;
-    final latest = _state;
-    final stillSameCard = switch (latest) {
-      ReviewQuestion(
-        card: final latestCard,
-        generationId: final latestGeneration,
-      ) when !answerSide =>
-        latestCard.cardId == card.cardId && latestGeneration == generationId,
-      ReviewAnswer(
-        card: final latestCard,
-        generationId: final latestGeneration,
-      ) when answerSide =>
-        latestCard.cardId == card.cardId && latestGeneration == generationId,
-      _ => false,
-    };
-    if (!stillSameCard) return;
-
-    final updatedCard = card.withFlag(flag);
-    if (answerSide) {
-      _setState(
-        ReviewAnswer(
-          card: updatedCard,
-          content: content,
-          settings: settings,
-          generationId: generationId,
-          error: answerError,
-        ),
-      );
-    } else {
-      _setState(
-        ReviewQuestion(
-          card: updatedCard,
-          content: content,
-          settings: settings,
-          generationId: generationId,
-        ),
-      );
-    }
-  }
-
   Future<void> rate(ReviewRating rating) async {
     final current = _state;
     if (current is! ReviewAnswer ||
@@ -393,6 +319,83 @@ class ReviewController extends ChangeNotifier {
 
   Future<void> suspendCurrentNote() =>
       _runCurrentCardAction(_repository.suspendNote);
+
+  Future<void> setCurrentFlag(int flag) async {
+    if (flag < 0 || flag > 7) {
+      throw ArgumentError.value(flag, 'flag', 'must be between 0 and 7');
+    }
+    final ReviewFlagRepository flagRepository;
+    if (_repository case final ReviewFlagRepository repository) {
+      flagRepository = repository;
+    } else {
+      return;
+    }
+
+    final current = _state;
+    final ReviewCard card;
+    final int generationId;
+    final bool answerSide;
+    final ReviewCardContent content;
+    final ReviewDeckSettings settings;
+    final Object? answerError;
+    if (current is ReviewQuestion) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = false;
+      content = current.content;
+      settings = current.settings;
+      answerError = null;
+    } else if (current is ReviewAnswer) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = true;
+      content = current.content;
+      settings = current.settings;
+      answerError = current.error;
+    } else {
+      return;
+    }
+
+    await flagRepository.setFlag(card, flag);
+    if (!_isCurrentGeneration(generationId)) return;
+    final latest = _state;
+    final stillSameCard = switch (latest) {
+      ReviewQuestion(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when !answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
+      ReviewAnswer(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
+      _ => false,
+    };
+    if (!stillSameCard) return;
+
+    final updatedCard = card.withFlag(flag);
+    if (answerSide) {
+      _setState(
+        ReviewAnswer(
+          card: updatedCard,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+          error: answerError,
+        ),
+      );
+    } else {
+      _setState(
+        ReviewQuestion(
+          card: updatedCard,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+        ),
+      );
+    }
+  }
 
   Future<void> _runCurrentCardAction(
     Future<void> Function(ReviewCard card) action,
