@@ -202,6 +202,16 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendNotesService",
         "note_fields_check",
     ),
+    (
+        "COMPARE_ANSWER",
+        "BackendCardRenderingService",
+        "compare_answer",
+    ),
+    (
+        "EXTRACT_CLOZE_FOR_TYPING",
+        "BackendCardRenderingService",
+        "extract_cloze_for_typing",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
