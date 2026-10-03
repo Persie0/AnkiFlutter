@@ -9,6 +9,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:flutter/foundation.dart';
 
 abstract interface class ReviewTimerHandle {
@@ -44,6 +45,8 @@ class ReviewController extends ChangeNotifier {
     _playingSubscription = _audio?.playingChanges.listen(_onPlayingChanged);
   }
 
+  static final RegExp _typedAnswerMarker = RegExp(r'\[\[type:(.+?)\]\]');
+
   late final ReviewRepository _repository;
   late final CardRenderRepository _renderer;
   late final int Function() _wallClockMillis;
@@ -63,18 +66,33 @@ class ReviewController extends ChangeNotifier {
   String? _autoAdvanceReminder;
   int _generation = 0;
   int? _selectedDeckId;
+  String? _typedAnswerPattern;
+  ReviewTypedAnswerPrompt? _typedAnswerPrompt;
+  String _typedAnswerProvided = '';
+  String? _typedAnswerComparisonHtml;
+  bool _showAnswerInProgress = false;
 
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
   String? get autoAdvanceReminder => _autoAdvanceReminder;
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
   bool get supportsFlags => _repository is ReviewFlagRepository;
+  ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
+  bool get hasTypedAnswerInput {
+    if (_state is! ReviewQuestion || _typedAnswerPattern == null) return false;
+    if (_repository is ReviewTypedAnswerRepository) {
+      return _typedAnswerPrompt != null;
+    }
+    return true;
+  }
+
   int get currentFlag => switch (_state) {
     ReviewQuestion(:final card) => card.flag,
     ReviewAnswer(:final card) => card.flag,
     ReviewTransition(:final card) => card.flag,
     _ => 0,
   };
+
   Duration get reviewTimerElapsed {
     final current = _state;
     final ReviewDeckSettings? settings = switch (current) {
@@ -127,6 +145,7 @@ class ReviewController extends ChangeNotifier {
     _deferredAutoAdvance = null;
     _frozenVisibleTimerMilliseconds = null;
     _autoAdvanceReminder = null;
+    _resetTypedAnswer();
     final generationId = ++_generation;
     _setState(const ReviewLoading());
 
@@ -146,35 +165,69 @@ class ReviewController extends ChangeNotifier {
     if (deckId != null) await start(deckId);
   }
 
+  void updateTypedAnswer(String value) {
+    _typedAnswerProvided = value;
+  }
+
   Future<void> showAnswer() async {
     final current = _state;
-    if (current is! ReviewQuestion) {
+    if (current is! ReviewQuestion || _showAnswerInProgress) {
       return;
     }
 
+    _showAnswerInProgress = true;
+    _clearAutoAdvanceTimer();
+    _deferredAutoAdvance = null;
     _autoAdvanceReminder = null;
     if (current.settings.stopTimerOnAnswer) {
       _frozenVisibleTimerMilliseconds =
           _answerStopwatch?.elapsedMilliseconds ?? 0;
     }
-    _setState(
-      ReviewAnswer(
-        card: current.card,
-        content: current.content,
-        settings: current.settings,
-        generationId: current.generationId,
-      ),
-    );
-    _scheduleAutoAdvanceForCurrentState();
 
-    if (current.settings.autoplay) {
-      final tags = current.settings.skipQuestionWhenReplayingAnswer
-          ? current.content.answerAudio
-          : <ReviewAudioTag>[
-              ...current.content.questionAudio,
-              ...current.content.answerAudio,
-            ];
-      await _playTags(tags, current.generationId);
+    try {
+      var comparison = '';
+      final prompt = _typedAnswerPrompt;
+      final repository = _repository;
+      if (_typedAnswerPattern != null &&
+          prompt != null &&
+          repository is ReviewTypedAnswerRepository) {
+        comparison = await repository.compareTypedAnswer(
+          expected: prompt.expected,
+          provided: _typedAnswerProvided,
+          combining: prompt.combining,
+        );
+        if (!_isCurrentQuestion(current)) return;
+      }
+      _typedAnswerComparisonHtml = comparison;
+
+      final answerContent = _contentWith(
+        current.content,
+        answerHtml: current.content.answerHtml.replaceAll(
+          _typedAnswerMarker,
+          comparison,
+        ),
+      );
+      _setState(
+        ReviewAnswer(
+          card: current.card,
+          content: answerContent,
+          settings: current.settings,
+          generationId: current.generationId,
+        ),
+      );
+      _scheduleAutoAdvanceForCurrentState();
+
+      if (current.settings.autoplay) {
+        final tags = current.settings.skipQuestionWhenReplayingAnswer
+            ? current.content.answerAudio
+            : <ReviewAudioTag>[
+                ...current.content.questionAudio,
+                ...current.content.answerAudio,
+              ];
+        await _playTags(tags, current.generationId);
+      }
+    } finally {
+      _showAnswerInProgress = false;
     }
   }
 
@@ -201,8 +254,28 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    final content = await _renderer.render(card.cardId);
+    final rawContent = await _renderer.render(card.cardId);
     if (!_isCurrentGeneration(generationId)) return;
+    ReviewCardContent content;
+    if (answerSide) {
+      content = _contentWith(
+        rawContent,
+        questionHtml: rawContent.questionHtml.replaceAll(_typedAnswerMarker, ''),
+        answerHtml: rawContent.answerHtml.replaceAll(
+          _typedAnswerMarker,
+          _typedAnswerComparisonHtml ?? '',
+        ),
+      );
+    } else {
+      final prepared = await _prepareQuestionContent(
+        card,
+        rawContent,
+        generationId,
+      );
+      if (prepared == null) return;
+      content = prepared;
+    }
+
     final latest = _state;
     final stillSameCard = switch (latest) {
       ReviewQuestion(
@@ -490,6 +563,7 @@ class ReviewController extends ChangeNotifier {
         _answerStopwatch = null;
         _frozenVisibleTimerMilliseconds = null;
         _autoAdvanceReminder = null;
+        _resetTypedAnswer();
         _setState(const ReviewFinished());
         return;
       }
@@ -499,8 +573,16 @@ class ReviewController extends ChangeNotifier {
         return;
       }
 
-      final content = await _renderer.render(card.cardId);
+      final rawContent = await _renderer.render(card.cardId);
       if (!_isCurrentGeneration(generationId)) {
+        return;
+      }
+      final content = await _prepareQuestionContent(
+        card,
+        rawContent,
+        generationId,
+      );
+      if (content == null || !_isCurrentGeneration(generationId)) {
         return;
       }
 
@@ -525,6 +607,67 @@ class ReviewController extends ChangeNotifier {
     } catch (error) {
       if (_isCurrentGeneration(generationId)) _setState(ReviewFailure(error));
     }
+  }
+
+  Future<ReviewCardContent?> _prepareQuestionContent(
+    ReviewCard card,
+    ReviewCardContent rawContent,
+    int generationId,
+  ) async {
+    _resetTypedAnswer();
+    final match = _typedAnswerMarker.firstMatch(rawContent.questionHtml);
+    if (match == null) return rawContent;
+
+    final pattern = match.group(1);
+    if (pattern == null || pattern.isEmpty) {
+      return _contentWith(
+        rawContent,
+        questionHtml: rawContent.questionHtml.replaceAll(_typedAnswerMarker, ''),
+      );
+    }
+
+    ReviewTypedAnswerPrompt? prompt;
+    final repository = _repository;
+    if (repository is ReviewTypedAnswerRepository) {
+      prompt = await repository.prepareTypedAnswer(card, pattern);
+      if (!_isCurrentGeneration(generationId)) return null;
+    }
+
+    _typedAnswerPattern = pattern;
+    _typedAnswerPrompt = prompt;
+    return _contentWith(
+      rawContent,
+      questionHtml: rawContent.questionHtml.replaceAll(_typedAnswerMarker, ''),
+    );
+  }
+
+  ReviewCardContent _contentWith(
+    ReviewCardContent content, {
+    String? questionHtml,
+    String? answerHtml,
+  }) {
+    return ReviewCardContent(
+      questionHtml: questionHtml ?? content.questionHtml,
+      answerHtml: answerHtml ?? content.answerHtml,
+      css: content.css,
+      questionAudio: content.questionAudio,
+      answerAudio: content.answerAudio,
+    );
+  }
+
+  void _resetTypedAnswer() {
+    _typedAnswerPattern = null;
+    _typedAnswerPrompt = null;
+    _typedAnswerProvided = '';
+    _typedAnswerComparisonHtml = null;
+  }
+
+  bool _isCurrentQuestion(ReviewQuestion original) {
+    if (!_isCurrentGeneration(original.generationId)) return false;
+    final current = _state;
+    return current is ReviewQuestion &&
+        current.generationId == original.generationId &&
+        current.card.cardId == original.card.cardId;
   }
 
   int _capElapsedMilliseconds(int elapsed, int limitSeconds) {
