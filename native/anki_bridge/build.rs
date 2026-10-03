@@ -213,6 +213,16 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "extract_cloze_for_typing",
     ),
     ("REMOVE_NOTES", "BackendNotesService", "remove_notes"),
+    (
+        "SCHEDULE_CARDS_AS_NEW",
+        "BackendSchedulerService",
+        "schedule_cards_as_new",
+    ),
+    (
+        "SCHEDULE_CARDS_AS_NEW_DEFAULTS",
+        "BackendSchedulerService",
+        "schedule_cards_as_new_defaults",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
