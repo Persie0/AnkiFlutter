@@ -106,7 +106,11 @@ void main() {
     expect(state, isA<ReviewAnswer>());
     final answer = state as ReviewAnswer;
     expect(answer.card, same(question.card));
-    expect(answer.content, same(question.content));
+    expect(answer.content.questionHtml, question.content.questionHtml);
+    expect(answer.content.answerHtml, question.content.answerHtml);
+    expect(answer.content.css, question.content.css);
+    expect(answer.content.questionAudio, same(question.content.questionAudio));
+    expect(answer.content.answerAudio, same(question.content.answerAudio));
     expect(answer.settings, same(question.settings));
     expect(answer.generationId, question.generationId);
     expect(repository.nextCardCalls, callsBeforeReveal.nextCard);
