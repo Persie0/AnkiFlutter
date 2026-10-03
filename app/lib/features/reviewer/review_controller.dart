@@ -9,6 +9,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_preparation.dart';
 import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:flutter/foundation.dart';
 
@@ -628,18 +629,30 @@ class ReviewController extends ChangeNotifier {
       );
     }
 
-    ReviewTypedAnswerPrompt? prompt;
+    var replacement = '';
     final repository = _repository;
     if (repository is ReviewTypedAnswerRepository) {
-      prompt = await repository.prepareTypedAnswer(card, pattern);
+      final preparation = await repository.prepareTypedAnswer(card, pattern);
       if (!_isCurrentGeneration(generationId)) return null;
+      switch (preparation) {
+        case ReviewTypedAnswerReady(:final prompt):
+          _typedAnswerPattern = pattern;
+          _typedAnswerPrompt = prompt;
+        case ReviewTypedAnswerWarning(:final message):
+          replacement = message;
+        case ReviewTypedAnswerEmpty():
+          break;
+      }
+    } else {
+      _typedAnswerPattern = pattern;
     }
 
-    _typedAnswerPattern = pattern;
-    _typedAnswerPrompt = prompt;
     return _contentWith(
       rawContent,
-      questionHtml: rawContent.questionHtml.replaceAll(_typedAnswerMarker, ''),
+      questionHtml: rawContent.questionHtml.replaceAll(
+        _typedAnswerMarker,
+        replacement,
+      ),
     );
   }
 
