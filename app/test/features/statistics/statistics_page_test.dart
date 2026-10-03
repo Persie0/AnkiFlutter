@@ -20,7 +20,15 @@ void main() {
     expect(find.text('New'), findsOneWidget);
     expect(find.text('120'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('True retention'), 200);
+    final statisticsList = find.descendant(
+      of: find.byType(RefreshIndicator),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('True retention'),
+      200,
+      scrollable: statisticsList,
+    );
     expect(find.text('True retention'), findsOneWidget);
     expect(find.text('90%'), findsOneWidget);
 
