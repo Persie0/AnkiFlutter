@@ -96,7 +96,8 @@ void main() {
     await tester.enterText(find.byKey(const ValueKey('note-field-0')), 'same');
     await tester.enterText(find.byKey(const ValueKey('note-field-1')), 'answer');
     await tester.tap(find.text('Add note'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Duplicate note'), findsOneWidget);
     expect(repository.savedNote, isNull);
