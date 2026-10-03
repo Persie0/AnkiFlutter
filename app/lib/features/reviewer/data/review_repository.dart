@@ -49,3 +49,30 @@ abstract interface class ReviewTypedAnswerRepository {
     required bool combining,
   });
 }
+
+extension ReviewTypedAnswerCapability on ReviewRepository {
+  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+    ReviewCard card,
+    String pattern,
+  ) {
+    if (this case final ReviewTypedAnswerRepository repository) {
+      return repository.prepareTypedAnswer(card, pattern);
+    }
+    return Future.value();
+  }
+
+  Future<String> compareTypedAnswer({
+    required String expected,
+    required String provided,
+    required bool combining,
+  }) {
+    if (this case final ReviewTypedAnswerRepository repository) {
+      return repository.compareTypedAnswer(
+        expected: expected,
+        provided: provided,
+        combining: combining,
+      );
+    }
+    throw UnsupportedError('Typed answers are not supported by this repository');
+  }
+}
