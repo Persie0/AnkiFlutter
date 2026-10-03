@@ -46,7 +46,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('sync-now')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Full sync required'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('full-sync-download')));
