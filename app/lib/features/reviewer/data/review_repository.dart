@@ -51,7 +51,7 @@ abstract interface class ReviewTypedAnswerRepository {
 }
 
 extension ReviewTypedAnswerCapability on ReviewRepository {
-  Future<ReviewTypedAnswerPreparation?> prepareTypedAnswer(
+  Future<ReviewTypedAnswerPreparation?> prepareTypedAnswerIfSupported(
     ReviewCard card,
     String pattern,
   ) {
