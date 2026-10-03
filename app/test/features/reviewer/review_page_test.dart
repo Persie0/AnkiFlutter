@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
