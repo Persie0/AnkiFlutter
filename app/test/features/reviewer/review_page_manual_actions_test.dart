@@ -127,12 +127,12 @@ ReviewCard _card(int id, String deckName) => ReviewCard(
 
 class _Renderer implements CardRenderRepository {
   @override
-  Future<ReviewCardContent> render(int cardId) async => const ReviewCardContent(
+  Future<ReviewCardContent> render(int cardId) async => ReviewCardContent(
     questionHtml: 'Question',
     answerHtml: 'Answer',
     css: '',
-    questionAudio: [],
-    answerAudio: [],
+    questionAudio: const [],
+    answerAudio: const [],
   );
 }
 
