@@ -31,6 +31,7 @@ class AnkiReviewRepository
         ReviewRepository,
         ReviewFlagRepository,
         ReviewMarkRepository,
+        ReviewDeleteNoteRepository,
         ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
@@ -137,6 +138,17 @@ class AnkiReviewRepository
     );
     await backend.invoke(
       marked ? BackendOperation.addNoteTags : BackendOperation.removeNoteTags,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<void> deleteNote(ReviewCard card) async {
+    final request = notes_pb.RemoveNotesRequest(
+      noteIds: [Int64(card.noteId)],
+    );
+    await backend.invoke(
+      BackendOperation.removeNotes,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }

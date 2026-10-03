@@ -13,6 +13,7 @@ enum _ReviewAction {
   editNote,
   setFlag,
   toggleMark,
+  deleteNote,
   undo,
   buryCard,
   buryNote,
@@ -142,6 +143,12 @@ class _ReviewPageState extends State<ReviewPage> {
           _actionShortcut(_ReviewAction.seekAudioForward),
       const SingleActivator(LogicalKeyboardKey.digit8, shift: true): () =>
           _actionShortcut(_ReviewAction.toggleMark),
+      if (Theme.of(context).platform == TargetPlatform.macOS)
+        const SingleActivator(LogicalKeyboardKey.backspace, control: true): () =>
+            _actionShortcut(_ReviewAction.deleteNote)
+      else
+        const SingleActivator(LogicalKeyboardKey.delete, control: true): () =>
+            _actionShortcut(_ReviewAction.deleteNote),
       const SingleActivator(LogicalKeyboardKey.keyA, shift: true): () =>
           _actionShortcut(_ReviewAction.autoAdvance),
       const SingleActivator(LogicalKeyboardKey.keyU): () =>
@@ -225,6 +232,9 @@ class _ReviewPageState extends State<ReviewPage> {
           break;
         case _ReviewAction.toggleMark:
           await widget.controller.toggleCurrentMarked();
+          break;
+        case _ReviewAction.deleteNote:
+          await widget.controller.deleteCurrentNote();
           break;
         case _ReviewAction.undo:
           if (!await widget.controller.canUndo()) {
@@ -310,6 +320,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.flag_outlined),
           title: Text('Set flag…'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.controller.supportsDeleteNote) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.deleteNote,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.delete_outline),
+          title: Text('Delete note'),
         ),
       ),
       const PopupMenuDivider(),

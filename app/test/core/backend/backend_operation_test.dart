@@ -78,6 +78,7 @@ void main() {
         'noteFieldsCheck': 67,
         'compareAnswer': 68,
         'extractClozeForTyping': 69,
+        'removeNotes': 70,
       },
     );
 

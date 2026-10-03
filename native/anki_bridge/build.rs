@@ -212,6 +212,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendCardRenderingService",
         "extract_cloze_for_typing",
     ),
+    ("REMOVE_NOTES", "BackendNotesService", "remove_notes"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

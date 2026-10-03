@@ -43,6 +43,10 @@ abstract interface class ReviewMarkRepository {
   Future<void> setMarked(ReviewCard card, bool marked);
 }
 
+abstract interface class ReviewDeleteNoteRepository {
+  Future<void> deleteNote(ReviewCard card);
+}
+
 abstract interface class ReviewTypedAnswerRepository {
   Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
