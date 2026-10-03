@@ -2,6 +2,8 @@ import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
+import 'package:anki_flutter/core/backend/generated/anki/card_rendering.pb.dart'
+    as card_rendering_pb;
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
     as collection_pb;
@@ -9,6 +11,9 @@ import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
     as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic_pb;
+import 'package:anki_flutter/core/backend/generated/anki/notes.pb.dart' as notes_pb;
+import 'package:anki_flutter/core/backend/generated/anki/notetypes.pb.dart'
+    as notetypes_pb;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart' as scheduler_pb;
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
@@ -16,9 +21,11 @@ import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_typed_answer_prompt.dart';
 import 'package:fixnum/fixnum.dart';
 
-class AnkiReviewRepository implements ReviewRepository, ReviewFlagRepository {
+class AnkiReviewRepository
+    implements ReviewRepository, ReviewFlagRepository, ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -103,6 +110,91 @@ class AnkiReviewRepository implements ReviewRepository, ReviewFlagRepository {
       BackendOperation.setFlag,
       Uint8List.fromList(request.writeToBuffer()),
     );
+  }
+
+  @override
+  Future<ReviewTypedAnswerPrompt?> prepareTypedAnswer(
+    ReviewCard card,
+    String pattern,
+  ) async {
+    var fieldName = pattern;
+    var cloze = false;
+    var combining = true;
+
+    if (fieldName.startsWith('cloze:')) {
+      cloze = true;
+      fieldName = fieldName.substring('cloze:'.length);
+    }
+    if (fieldName.startsWith('nc:')) {
+      combining = false;
+      fieldName = fieldName.substring('nc:'.length);
+    }
+
+    final noteBytes = await backend.invoke(
+      BackendOperation.getNote,
+      Uint8List.fromList(
+        notes_pb.NoteId(nid: Int64(card.noteId)).writeToBuffer(),
+      ),
+    );
+    final note = notes_pb.Note.fromBuffer(noteBytes);
+
+    final notetypeBytes = await backend.invoke(
+      BackendOperation.getNotetype,
+      Uint8List.fromList(
+        notetypes_pb.NotetypeId(ntid: note.notetypeId).writeToBuffer(),
+      ),
+    );
+    final notetype = notetypes_pb.Notetype.fromBuffer(notetypeBytes);
+
+    final matchingFields = notetype.fields.where(
+      (field) => field.name == fieldName,
+    );
+    if (matchingFields.isEmpty) return null;
+
+    final field = matchingFields.first;
+    final fieldOrdinal = field.ord.val;
+    if (fieldOrdinal >= note.fields.length) return null;
+
+    var expected = note.fields[fieldOrdinal];
+    if (cloze) {
+      final request = card_rendering_pb.ExtractClozeForTypingRequest(
+        text: expected,
+        ordinal: card.templateOrdinal + 1,
+      );
+      final response = await backend.invoke(
+        BackendOperation.extractClozeForTyping,
+        Uint8List.fromList(request.writeToBuffer()),
+      );
+      expected = generic_pb.String.fromBuffer(response).val;
+    }
+    if (expected.isEmpty) return null;
+
+    return ReviewTypedAnswerPrompt(
+      pattern: pattern,
+      fieldName: fieldName,
+      expected: expected,
+      combining: combining,
+      fontName: field.config.fontName,
+      fontSize: field.config.fontSize,
+    );
+  }
+
+  @override
+  Future<String> compareTypedAnswer({
+    required String expected,
+    required String provided,
+    required bool combining,
+  }) async {
+    final request = card_rendering_pb.CompareAnswerRequest(
+      expected: expected,
+      provided: provided,
+      combining: combining,
+    );
+    final response = await backend.invoke(
+      BackendOperation.compareAnswer,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return generic_pb.String.fromBuffer(response).val;
   }
 
   @override
