@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
@@ -9,6 +10,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 typedef ReviewNoteEditor = Future<bool> Function(int noteId);
+typedef ReviewDeckOptionsOpener = Future<void> Function(
+  ReviewDeckOptionsTarget target,
+);
+
+final class ReviewDeckOptionsTarget {
+  const ReviewDeckOptionsTarget({
+    required this.deckId,
+    required this.filtered,
+  });
+
+  final int deckId;
+  final bool filtered;
+}
 
 enum _ReviewAction {
   editNote,
@@ -16,6 +30,7 @@ enum _ReviewAction {
   toggleMark,
   forgetCard,
   setDueDate,
+  options,
   deleteNote,
   undo,
   buryCard,
@@ -36,6 +51,8 @@ class ReviewPage extends StatefulWidget {
     this.cardSurfaceBuilder,
     this.mediaBaseUri,
     this.onEditNote,
+    this.studyDeckId,
+    this.onOpenDeckOptions,
     super.key,
   });
 
@@ -44,6 +61,8 @@ class ReviewPage extends StatefulWidget {
   final Widget Function(BuildContext context, String html)? cardSurfaceBuilder;
   final Uri? mediaBaseUri;
   final ReviewNoteEditor? onEditNote;
+  final int? studyDeckId;
+  final ReviewDeckOptionsOpener? onOpenDeckOptions;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -134,6 +153,8 @@ class _ReviewPageState extends State<ReviewPage> {
           _flagShortcut(7),
       const SingleActivator(LogicalKeyboardKey.keyE): () =>
           _actionShortcut(_ReviewAction.editNote),
+      const SingleActivator(LogicalKeyboardKey.keyO): () =>
+          _actionShortcut(_ReviewAction.options),
       const SingleActivator(LogicalKeyboardKey.keyR): () =>
           _actionShortcut(_ReviewAction.replayAudio),
       const SingleActivator(LogicalKeyboardKey.f5): () =>
@@ -177,11 +198,61 @@ class _ReviewPageState extends State<ReviewPage> {
     };
   }
 
-  int? _currentNoteId() => switch (widget.controller.state) {
-    ReviewQuestion(:final card) => card.noteId,
-    ReviewAnswer(:final card) => card.noteId,
+  ReviewCard? _currentCard() => switch (widget.controller.state) {
+    ReviewQuestion(:final card) => card,
+    ReviewAnswer(:final card) => card,
     _ => null,
   };
+
+  int? _currentNoteId() => _currentCard()?.noteId;
+
+  Future<ReviewDeckOptionsTarget?> _chooseDeckOptionsTarget(
+    ReviewCard card,
+  ) async {
+    final studyDeckId = widget.studyDeckId;
+    if (studyDeckId == null) return null;
+
+    if (card.originalDeckId != 0) {
+      return ReviewDeckOptionsTarget(
+        deckId: card.storageDeckId,
+        filtered: true,
+      );
+    }
+    if (card.storageDeckId == studyDeckId) {
+      return ReviewDeckOptionsTarget(
+        deckId: card.storageDeckId,
+        filtered: false,
+      );
+    }
+
+    return showDialog<ReviewDeckOptionsTarget>(
+      context: context,
+      builder: (dialogContext) => SimpleDialog(
+        title: const Text('Which deck?'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(
+              ReviewDeckOptionsTarget(deckId: studyDeckId, filtered: false),
+            ),
+            child: const Text('Study Options'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(
+              ReviewDeckOptionsTarget(
+                deckId: card.storageDeckId,
+                filtered: false,
+              ),
+            ),
+            child: Text('${card.deckName} Options'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _setFlag(int flag) async {
     if (_manualActionInProgress || !widget.controller.supportsFlags) return;
@@ -356,6 +427,25 @@ class _ReviewPageState extends State<ReviewPage> {
             await widget.controller.setCurrentCardDueDate(days);
           }
           break;
+        case _ReviewAction.options:
+          final opener = widget.onOpenDeckOptions;
+          final card = _currentCard();
+          if (opener == null || card == null || widget.studyDeckId == null) return;
+          final target = await _chooseDeckOptionsTarget(card);
+          if (target == null) return;
+          final autoAdvanceWasEnabled = widget.controller.autoAdvanceEnabled;
+          if (autoAdvanceWasEnabled) {
+            await widget.controller.toggleAutoAdvance();
+          }
+          try {
+            await opener(target);
+            await widget.controller.refreshCurrentDeckSettings();
+          } finally {
+            if (autoAdvanceWasEnabled && !widget.controller.autoAdvanceEnabled) {
+              await widget.controller.toggleAutoAdvance();
+            }
+          }
+          break;
         case _ReviewAction.deleteNote:
           await widget.controller.deleteCurrentNote();
           break;
@@ -465,6 +555,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.event_outlined),
           title: Text('Set Due Date…'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.onOpenDeckOptions != null && widget.studyDeckId != null) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.options,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.settings_outlined),
+          title: Text('Options'),
         ),
       ),
       const PopupMenuDivider(),

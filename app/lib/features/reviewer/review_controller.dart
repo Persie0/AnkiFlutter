@@ -331,6 +331,72 @@ class ReviewController extends ChangeNotifier {
     }
   }
 
+  Future<void> refreshCurrentDeckSettings() async {
+    final current = _state;
+    final ReviewCard card;
+    final int generationId;
+    final bool answerSide;
+    final ReviewCardContent content;
+    final Object? answerError;
+    if (current is ReviewQuestion) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = false;
+      content = current.content;
+      answerError = null;
+    } else if (current is ReviewAnswer) {
+      card = current.card;
+      generationId = current.generationId;
+      answerSide = true;
+      content = current.content;
+      answerError = current.error;
+    } else {
+      return;
+    }
+
+    final settings = await _repository.settingsForDeck(card.currentDeckId);
+    if (!_isCurrentGeneration(generationId)) return;
+
+    final latest = _state;
+    final stillSameCard = switch (latest) {
+      ReviewQuestion(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when !answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
+      ReviewAnswer(
+        card: final latestCard,
+        generationId: final latestGeneration,
+      ) when answerSide =>
+        latestCard.cardId == card.cardId && latestGeneration == generationId,
+      _ => false,
+    };
+    if (!stillSameCard) return;
+
+    _autoAdvanceReminder = null;
+    if (answerSide) {
+      _setState(
+        ReviewAnswer(
+          card: card,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+          error: answerError,
+        ),
+      );
+    } else {
+      _setState(
+        ReviewQuestion(
+          card: card,
+          content: content,
+          settings: settings,
+          generationId: generationId,
+        ),
+      );
+    }
+    _scheduleAutoAdvanceForCurrentState();
+  }
+
   Future<void> rate(ReviewRating rating) async {
     final current = _state;
     if (current is! ReviewAnswer ||
