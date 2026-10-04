@@ -70,7 +70,9 @@ enum BackendOperation {
   extractClozeForTyping(69),
   removeNotes(70),
   scheduleCardsAsNew(71),
-  scheduleCardsAsNewDefaults(72);
+  scheduleCardsAsNewDefaults(72),
+  getConfigString(73),
+  setDueDate(74);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
