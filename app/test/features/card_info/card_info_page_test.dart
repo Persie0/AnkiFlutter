@@ -156,12 +156,20 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     expect(find.text('{"x":1}'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('Timing'), 300);
+    await tester.scrollUntilVisible(
+      find.text('Timing'),
+      300,
+      scrollable: find.byType(ListView),
+    );
     expect(find.text(formatCardInfoTimestamp(data.addedUnixSeconds)), findsOneWidget);
     expect(find.text('4.5s'), findsOneWidget);
     expect(find.text('54s'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('FSRS'), 300);
+    await tester.scrollUntilVisible(
+      find.text('FSRS'),
+      300,
+      scrollable: find.byType(ListView),
+    );
     expect(find.textContaining('12.50'), findsOneWidget);
     expect(find.textContaining('4.25'), findsOneWidget);
     expect(find.textContaining('91'), findsOneWidget);
@@ -171,7 +179,11 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('0.4000'), findsOneWidget);
 
-    await tester.scrollUntilVisible(find.text('Review history'), 300);
+    await tester.scrollUntilVisible(
+      find.text('Review history'),
+      300,
+      scrollable: find.byType(ListView),
+    );
     expect(find.text('Review'), findsOneWidget);
     expect(find.text('Unknown (99)'), findsOneWidget);
     expect(find.text('Button 3'), findsOneWidget);
@@ -216,7 +228,11 @@ void main() {
     expect(find.text('Due position'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
     expect(find.text('FSRS'), findsNothing);
-    await tester.scrollUntilVisible(find.text('Review history'), 300);
+    await tester.scrollUntilVisible(
+      find.text('Review history'),
+      300,
+      scrollable: find.byType(ListView),
+    );
     expect(find.text('No review history yet.'), findsOneWidget);
   });
 
@@ -255,11 +271,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('card-info-review-0')),
       600,
+      scrollable: find.byType(ListView),
     );
     expect(find.byKey(const ValueKey('card-info-review-0')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('card-info-review-199')),
       600,
+      scrollable: find.byType(ListView),
     );
     expect(find.byKey(const ValueKey('card-info-review-199')), findsOneWidget);
     expect(tester.takeException(), isNull);
