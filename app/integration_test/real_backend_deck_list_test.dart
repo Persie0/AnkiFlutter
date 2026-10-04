@@ -6,6 +6,7 @@ import 'package:anki_flutter/core/backend/anki_backend_client.dart';
 import 'package:anki_flutter/core/backend/generated/anki/backend.pb.dart';
 import 'package:anki_flutter/core/backend/native/ffi_native_anki_bindings.dart';
 import 'package:anki_flutter/core/backend/native/native_library_loader.dart';
+import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.dart';
 import 'package:anki_flutter/features/collection/collection_location.dart';
 import 'package:anki_flutter/features/collection/collection_session.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
@@ -107,10 +108,14 @@ void main() {
     );
 
     final browser = AnkiCardBrowserRepository(backend: client);
-    final resolvedNoteId = await browser.noteIdForCard(
-      browserResult.cards.single.cardId,
-    );
+    final cardId = browserResult.cards.single.cardId;
+    final resolvedNoteId = await browser.noteIdForCard(cardId);
     expect(resolvedNoteId, noteId);
+
+    final cardInfo = await AnkiCardInfoRepository(backend: client).load(cardId);
+    expect(cardInfo.cardId, cardId);
+    expect(cardInfo.noteId, noteId);
+    expect(cardInfo.deck, 'Default');
 
     final editableNote = await noteRepository.getNote(resolvedNoteId);
     editableNote.fields[0] = 'browser integration edited front';
