@@ -7,6 +7,7 @@ import 'package:anki_flutter/core/backend/generated/anki/card_rendering.pb.dart'
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
     as collection_pb;
+import 'package:anki_flutter/core/backend/generated/anki/config.pb.dart' as config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
     as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
@@ -33,6 +34,7 @@ class AnkiReviewRepository
         ReviewMarkRepository,
         ReviewDeleteNoteRepository,
         ReviewForgetCardRepository,
+        ReviewSetDueDateRepository,
         ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
@@ -186,6 +188,33 @@ class AnkiReviewRepository
     );
     await backend.invoke(
       BackendOperation.scheduleCardsAsNew,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<String> dueDateDefault() async {
+    final request = config_pb.GetConfigStringRequest(
+      key: config_pb.ConfigKey_String.SET_DUE_REVIEWER,
+    );
+    final response = await backend.invoke(
+      BackendOperation.getConfigString,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return generic_pb.String.fromBuffer(response).val;
+  }
+
+  @override
+  Future<void> setDueDate(ReviewCard card, String days) async {
+    final request = scheduler_pb.SetDueDateRequest(
+      cardIds: [Int64(card.cardId)],
+      days: days,
+      configKey: config_pb.OptionalStringConfigKey(
+        key: config_pb.ConfigKey_String.SET_DUE_REVIEWER,
+      ),
+    );
+    await backend.invoke(
+      BackendOperation.setDueDate,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
