@@ -81,6 +81,7 @@ class ReviewController extends ChangeNotifier {
   bool get supportsFlags => _repository is ReviewFlagRepository;
   bool get supportsMarking => _repository is ReviewMarkRepository;
   bool get supportsDeleteNote => _repository is ReviewDeleteNoteRepository;
+  bool get supportsForgetCard => _repository is ReviewForgetCardRepository;
   bool get currentMarked => _currentMarked;
   ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
   bool get hasTypedAnswerInput {
@@ -411,6 +412,22 @@ class ReviewController extends ChangeNotifier {
   Future<void> deleteCurrentNote() {
     if (_repository case final ReviewDeleteNoteRepository repository) {
       return _runCurrentCardAction(repository.deleteNote);
+    }
+    return Future<void>.value();
+  }
+
+  Future<ReviewForgetCardOptions> forgetCurrentCardDefaults() {
+    if (_repository case final ReviewForgetCardRepository repository) {
+      return repository.forgetCardDefaults();
+    }
+    return Future<ReviewForgetCardOptions>.error(
+      UnsupportedError('Forget card is not supported by this repository'),
+    );
+  }
+
+  Future<void> forgetCurrentCard(ReviewForgetCardOptions options) {
+    if (_repository case final ReviewForgetCardRepository repository) {
+      return _runCurrentCardAction((card) => repository.forgetCard(card, options));
     }
     return Future<void>.value();
   }

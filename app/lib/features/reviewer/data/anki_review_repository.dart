@@ -32,6 +32,7 @@ class AnkiReviewRepository
         ReviewFlagRepository,
         ReviewMarkRepository,
         ReviewDeleteNoteRepository,
+        ReviewForgetCardRepository,
         ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
@@ -149,6 +150,42 @@ class AnkiReviewRepository
     );
     await backend.invoke(
       BackendOperation.removeNotes,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<ReviewForgetCardOptions> forgetCardDefaults() async {
+    final request = scheduler_pb.ScheduleCardsAsNewDefaultsRequest(
+      context: scheduler_pb.ScheduleCardsAsNewRequest_Context.REVIEWER,
+    );
+    final response = await backend.invoke(
+      BackendOperation.scheduleCardsAsNewDefaults,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    final defaults = scheduler_pb.ScheduleCardsAsNewDefaultsResponse.fromBuffer(
+      response,
+    );
+    return ReviewForgetCardOptions(
+      restoreOriginalPosition: defaults.restorePosition,
+      resetRepetitionAndLapseCounts: defaults.resetCounts,
+    );
+  }
+
+  @override
+  Future<void> forgetCard(
+    ReviewCard card,
+    ReviewForgetCardOptions options,
+  ) async {
+    final request = scheduler_pb.ScheduleCardsAsNewRequest(
+      cardIds: [Int64(card.cardId)],
+      log: true,
+      restorePosition: options.restoreOriginalPosition,
+      resetCounts: options.resetRepetitionAndLapseCounts,
+      context: scheduler_pb.ScheduleCardsAsNewRequest_Context.REVIEWER,
+    );
+    await backend.invoke(
+      BackendOperation.scheduleCardsAsNew,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }

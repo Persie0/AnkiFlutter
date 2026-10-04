@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
@@ -13,6 +14,7 @@ enum _ReviewAction {
   editNote,
   setFlag,
   toggleMark,
+  forgetCard,
   deleteNote,
   undo,
   buryCard,
@@ -143,6 +145,11 @@ class _ReviewPageState extends State<ReviewPage> {
           _actionShortcut(_ReviewAction.seekAudioForward),
       const SingleActivator(LogicalKeyboardKey.digit8, shift: true): () =>
           _actionShortcut(_ReviewAction.toggleMark),
+      const SingleActivator(
+        LogicalKeyboardKey.keyN,
+        control: true,
+        alt: true,
+      ): () => _actionShortcut(_ReviewAction.forgetCard),
       if (Theme.of(context).platform == TargetPlatform.macOS)
         const SingleActivator(LogicalKeyboardKey.backspace, control: true): () =>
             _actionShortcut(_ReviewAction.deleteNote)
@@ -204,6 +211,62 @@ class _ReviewPageState extends State<ReviewPage> {
     ),
   );
 
+  Future<ReviewForgetCardOptions?> _chooseForgetCardOptions() async {
+    final defaults = await widget.controller.forgetCurrentCardDefaults();
+    if (!mounted) return null;
+    var restoreOriginalPosition = defaults.restoreOriginalPosition;
+    var resetRepetitionAndLapseCounts =
+        defaults.resetRepetitionAndLapseCounts;
+
+    return showDialog<ReviewForgetCardOptions>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('Forget card…'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: restoreOriginalPosition,
+                onChanged: (value) => setDialogState(
+                  () => restoreOriginalPosition =
+                      value ?? restoreOriginalPosition,
+                ),
+                title: const Text('Restore original position where possible'),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                value: resetRepetitionAndLapseCounts,
+                onChanged: (value) => setDialogState(
+                  () => resetRepetitionAndLapseCounts =
+                      value ?? resetRepetitionAndLapseCounts,
+                ),
+                title: const Text('Reset repetition and lapse counts'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(
+                ReviewForgetCardOptions(
+                  restoreOriginalPosition: restoreOriginalPosition,
+                  resetRepetitionAndLapseCounts:
+                      resetRepetitionAndLapseCounts,
+                ),
+              ),
+              child: const Text('Forget'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
@@ -232,6 +295,10 @@ class _ReviewPageState extends State<ReviewPage> {
           break;
         case _ReviewAction.toggleMark:
           await widget.controller.toggleCurrentMarked();
+          break;
+        case _ReviewAction.forgetCard:
+          final options = await _chooseForgetCardOptions();
+          if (options != null) await widget.controller.forgetCurrentCard(options);
           break;
         case _ReviewAction.deleteNote:
           await widget.controller.deleteCurrentNote();
@@ -320,6 +387,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.flag_outlined),
           title: Text('Set flag…'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.controller.supportsForgetCard) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.forgetCard,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.restart_alt),
+          title: Text('Forget card…'),
         ),
       ),
       const PopupMenuDivider(),

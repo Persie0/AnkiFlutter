@@ -79,6 +79,8 @@ void main() {
         'compareAnswer': 68,
         'extractClozeForTyping': 69,
         'removeNotes': 70,
+        'scheduleCardsAsNew': 71,
+        'scheduleCardsAsNewDefaults': 72,
       },
     );
 

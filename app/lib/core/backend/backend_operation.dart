@@ -68,7 +68,9 @@ enum BackendOperation {
   noteFieldsCheck(67),
   compareAnswer(68),
   extractClozeForTyping(69),
-  removeNotes(70);
+  removeNotes(70),
+  scheduleCardsAsNew(71),
+  scheduleCardsAsNewDefaults(72);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
