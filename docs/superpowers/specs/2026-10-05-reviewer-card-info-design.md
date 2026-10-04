@@ -115,7 +115,7 @@ Pinned Anki BackendStatsService.card_stats
 
 Generated protobuf objects must not become long-lived widget state. The repository maps `CardStatsResponse` into immutable app-level models that are straightforward to render and unit-test.
 
-Suggested model split:
+The app-level model split is:
 
 ```text
 CardInfoData
@@ -156,19 +156,25 @@ Add two Reviewer actions using the existing menu/shortcut architecture:
 - `Card Info` — `I`
 - `Previous Card Info` — `Ctrl+Alt+I`
 
-The Reviewer page should delegate navigation through a typed callback rather than directly constructing repository/backend dependencies, matching the existing navigation pattern used for other Reviewer-owned secondary screens.
+The Reviewer page delegates navigation through a typed callback rather than directly constructing repository/backend dependencies, matching the existing navigation pattern used for other Reviewer-owned secondary screens.
 
-The navigation request should contain the immutable target card ID and whether the request is current/previous only when needed for title/empty-state presentation. The Card Info page must not reach back into `ReviewController` to discover a different card after navigation has started.
+The navigation target captures:
 
-Both menu and keyboard paths must resolve through the same action handler.
+- source: current or previous;
+- target `cardId`, nullable only for the previous-card empty state;
+- the Reviewer generation/current-card identity needed for safe auto-advance restoration.
+
+The Card Info page must not reach back into `ReviewController` to discover a different card after navigation has started.
+
+Both menu and keyboard paths resolve through the same action handler.
 
 ## 9. Card Info UI
 
 Use one native Flutter `CardInfoPage` for current and previous cards.
 
-The page should be responsive and scrollable, suitable for phone-size through desktop-size windows. Do not reproduce a desktop-only fixed dialog layout.
+The page is responsive and scrollable, suitable for phone-size through desktop-size windows. Do not reproduce a desktop-only fixed dialog layout.
 
-Recommended presentation sections:
+Presentation sections are:
 
 ### Identity
 
@@ -182,7 +188,9 @@ Recommended presentation sections:
 
 ### Scheduling
 
-- Due date or due position, according to which backend field is present
+- Due Date when `due_date` is present;
+- otherwise Due Position when `due_position` is present;
+- omit the due row if neither is present;
 - Current interval
 - Ease
 - Review count
@@ -204,13 +212,13 @@ Show only fields the backend actually supplies:
 - stability/difficulty from memory state;
 - retrievability;
 - desired retention;
-- FSRS parameters only in an expandable/advanced details area if displaying the full list remains useful and readable.
+- FSRS parameters in a collapsed advanced/details section whenever the backend list is non-empty.
 
 Do not fabricate FSRS values for cards where they are absent.
 
 ### Review history
 
-Render all backend-provided `revlog` entries in reverse-chronological backend order without recalculating scheduling values. Each row should expose, where available:
+Render all backend-provided `revlog` entries in the order supplied by `CardStatsResponse`; do not sort or recalculate them in Flutter. Each row exposes, where available:
 
 - review time;
 - review kind;
@@ -223,7 +231,7 @@ Render all backend-provided `revlog` entries in reverse-chronological backend or
 
 On narrow screens, history rows may use stacked cards/list tiles. On wider screens, a compact table is acceptable. The information content must be equivalent.
 
-Dates/times should use the app's normal local-time formatting rather than raw Unix timestamps.
+Dates/times use the app's normal local-time formatting rather than raw Unix timestamps.
 
 ## 10. Loading, empty, and error states
 
@@ -251,17 +259,18 @@ Opening either Card Info action is a secondary Reviewer surface, not a queue tra
 
 Before opening it:
 
-1. suspend Reviewer auto-advance timers using the same lifecycle pattern as other Reviewer secondary screens;
-2. remember whether auto-advance was enabled;
-3. open Card Info for the captured target card ID.
+1. capture the current Reviewer generation and current card ID;
+2. suspend Reviewer auto-advance timers using the same lifecycle pattern as other Reviewer secondary screens;
+3. remember whether auto-advance was enabled;
+4. open Card Info for the captured target card ID.
 
 When Card Info closes:
 
 - do not fetch another card;
 - do not reveal/answer the card;
 - do not alter question/answer side;
-- restore auto-advance only if it was enabled before opening and the same Reviewer session/current-card context is still valid;
-- stale completion from an older Reviewer generation must not re-enable timers in a newer session.
+- restore auto-advance only if it was enabled before opening, the Reviewer generation is unchanged, and the current card ID still equals the captured current card ID;
+- otherwise leave auto-advance in the newer/current Reviewer state untouched.
 
 The page itself is read-only and therefore does not need a post-return deck/settings refresh.
 
@@ -269,7 +278,7 @@ The page itself is read-only and therefore does not need a post-return deck/sett
 
 Display values are presentation conversions only. Scheduling meaning always comes from the backend.
 
-Examples:
+Rules:
 
 - timestamps: backend Unix time -> local date/time;
 - durations: seconds -> concise human-readable time;
@@ -277,11 +286,11 @@ Examples:
 - intervals: use backend-provided interval values and a shared formatter; do not recompute intervals from dates;
 - enum review kinds: map known pinned enum values to readable labels and retain a safe fallback for future/unknown values.
 
-Formatting functions should be testable independently from widgets.
+Formatting functions are independently unit-testable and contain no backend calls.
 
 ## 13. Files/components expected to change
 
-Exact filenames may be adjusted during planning to fit existing conventions, but implementation should stay within these responsibilities:
+Exact filenames may be adjusted during planning to fit existing conventions, but implementation must stay within these responsibilities:
 
 ### Backend bridge
 
