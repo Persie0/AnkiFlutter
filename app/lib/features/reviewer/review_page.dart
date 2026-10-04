@@ -15,6 +15,7 @@ enum _ReviewAction {
   setFlag,
   toggleMark,
   forgetCard,
+  setDueDate,
   deleteNote,
   undo,
   buryCard,
@@ -150,6 +151,11 @@ class _ReviewPageState extends State<ReviewPage> {
         control: true,
         alt: true,
       ): () => _actionShortcut(_ReviewAction.forgetCard),
+      const SingleActivator(
+        LogicalKeyboardKey.keyD,
+        control: true,
+        shift: true,
+      ): () => _actionShortcut(_ReviewAction.setDueDate),
       if (Theme.of(context).platform == TargetPlatform.macOS)
         const SingleActivator(LogicalKeyboardKey.backspace, control: true): () =>
             _actionShortcut(_ReviewAction.deleteNote)
@@ -267,6 +273,53 @@ class _ReviewPageState extends State<ReviewPage> {
     );
   }
 
+  Future<String?> _chooseDueDate() async {
+    final defaultValue = await widget.controller.currentCardDueDateDefault();
+    if (!mounted) return null;
+    final textController = TextEditingController(text: defaultValue);
+    try {
+      return await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Set Due Date'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text('Show card in how many days?'),
+              const SizedBox(height: 8),
+              TextField(
+                controller: textController,
+                autofocus: true,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '0 = today\n'
+                '1! = tomorrow + change interval to 1\n'
+                '3-7 = random choice of 3-7 days',
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () =>
+                  Navigator.of(dialogContext).pop(textController.text),
+              child: const Text('Set'),
+            ),
+          ],
+        ),
+      );
+    } finally {
+      textController.dispose();
+    }
+  }
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
@@ -299,6 +352,12 @@ class _ReviewPageState extends State<ReviewPage> {
         case _ReviewAction.forgetCard:
           final options = await _chooseForgetCardOptions();
           if (options != null) await widget.controller.forgetCurrentCard(options);
+          break;
+        case _ReviewAction.setDueDate:
+          final days = await _chooseDueDate();
+          if (days != null && days.trim().isNotEmpty) {
+            await widget.controller.setCurrentCardDueDate(days);
+          }
           break;
         case _ReviewAction.deleteNote:
           await widget.controller.deleteCurrentNote();
@@ -398,6 +457,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.restart_alt),
           title: Text('Forget card…'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.controller.supportsSetDueDate) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.setDueDate,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.event_outlined),
+          title: Text('Set Due Date…'),
         ),
       ),
       const PopupMenuDivider(),
