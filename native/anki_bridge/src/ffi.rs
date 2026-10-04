@@ -306,10 +306,10 @@ pub unsafe extern "C" fn anki_bridge_destroy(handle: *mut BridgeBackend) {
 mod tests {
     use super::operation_from_id;
     use crate::operations::{
-        ADD_NOTE_TAGS, ALL_TAGS, COMPARE_ANSWER, EXTRACT_CLOZE_FOR_TYPING, GET_CONFIG_STRING,
-        GET_PREFERENCES, GRAPHS, NOTE_FIELDS_CHECK, REMOVE_NOTES, REMOVE_NOTE_TAGS,
-        SCHEDULE_CARDS_AS_NEW, SCHEDULE_CARDS_AS_NEW_DEFAULTS, SET_DECK, SET_DUE_DATE, SET_FLAG,
-        SET_PREFERENCES,
+        ADD_NOTE_TAGS, ALL_TAGS, CARD_STATS, COMPARE_ANSWER, EXTRACT_CLOZE_FOR_TYPING,
+        GET_CONFIG_STRING, GET_PREFERENCES, GRAPHS, NOTE_FIELDS_CHECK, REMOVE_NOTES,
+        REMOVE_NOTE_TAGS, SCHEDULE_CARDS_AS_NEW, SCHEDULE_CARDS_AS_NEW_DEFAULTS, SET_DECK,
+        SET_DUE_DATE, SET_FLAG, SET_PREFERENCES,
     };
 
     #[test]
@@ -333,7 +333,8 @@ mod tests {
         );
         assert_eq!(operation_from_id(73).unwrap(), GET_CONFIG_STRING);
         assert_eq!(operation_from_id(74).unwrap(), SET_DUE_DATE);
+        assert_eq!(operation_from_id(75).unwrap(), CARD_STATS);
         assert!(operation_from_id(0).is_err());
-        assert!(operation_from_id(75).is_err());
+        assert!(operation_from_id(76).is_err());
     }
 }
