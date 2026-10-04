@@ -8,6 +8,7 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/review_card_info_lifecycle.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -133,13 +134,17 @@ void main() {
 ReviewController _controller(
   _Repository repository, {
   _Timers? timers,
-}) => ReviewController(
-  repository: repository,
-  renderer: _Renderer(),
-  wallClockMillis: () => 100,
-  stopwatchFactory: Stopwatch.new,
-  timerFactory: timers?.call,
-);
+}) {
+  final controller = ReviewController(
+    repository: repository,
+    renderer: _Renderer(),
+    wallClockMillis: () => 100,
+    stopwatchFactory: Stopwatch.new,
+    timerFactory: timers?.call,
+  );
+  controller.enableCardInfoLifecycleTracking();
+  return controller;
+}
 
 ReviewCard _card(int id) => ReviewCard(
   cardId: id,
