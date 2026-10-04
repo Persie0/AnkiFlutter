@@ -24,10 +24,10 @@
 
 ## Review Focus
 
-1. **Deleted previous card:** a captured `previousCardId` may no longer exist; Card Info must show an unavailable/error state and never fall back to the current card. Test in Task 3 and Task 5.
+1. **Deleted previous card:** a captured `previousCardId` may no longer exist; Card Info must show an unavailable/error state and never fall back to the current card. Test in Task 4 and Task 5.
 2. **Stale secondary-surface return:** a Reviewer generation/card may change while Card Info is open; returning must not re-enable auto-advance on the newer card/session. Test in Task 3 and Task 5.
 3. **Absent protobuf optionals:** due date/position, original deck, review timestamps, memory state, retrievability, and desired retention must remain absent rather than render fake zero values. Test in Task 2 and Task 4.
-4. **Large/empty review history:** zero history rows and many rows must both render safely without changing backend order. Test in Task 4.
+4. **Large/empty review history:** zero history rows and 200 history rows must both render safely without changing backend order. Test in Task 4.
 5. **Unknown future review kind:** rendering must use a safe readable fallback instead of crashing on an unmapped enum value. Test formatter behavior in Task 2.
 
 ---
@@ -233,6 +233,7 @@ Assert:
 - after `start()`, current ID is first card and `previousCardId == null`;
 - after a successful answer advances to card B, `previousCardId == cardA.cardId`;
 - after another advance to card C, previous becomes B, not A;
+- an advancing delete/mutation retains the outgoing card ID as previous even though later Card Stats may report that card unavailable;
 - existing advancing actions use the same `_loadNextCard()` behavior and capture the outgoing card;
 - a fresh `start()` clears previous state from the old session;
 - a failed/stale next-card load does not install a misleading previous ID.
@@ -297,7 +298,9 @@ git commit -m "feat: track reviewer card info targets [skip ci]"
 Assert:
 
 - non-null `cardId` starts loading exactly once;
+- current kind uses title `Card Info` and previous kind uses title `Previous Card Info`;
 - `cardId == null && kind == CardInfoKind.previous` shows `No previous card available` and never calls the repository;
+- a backend/not-found failure for a non-null previous ID shows that captured card's information as unavailable and never switches to a different ID/current card;
 - load error renders an unavailable/error message plus `Retry`;
 - tapping Retry invokes the same captured card ID again;
 - completing a request after widget disposal produces no exception/state update.
@@ -312,8 +315,9 @@ With a representative `CardInfoData`, assert visible sections/values for:
 - added/first/latest review/average/total time;
 - FSRS stability/difficulty/retrievability/desired retention only when present;
 - FSRS parameters in an expandable advanced area;
+- absent optional fields do not display fabricated zero values;
 - empty review history state;
-- multiple history entries in backend order, including unknown review-kind fallback.
+- 200 history entries render in backend order, including an unknown review-kind fallback.
 
 - [ ] **Step 3: Write responsive-layout test**
 
@@ -369,6 +373,7 @@ Assert:
 - `I` calls opener with current card ID and `CardInfoKind.current`;
 - `Ctrl+Alt+I` calls opener with captured `previousCardId` and `CardInfoKind.previous`;
 - previous action still opens with `cardId == null` on the first card so the dedicated empty page can render;
+- after an advancing delete/mutation, Previous Card Info passes the deleted outgoing ID unchanged rather than falling back to current;
 - both menu and shortcut routes use the same typed target semantics.
 
 - [ ] **Step 2: Write failing lifecycle/navigation tests**
@@ -434,17 +439,40 @@ git commit -m "feat: add reviewer card info actions [skip ci]"
 
 ---
 
-### Task 6: Validate exact implementation tree publicly and finalize stacked PR
+### Task 6: Add real-backend Card Stats smoke coverage, validate exact tree, and finalize stacked PR
 
 **Files:**
-- No production changes unless validation exposes a real defect.
-- If a fix is required, modify only the owning task's files and add/adjust the regression test that reproduces the failure.
+- Modify: `app/integration_test/real_backend_deck_list_test.dart`
+- No other production changes unless validation exposes a real defect.
 
 **Interfaces:**
-- Consumes: completed Tasks 1–5.
-- Produces: one exact implementation SHA proven green in public validation, then a tree-identical `[skip ci]` head if needed, and a stacked PR against `feat/reviewer-delete-note`.
+- Consumes: completed Tasks 1–5 and existing real-backend collection/note/card setup.
+- Produces: direct real-backend proof that operation 75 returns Card Stats, one exact implementation SHA proven green in public validation, then a tree-identical `[skip ci]` head if needed, and a stacked PR against `feat/reviewer-delete-note`.
 
-- [ ] **Step 1: Run local/focused verification commands available in the execution environment**
+- [ ] **Step 1: Add real-backend Card Stats assertion**
+
+In the existing real-backend integration flow that creates a note and resolves its card ID, instantiate `AnkiCardInfoRepository(backend: client)`, call `load(resolvedCardId)`, and assert at minimum:
+
+```text
+info.cardId == resolvedCardId
+info.noteId == noteId
+info.deck == "Default"
+```
+
+This test must use the native bridge/client, not a fake `BackendInvoker`.
+
+- [ ] **Step 2: Run focused real-backend test when native library is available**
+
+Run the existing integration-test command used by the public real-backend workflow with `ANKIFLUTTER_NATIVE_LIB` configured. Expected: PASS and operation 75 exercised end-to-end.
+
+- [ ] **Step 3: Commit integration coverage**
+
+```bash
+git add app/integration_test/real_backend_deck_list_test.dart
+git commit -m "test: cover card stats on real backend [skip ci]"
+```
+
+- [ ] **Step 4: Run local/focused verification commands available in the execution environment**
 
 At minimum:
 
@@ -456,15 +484,15 @@ cd native/anki_bridge && cargo fmt --check && cargo clippy --all-targets -- -D w
 
 Expected: all PASS.
 
-- [ ] **Step 2: Public focused RED/GREEN provenance**
+- [ ] **Step 5: Public focused RED/GREEN provenance**
 
 Preserve the already-created RED commit when practical, then validate the implementation SHA in `Persie0/Playground` with the established focused Reviewer/Card Info workflow. Expected: analyzer + focused tests PASS.
 
-- [ ] **Step 3: Public full Flutter validation**
+- [ ] **Step 6: Public full Flutter validation**
 
 Run the existing full Flutter public workflow against the same implementation SHA. Expected: analyzer and complete Flutter test suite PASS.
 
-- [ ] **Step 4: Public cross-platform validation**
+- [ ] **Step 7: Public cross-platform validation**
 
 Run the established cross-platform public workflow against the same implementation SHA and require PASS for:
 
@@ -474,20 +502,20 @@ Rust fmt / strict Clippy / Rust tests
 Flutter analyze / full tests
 Linux bridge + app
 Android APK
-real-backend integration
+real-backend integration including operation 75 Card Stats
 iOS bridge + simulator app
 macOS bridge + app
 Windows bridge + app
 ```
 
-- [ ] **Step 5: Self-review base-to-head diff**
+- [ ] **Step 8: Self-review base-to-head diff**
 
 Compare against `feat/reviewer-delete-note` and confirm only the Card Info bridge/data/UI/controller/navigation/tests plus approved docs changed. Specifically verify no operation renumbering, no protobuf schema changes, and no unrelated Reviewer behavior changes.
 
-- [ ] **Step 6: Finalize without private CI**
+- [ ] **Step 9: Finalize without private CI**
 
 If the validated implementation head itself is not already `[skip ci]`, create a tree-identical final `[skip ci]` commit. Verify the final tree SHA is identical to the publicly validated implementation tree and verify no private AnkiFlutter workflow ran on the final head.
 
-- [ ] **Step 7: Open stacked PR**
+- [ ] **Step 10: Open stacked PR**
 
 Open `feat/reviewer-card-info` against `feat/reviewer-delete-note`, include the exact public run IDs and validated SHA/tree in the PR body, verify mergeability/review threads, and merge only when clean under the user's standing merge-if-OK instruction.
