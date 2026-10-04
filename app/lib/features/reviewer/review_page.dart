@@ -1,7 +1,9 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
+import 'package:anki_flutter/features/reviewer/review_card_info_lifecycle.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
 import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
@@ -13,6 +15,7 @@ typedef ReviewNoteEditor = Future<bool> Function(int noteId);
 typedef ReviewDeckOptionsOpener = Future<void> Function(
   ReviewDeckOptionsTarget target,
 );
+typedef ReviewCardInfoOpener = Future<void> Function(ReviewCardInfoTarget target);
 
 final class ReviewDeckOptionsTarget {
   const ReviewDeckOptionsTarget({
@@ -24,6 +27,13 @@ final class ReviewDeckOptionsTarget {
   final bool filtered;
 }
 
+final class ReviewCardInfoTarget {
+  const ReviewCardInfoTarget({required this.kind, required this.cardId});
+
+  final CardInfoKind kind;
+  final int? cardId;
+}
+
 enum _ReviewAction {
   editNote,
   setFlag,
@@ -31,6 +41,8 @@ enum _ReviewAction {
   forgetCard,
   setDueDate,
   options,
+  cardInfo,
+  previousCardInfo,
   deleteNote,
   undo,
   buryCard,
@@ -53,6 +65,7 @@ class ReviewPage extends StatefulWidget {
     this.onEditNote,
     this.studyDeckId,
     this.onOpenDeckOptions,
+    this.onOpenCardInfo,
     super.key,
   });
 
@@ -63,6 +76,7 @@ class ReviewPage extends StatefulWidget {
   final ReviewNoteEditor? onEditNote;
   final int? studyDeckId;
   final ReviewDeckOptionsOpener? onOpenDeckOptions;
+  final ReviewCardInfoOpener? onOpenCardInfo;
 
   @override
   State<ReviewPage> createState() => _ReviewPageState();
@@ -76,6 +90,7 @@ class _ReviewPageState extends State<ReviewPage> {
   @override
   void initState() {
     super.initState();
+    widget.controller.enableCardInfoLifecycleTracking();
     _typedAnswerFocusNode.addListener(_onTypedAnswerFocusChanged);
   }
 
@@ -155,6 +170,13 @@ class _ReviewPageState extends State<ReviewPage> {
           _actionShortcut(_ReviewAction.editNote),
       const SingleActivator(LogicalKeyboardKey.keyO): () =>
           _actionShortcut(_ReviewAction.options),
+      const SingleActivator(
+        LogicalKeyboardKey.keyI,
+        control: true,
+        alt: true,
+      ): () => _actionShortcut(_ReviewAction.previousCardInfo),
+      const SingleActivator(LogicalKeyboardKey.keyI): () =>
+          _actionShortcut(_ReviewAction.cardInfo),
       const SingleActivator(LogicalKeyboardKey.keyR): () =>
           _actionShortcut(_ReviewAction.replayAudio),
       const SingleActivator(LogicalKeyboardKey.f5): () =>
@@ -388,6 +410,24 @@ class _ReviewPageState extends State<ReviewPage> {
     );
   }
 
+  Future<void> _openCardInfo(CardInfoKind kind) async {
+    final opener = widget.onOpenCardInfo;
+    if (opener == null) return;
+    final target = ReviewCardInfoTarget(
+      kind: kind,
+      cardId: kind == CardInfoKind.current
+          ? widget.controller.currentCardId
+          : widget.controller.previousCardId,
+    );
+    final token = widget.controller.pauseForSecondarySurface();
+    if (token == null) return;
+    try {
+      await opener(target);
+    } finally {
+      widget.controller.resumeAfterSecondarySurface(token);
+    }
+  }
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
@@ -445,6 +485,12 @@ class _ReviewPageState extends State<ReviewPage> {
               await widget.controller.toggleAutoAdvance();
             }
           }
+          break;
+        case _ReviewAction.cardInfo:
+          await _openCardInfo(CardInfoKind.current);
+          break;
+        case _ReviewAction.previousCardInfo:
+          await _openCardInfo(CardInfoKind.previous);
           break;
         case _ReviewAction.deleteNote:
           await widget.controller.deleteCurrentNote();
@@ -566,6 +612,25 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.settings_outlined),
           title: Text('Options'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.onOpenCardInfo != null) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.cardInfo,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.info_outline),
+          title: Text('Card Info'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _ReviewAction.previousCardInfo,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.history),
+          title: Text('Previous Card Info'),
         ),
       ),
       const PopupMenuDivider(),
