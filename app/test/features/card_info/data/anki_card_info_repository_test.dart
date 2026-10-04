@@ -90,7 +90,10 @@ void main() {
     expect(result.memoryState?.difficulty, closeTo(4.25, 0.001));
     expect(result.retrievability, closeTo(0.91, 0.001));
     expect(result.desiredRetention, closeTo(0.9, 0.001));
-    expect(result.fsrsParameters, [0.4, 1.2, 3.5]);
+    expect(result.fsrsParameters, hasLength(3));
+    expect(result.fsrsParameters[0], closeTo(0.4, 0.000001));
+    expect(result.fsrsParameters[1], closeTo(1.2, 0.000001));
+    expect(result.fsrsParameters[2], closeTo(3.5, 0.000001));
 
     expect(result.reviewHistory, hasLength(2));
     expect(result.reviewHistory[0].unixSeconds, 1_700_001_000);
