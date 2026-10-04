@@ -276,48 +276,45 @@ class _ReviewPageState extends State<ReviewPage> {
   Future<String?> _chooseDueDate() async {
     final defaultValue = await widget.controller.currentCardDueDateDefault();
     if (!mounted) return null;
-    final textController = TextEditingController(text: defaultValue);
-    try {
-      return await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Set Due Date'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text('Show card in how many days?'),
-              const SizedBox(height: 8),
-              TextField(
-                controller: textController,
-                autofocus: true,
-                textInputAction: TextInputAction.done,
-                onSubmitted: (value) => Navigator.of(dialogContext).pop(value),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                '0 = today\n'
-                '1! = tomorrow + change interval to 1\n'
-                '3-7 = random choice of 3-7 days',
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
+    var value = defaultValue;
+    return showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Set Due Date'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Show card in how many days?'),
+            const SizedBox(height: 8),
+            TextFormField(
+              initialValue: defaultValue,
+              autofocus: true,
+              textInputAction: TextInputAction.done,
+              onChanged: (text) => value = text,
+              onFieldSubmitted: (text) =>
+                  Navigator.of(dialogContext).pop(text),
             ),
-            FilledButton(
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(textController.text),
-              child: const Text('Set'),
+            const SizedBox(height: 8),
+            const Text(
+              '0 = today\n'
+              '1! = tomorrow + change interval to 1\n'
+              '3-7 = random choice of 3-7 days',
             ),
           ],
         ),
-      );
-    } finally {
-      textController.dispose();
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(value),
+            child: const Text('Set'),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _runReviewAction(_ReviewAction action) async {
