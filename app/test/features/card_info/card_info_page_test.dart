@@ -159,7 +159,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Timing'),
       300,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.text(formatCardInfoTimestamp(data.addedUnixSeconds)), findsOneWidget);
     expect(find.text('4.5s'), findsOneWidget);
@@ -168,7 +168,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('FSRS'),
       300,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.textContaining('12.50'), findsOneWidget);
     expect(find.textContaining('4.25'), findsOneWidget);
@@ -182,7 +182,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Review history'),
       300,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.text('Review'), findsOneWidget);
     expect(find.text('Unknown (99)'), findsOneWidget);
@@ -231,7 +231,7 @@ void main() {
     await tester.scrollUntilVisible(
       find.text('Review history'),
       300,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.text('No review history yet.'), findsOneWidget);
   });
@@ -271,13 +271,13 @@ void main() {
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('card-info-review-0')),
       600,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.byKey(const ValueKey('card-info-review-0')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('card-info-review-199')),
       600,
-      scrollable: find.byType(ListView),
+      scrollable: _cardInfoScrollable(),
     );
     expect(find.byKey(const ValueKey('card-info-review-199')), findsOneWidget);
     expect(tester.takeException(), isNull);
@@ -303,6 +303,11 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 }
+
+Finder _cardInfoScrollable() => find.descendant(
+  of: find.byType(ListView),
+  matching: find.byType(Scrollable),
+);
 
 Widget _app(Widget child) => MaterialApp(home: child);
 
