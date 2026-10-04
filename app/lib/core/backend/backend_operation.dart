@@ -72,7 +72,8 @@ enum BackendOperation {
   scheduleCardsAsNew(71),
   scheduleCardsAsNewDefaults(72),
   getConfigString(73),
-  setDueDate(74);
+  setDueDate(74),
+  cardStats(75);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
