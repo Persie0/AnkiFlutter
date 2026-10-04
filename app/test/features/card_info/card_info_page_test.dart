@@ -304,10 +304,7 @@ void main() {
   });
 }
 
-Finder _cardInfoScrollable() => find.descendant(
-  of: find.byType(ListView),
-  matching: find.byType(Scrollable),
-);
+Finder _cardInfoScrollable() => find.byType(Scrollable).first;
 
 Widget _app(Widget child) => MaterialApp(home: child);
 
