@@ -82,6 +82,7 @@ class ReviewController extends ChangeNotifier {
   bool get supportsMarking => _repository is ReviewMarkRepository;
   bool get supportsDeleteNote => _repository is ReviewDeleteNoteRepository;
   bool get supportsForgetCard => _repository is ReviewForgetCardRepository;
+  bool get supportsSetDueDate => _repository is ReviewSetDueDateRepository;
   bool get currentMarked => _currentMarked;
   ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
   bool get hasTypedAnswerInput {
@@ -428,6 +429,22 @@ class ReviewController extends ChangeNotifier {
   Future<void> forgetCurrentCard(ReviewForgetCardOptions options) {
     if (_repository case final ReviewForgetCardRepository repository) {
       return _runCurrentCardAction((card) => repository.forgetCard(card, options));
+    }
+    return Future<void>.value();
+  }
+
+  Future<String> currentCardDueDateDefault() {
+    if (_repository case final ReviewSetDueDateRepository repository) {
+      return repository.dueDateDefault();
+    }
+    return Future<String>.error(
+      UnsupportedError('Set due date is not supported by this repository'),
+    );
+  }
+
+  Future<void> setCurrentCardDueDate(String days) {
+    if (_repository case final ReviewSetDueDateRepository repository) {
+      return _runCurrentCardAction((card) => repository.setDueDate(card, days));
     }
     return Future<void>.value();
   }

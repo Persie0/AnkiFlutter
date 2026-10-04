@@ -223,6 +223,12 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendSchedulerService",
         "schedule_cards_as_new_defaults",
     ),
+    (
+        "GET_CONFIG_STRING",
+        "BackendConfigService",
+        "get_config_string",
+    ),
+    ("SET_DUE_DATE", "BackendSchedulerService", "set_due_date"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

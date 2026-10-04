@@ -79,6 +79,12 @@ abstract interface class ReviewForgetCardRepository {
   );
 }
 
+abstract interface class ReviewSetDueDateRepository {
+  Future<String> dueDateDefault();
+
+  Future<void> setDueDate(ReviewCard card, String days);
+}
+
 abstract interface class ReviewTypedAnswerRepository {
   Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,
