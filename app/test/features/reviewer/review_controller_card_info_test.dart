@@ -8,7 +8,6 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_counts.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
 import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
-import 'package:anki_flutter/features/reviewer/reviewer.dart';
 import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
