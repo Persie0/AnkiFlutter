@@ -31,7 +31,7 @@ void main() {
   testWidgets('current Card Info loads captured card exactly once', (
     tester,
   ) async {
-    final repository = _QueueRepository([Future.value(_data())]);
+    final repository = _QueueRepository([() async => _data()]);
 
     await tester.pumpWidget(
       _app(
@@ -59,8 +59,8 @@ void main() {
     tester,
   ) async {
     final repository = _QueueRepository([
-      Future<CardInfoData>.error(StateError('card was deleted')),
-      Future.value(_data()),
+      () async => throw StateError('card was deleted'),
+      () async => _data(),
     ]);
 
     await tester.pumpWidget(
@@ -89,7 +89,7 @@ void main() {
     tester,
   ) async {
     final completer = Completer<CardInfoData>();
-    final repository = _QueueRepository([completer.future]);
+    final repository = _QueueRepository([() => completer.future]);
 
     await tester.pumpWidget(
       _app(
@@ -135,7 +135,7 @@ void main() {
         ),
       ],
     );
-    final repository = _QueueRepository([Future.value(data)]);
+    final repository = _QueueRepository([() async => data]);
 
     await tester.pumpWidget(
       _app(
@@ -156,12 +156,12 @@ void main() {
     expect(find.text('2'), findsOneWidget);
     expect(find.text('{"x":1}'), findsOneWidget);
 
-    expect(find.text('Timing'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Timing'), 300);
     expect(find.text(formatCardInfoTimestamp(data.addedUnixSeconds)), findsOneWidget);
     expect(find.text('4.5s'), findsOneWidget);
     expect(find.text('54s'), findsOneWidget);
 
-    expect(find.text('FSRS'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('FSRS'), 300);
     expect(find.textContaining('12.50'), findsOneWidget);
     expect(find.textContaining('4.25'), findsOneWidget);
     expect(find.textContaining('91'), findsOneWidget);
@@ -171,7 +171,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('0.4000'), findsOneWidget);
 
-    expect(find.text('Review history'), findsOneWidget);
+    await tester.scrollUntilVisible(find.text('Review history'), 300);
     expect(find.text('Review'), findsOneWidget);
     expect(find.text('Unknown (99)'), findsOneWidget);
     expect(find.text('Button 3'), findsOneWidget);
@@ -200,7 +200,7 @@ void main() {
       fsrsParameters: const [],
       reviewHistory: const [],
     );
-    final repository = _QueueRepository([Future.value(data)]);
+    final repository = _QueueRepository([() async => data]);
 
     await tester.pumpWidget(
       _app(
@@ -216,6 +216,7 @@ void main() {
     expect(find.text('Due position'), findsOneWidget);
     expect(find.text('42'), findsOneWidget);
     expect(find.text('FSRS'), findsNothing);
+    await tester.scrollUntilVisible(find.text('Review history'), 300);
     expect(find.text('No review history yet.'), findsOneWidget);
   });
 
@@ -235,7 +236,7 @@ void main() {
         ),
     ];
     final repository = _QueueRepository([
-      Future.value(_data(history: history)),
+      () async => _data(history: history),
     ]);
     await tester.binding.setSurfaceSize(const Size(360, 800));
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -251,6 +252,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey('card-info-review-0')),
+      600,
+    );
     expect(find.byKey(const ValueKey('card-info-review-0')), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey('card-info-review-199')),
@@ -263,7 +268,7 @@ void main() {
   testWidgets('wide Card Info layout renders without overflow', (tester) async {
     await tester.binding.setSurfaceSize(const Size(1200, 900));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final repository = _QueueRepository([Future.value(_data())]);
+    final repository = _QueueRepository([() async => _data()]);
 
     await tester.pumpWidget(
       _app(
@@ -313,13 +318,13 @@ CardInfoData _data({List<CardReviewHistoryEntry> history = const []}) =>
 final class _QueueRepository implements CardInfoRepository {
   _QueueRepository(this.responses);
 
-  final List<Future<CardInfoData>> responses;
+  final List<Future<CardInfoData> Function()> responses;
   final cardIds = <int>[];
   var _index = 0;
 
   @override
   Future<CardInfoData> load(int cardId) {
     cardIds.add(cardId);
-    return responses[_index++];
+    return responses[_index++]();
   }
 }
