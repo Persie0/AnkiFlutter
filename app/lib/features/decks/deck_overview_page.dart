@@ -138,6 +138,10 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 controller: controller,
                 mediaBaseUri: widget.mediaBaseUri,
                 onEditNote: widget.backend == null ? null : _editReviewNote,
+                studyDeckId: widget.deck.id,
+                onOpenDeckOptions: widget.backend == null
+                    ? null
+                    : _openReviewDeckOptions,
                 onFinished: () {
                   unawaited(widget.onChanged?.call());
                   Navigator.of(context).maybePop();
@@ -167,6 +171,30 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       ),
     );
     return saved == true;
+  }
+
+  Future<void> _openReviewDeckOptions(ReviewDeckOptionsTarget target) async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    if (target.filtered) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Filtered deck configuration is not available yet.'),
+          ),
+        );
+      }
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeckOptionsPage(
+          deckId: target.deckId,
+          repository: AnkiDeckOptionsRepository(backend: backend),
+          onChanged: widget.onChanged,
+        ),
+      ),
+    );
   }
 
   Future<void> _addNote() async {
