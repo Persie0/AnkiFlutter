@@ -68,6 +68,9 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   bool _recording = false;
   bool _disposed = false;
   int _pathSequence = 0;
+  int _activeOperations = 0;
+  Completer<void>? _operationsIdleCompleter;
+  Future<void>? _disposeFuture;
 
   @override
   bool get isRecording => _recording;
@@ -76,19 +79,28 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   Stream<Duration> get elapsedChanges => _elapsedController.stream;
 
   @override
-  Future<bool> ensurePermission() async {
+  Future<bool> ensurePermission() {
     _ensureUsable();
-    return _recorder.hasPermission();
+    return _runOperation(_recorder.hasPermission);
   }
 
   @override
-  Future<void> start() async {
+  Future<void> start() {
     _ensureUsable();
     if (_recording) {
-      throw StateError('A Reviewer voice recording is already active.');
+      return Future<void>.error(
+        StateError('A Reviewer voice recording is already active.'),
+      );
+    }
+    return _runOperation(_startInternal);
+  }
+
+  Future<void> _startInternal() async {
+    final directory = await _tempDirectoryProvider();
+    if (_disposed) {
+      throw StateError('The Reviewer voice recorder has been disposed.');
     }
 
-    final directory = await _tempDirectoryProvider();
     final path = _nextRecordingPath(directory);
     try {
       await _recorder.start(
@@ -120,10 +132,13 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   }
 
   @override
-  Future<Uri?> stop() async {
+  Future<Uri?> stop() {
     _ensureUsable();
-    if (!_recording) return null;
+    if (!_recording) return Future<Uri?>.value();
+    return _runOperation(_stopInternal);
+  }
 
+  Future<Uri?> _stopInternal() async {
     _clearActiveState();
     final path = await _recorder.stop();
     if (path == null || path.isEmpty) return null;
@@ -131,21 +146,33 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   }
 
   @override
-  Future<void> cancel() async {
+  Future<void> cancel() {
     _ensureUsable();
-    if (!_recording) return;
+    if (!_recording) return Future<void>.value();
+    return _runOperation(_cancelInternal);
+  }
 
+  Future<void> _cancelInternal() async {
     _clearActiveState();
     await _recorder.cancel();
   }
 
   @override
-  Future<void> dispose() async {
-    if (_disposed) return;
+  Future<void> dispose() {
+    final existing = _disposeFuture;
+    if (existing != null) return existing;
+    final future = _disposeInternal();
+    _disposeFuture = future;
+    return future;
+  }
+
+  Future<void> _disposeInternal() async {
     _disposed = true;
 
     final wasRecording = _recording;
     _clearActiveState();
+    await _waitForActiveOperations();
+
     if (wasRecording) {
       try {
         await _recorder.cancel();
@@ -157,8 +184,34 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
     try {
       await _recorder.dispose();
     } finally {
-      await _elapsedController.close();
+      if (!_elapsedController.isClosed) {
+        await _elapsedController.close();
+      }
     }
+  }
+
+  Future<T> _runOperation<T>(Future<T> Function() operation) async {
+    if (_activeOperations == 0) {
+      _operationsIdleCompleter = Completer<void>();
+    }
+    _activeOperations += 1;
+    try {
+      return await operation();
+    } finally {
+      _activeOperations -= 1;
+      if (_activeOperations == 0) {
+        final idle = _operationsIdleCompleter;
+        _operationsIdleCompleter = null;
+        if (idle != null && !idle.isCompleted) {
+          idle.complete();
+        }
+      }
+    }
+  }
+
+  Future<void> _waitForActiveOperations() {
+    if (_activeOperations == 0) return Future<void>.value();
+    return _operationsIdleCompleter!.future;
   }
 
   String _nextRecordingPath(Directory directory) {
