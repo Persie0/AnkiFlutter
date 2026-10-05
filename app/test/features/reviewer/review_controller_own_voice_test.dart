@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
@@ -171,9 +172,9 @@ void main() {
 
   test('stop exception preserves previous successful recording', () async {
     final first = Uri.file('/tmp/voice-1.wav');
-    final failingStop = Future<Uri?>.error(StateError('stop failed'));
+    final failingStop = Completer<Uri?>();
     final recorder = _VoiceRecorder(
-      stopResults: [Future.value(first), failingStop],
+      stopResults: [Future.value(first), failingStop.future],
     );
     final audio = _Audio();
     final controller = _controller(voiceRecorder: recorder, audio: audio);
@@ -182,7 +183,9 @@ void main() {
     await controller.beginOwnVoiceRecording();
     await controller.stopOwnVoiceRecording();
     await controller.beginOwnVoiceRecording();
-    await expectLater(controller.stopOwnVoiceRecording(), throwsStateError);
+    final stop = controller.stopOwnVoiceRecording();
+    failingStop.completeError(StateError('stop failed'));
+    await expectLater(stop, throwsStateError);
 
     audio.oneShots.clear();
     expect(await controller.replayOwnVoice(), isTrue);
@@ -436,12 +439,12 @@ class _Repository implements ReviewRepository {
 
 class _Renderer implements CardRenderRepository {
   @override
-  Future<ReviewCardContent> render(int cardId) async => const ReviewCardContent(
+  Future<ReviewCardContent> render(int cardId) async => ReviewCardContent(
     questionHtml: 'Question',
     answerHtml: 'Answer',
     css: '',
-    questionAudio: [],
-    answerAudio: [],
+    questionAudio: const [],
+    answerAudio: const [],
   );
 }
 
