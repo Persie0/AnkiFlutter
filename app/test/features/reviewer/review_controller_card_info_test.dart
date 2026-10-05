@@ -33,6 +33,22 @@ void main() {
     expect(controller.previousCardId, 2);
   });
 
+  test('same-card repeat still becomes the previous card', () async {
+    final repository = _Repository([_card(1), _card(1)]);
+    final controller = _controller(repository);
+    addTearDown(controller.dispose);
+
+    await controller.start(7);
+    expect(controller.currentCardId, 1);
+    expect(controller.previousCardId, isNull);
+
+    await controller.showAnswer();
+    await controller.rate(ReviewRating.good);
+
+    expect(controller.currentCardId, 1);
+    expect(controller.previousCardId, 1);
+  });
+
   test('advancing manual actions use the same previous-card semantics', () async {
     final repository = _Repository([_card(10), _card(20)]);
     final controller = _controller(repository);
