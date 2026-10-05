@@ -154,6 +154,7 @@ class _FakePlayerAdapter implements ReviewAudioPlayerAdapter {
     openedQueues.add(List<Uri>.from(items));
   }
 
+  @override
   Future<void> openOneShot(Uri item) async {
     openedOneShots.add(item);
   }
