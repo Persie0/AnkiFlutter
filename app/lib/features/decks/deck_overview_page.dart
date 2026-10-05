@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
+import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.dart';
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
@@ -142,6 +144,9 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 onOpenDeckOptions: widget.backend == null
                     ? null
                     : _openReviewDeckOptions,
+                onOpenCardInfo: widget.backend == null
+                    ? null
+                    : _openReviewCardInfo,
                 onFinished: () {
                   unawaited(widget.onChanged?.call());
                   Navigator.of(context).maybePop();
@@ -192,6 +197,20 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
           deckId: target.deckId,
           repository: AnkiDeckOptionsRepository(backend: backend),
           onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReviewCardInfo(ReviewCardInfoTarget target) async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CardInfoPage(
+          repository: AnkiCardInfoRepository(backend: backend),
+          cardId: target.cardId,
+          kind: target.kind,
         ),
       ),
     );

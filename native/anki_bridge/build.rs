@@ -229,6 +229,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "get_config_string",
     ),
     ("SET_DUE_DATE", "BackendSchedulerService", "set_due_date"),
+    ("CARD_STATS", "BackendStatsService", "card_stats"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

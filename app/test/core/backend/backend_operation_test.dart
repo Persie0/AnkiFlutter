@@ -83,6 +83,7 @@ void main() {
         'scheduleCardsAsNewDefaults': 72,
         'getConfigString': 73,
         'setDueDate': 74,
+        'cardStats': 75,
       },
     );
 

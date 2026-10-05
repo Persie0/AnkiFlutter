@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
@@ -62,6 +63,49 @@ void main() {
     await tester.pumpAndSettle();
     expect(repository.buriedCardIds, [1]);
     expect(find.text('Second'), findsOneWidget);
+  });
+
+  testWidgets('Card Info shortcuts match pinned Anki reviewer bindings', (
+    tester,
+  ) async {
+    final repository = _Repository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer(),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    addTearDown(controller.dispose);
+    await controller.start(7);
+    final targets = <ReviewCardInfoTarget>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onOpenCardInfo: (target) async => targets.add(target),
+          onFinished: () {},
+          cardSurfaceBuilder: (_, _) => const Text('Card'),
+        ),
+      ),
+    );
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.pumpAndSettle();
+    expect(targets, hasLength(1));
+    expect(targets.first.kind, CardInfoKind.current);
+    expect(targets.first.cardId, 1);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(targets, hasLength(2));
+    expect(targets.last.kind, CardInfoKind.previous);
+    expect(targets.last.cardId, isNull);
   });
 
   testWidgets('undo bury-note and suspend shortcuts are wired', (tester) async {
