@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:anki_flutter/features/reviewer/audio/record_review_voice_recorder.dart';
