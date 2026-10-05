@@ -77,7 +77,7 @@ void main() {
     expect(recorder.startCalls, 1);
 
     recorder.emitElapsed(const Duration(seconds: 3));
-    await tester.pump();
+    await tester.pumpAndSettle();
     expect(find.text('0:03'), findsOneWidget);
   });
 
