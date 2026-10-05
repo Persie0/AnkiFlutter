@@ -61,7 +61,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   final DateTime Function() _now;
   final ReviewVoiceTimerFactory _timerFactory;
   final StreamController<Duration> _elapsedController =
-      StreamController<Duration>.broadcast();
+      StreamController<Duration>.broadcast(sync: true);
 
   ReviewVoiceTimerHandle? _elapsedTimer;
   DateTime? _recordingStartedAt;
