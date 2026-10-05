@@ -216,6 +216,9 @@ class _Audio implements ReviewAudioService {
   }
 
   @override
+  Future<void> playOneShot(Uri item) async {}
+
+  @override
   Future<void> replay() async {}
 
   @override
