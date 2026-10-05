@@ -1,7 +1,9 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
+import 'package:anki_flutter/features/reviewer/audio/review_voice_recorder.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
@@ -24,6 +26,8 @@ typedef ReviewTimerFactory = ReviewTimerHandle Function(
   Future<void> Function() callback,
 );
 
+enum ReviewOwnVoiceStartResult { started, permissionDenied }
+
 class ReviewController extends ChangeNotifier {
   ReviewController({
     required ReviewRepository repository,
@@ -32,6 +36,8 @@ class ReviewController extends ChangeNotifier {
     required Stopwatch Function() stopwatchFactory,
     ReviewAudioService? audio,
     ReviewTtsService? tts,
+    ReviewVoiceRecorder? voiceRecorder,
+    Future<void> Function(Uri uri)? ownVoiceFileDeleter,
     Uri Function(String filename)? mediaUriFor,
     ReviewTimerFactory? timerFactory,
   }) {
@@ -41,6 +47,8 @@ class ReviewController extends ChangeNotifier {
     _stopwatchFactory = stopwatchFactory;
     _audio = audio;
     _tts = tts;
+    _voiceRecorder = voiceRecorder;
+    _ownVoiceFileDeleter = ownVoiceFileDeleter ?? _deleteOwnVoiceFile;
     _mediaUriFor = mediaUriFor;
     _timerFactory = timerFactory;
     _playingSubscription = _audio?.playingChanges.listen(_onPlayingChanged);
@@ -54,6 +62,8 @@ class ReviewController extends ChangeNotifier {
   late final Stopwatch Function() _stopwatchFactory;
   late final ReviewAudioService? _audio;
   late final ReviewTtsService? _tts;
+  late final ReviewVoiceRecorder? _voiceRecorder;
+  late final Future<void> Function(Uri uri) _ownVoiceFileDeleter;
   late final Uri Function(String filename)? _mediaUriFor;
   late final ReviewTimerFactory? _timerFactory;
   late final StreamSubscription<bool>? _playingSubscription;
@@ -67,12 +77,15 @@ class ReviewController extends ChangeNotifier {
   String? _autoAdvanceReminder;
   bool _currentMarked = false;
   int _generation = 0;
+  int _ownVoiceOperation = 0;
   int? _selectedDeckId;
   String? _typedAnswerPattern;
   ReviewTypedAnswerPrompt? _typedAnswerPrompt;
   String _typedAnswerProvided = '';
   String? _typedAnswerComparisonHtml;
+  Uri? _recordedOwnVoice;
   bool _showAnswerInProgress = false;
+  bool _disposed = false;
 
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
@@ -83,6 +96,10 @@ class ReviewController extends ChangeNotifier {
   bool get supportsDeleteNote => _repository is ReviewDeleteNoteRepository;
   bool get supportsForgetCard => _repository is ReviewForgetCardRepository;
   bool get supportsSetDueDate => _repository is ReviewSetDueDateRepository;
+  bool get canRecordOwnVoice => _voiceRecorder != null && _audio != null;
+  bool get hasRecordedOwnVoice => _recordedOwnVoice != null;
+  Stream<Duration> get ownVoiceRecordingElapsed =>
+      _voiceRecorder?.elapsedChanges ?? const Stream<Duration>.empty();
   bool get currentMarked => _currentMarked;
   ReviewTypedAnswerPrompt? get typedAnswerPrompt => _typedAnswerPrompt;
   bool get hasTypedAnswerInput {
@@ -137,13 +154,103 @@ class ReviewController extends ChangeNotifier {
 
   @override
   void dispose() {
+    if (_disposed) return;
+    _disposed = true;
     _generation++;
+    _ownVoiceOperation++;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
+    final recorder = _voiceRecorder;
+    final recordedOwnVoice = _recordedOwnVoice;
+    _recordedOwnVoice = null;
     unawaited(_playingSubscription?.cancel());
     unawaited(_audio?.dispose());
     unawaited(_tts?.dispose());
+    unawaited(_disposeOwnVoice(recorder, recordedOwnVoice));
     super.dispose();
+  }
+
+  Future<ReviewOwnVoiceStartResult> beginOwnVoiceRecording() async {
+    final recorder = _voiceRecorder;
+    final audio = _audio;
+    if (recorder == null || audio == null) {
+      throw UnsupportedError('Record Own Voice is not available');
+    }
+
+    final operationId = ++_ownVoiceOperation;
+    await audio.stop();
+    if (!_isCurrentOwnVoiceOperation(operationId)) {
+      return ReviewOwnVoiceStartResult.permissionDenied;
+    }
+
+    final permitted = await recorder.ensurePermission();
+    if (!_isCurrentOwnVoiceOperation(operationId)) {
+      return ReviewOwnVoiceStartResult.permissionDenied;
+    }
+    if (!permitted) {
+      return ReviewOwnVoiceStartResult.permissionDenied;
+    }
+
+    try {
+      await recorder.start();
+    } catch (_) {
+      await _cancelOwnVoiceBestEffort(recorder);
+      rethrow;
+    }
+
+    if (!_isCurrentOwnVoiceOperation(operationId)) {
+      await _cancelOwnVoiceBestEffort(recorder);
+      return ReviewOwnVoiceStartResult.permissionDenied;
+    }
+    return ReviewOwnVoiceStartResult.started;
+  }
+
+  Future<void> stopOwnVoiceRecording() async {
+    final recorder = _voiceRecorder;
+    final audio = _audio;
+    if (recorder == null || audio == null) {
+      throw UnsupportedError('Record Own Voice is not available');
+    }
+
+    final operationId = ++_ownVoiceOperation;
+    final output = await recorder.stop();
+    if (output == null) {
+      if (_isCurrentOwnVoiceOperation(operationId)) {
+        throw StateError('Voice recording did not produce usable audio');
+      }
+      return;
+    }
+
+    if (!_isCurrentOwnVoiceOperation(operationId)) {
+      await _deleteOwnVoiceBestEffort(output);
+      return;
+    }
+
+    final previous = _recordedOwnVoice;
+    _recordedOwnVoice = output;
+    if (previous != null && previous != output) {
+      await _deleteOwnVoiceBestEffort(previous);
+    }
+
+    if (_isCurrentOwnVoiceOperation(operationId)) {
+      await audio.playOneShot(output);
+    }
+  }
+
+  Future<void> cancelOwnVoiceRecording() async {
+    final recorder = _voiceRecorder;
+    if (recorder == null) return;
+    ++_ownVoiceOperation;
+    await recorder.cancel();
+  }
+
+  Future<bool> replayOwnVoice() async {
+    if (_disposed) return false;
+    final recorded = _recordedOwnVoice;
+    final audio = _audio;
+    if (recorded == null || audio == null) return false;
+    await audio.playOneShot(recorded);
+    return true;
   }
 
   Future<void> start(int deckId) async {
@@ -959,6 +1066,7 @@ class ReviewController extends ChangeNotifier {
   }
 
   void _onPlayingChanged(bool isPlaying) {
+    if (_disposed) return;
     if (!isPlaying) {
       final deferred = _deferredAutoAdvance;
       if (deferred != null) {
@@ -1012,9 +1120,49 @@ class ReviewController extends ChangeNotifier {
 
   bool _isCurrentGeneration(int generationId) => generationId == _generation;
 
+  bool _isCurrentOwnVoiceOperation(int operationId) =>
+      !_disposed && operationId == _ownVoiceOperation;
+
+  Future<void> _cancelOwnVoiceBestEffort(ReviewVoiceRecorder recorder) async {
+    try {
+      await recorder.cancel();
+    } catch (_) {}
+  }
+
+  Future<void> _deleteOwnVoiceBestEffort(Uri uri) async {
+    try {
+      await _ownVoiceFileDeleter(uri);
+    } catch (_) {}
+  }
+
+  Future<void> _disposeOwnVoice(
+    ReviewVoiceRecorder? recorder,
+    Uri? recordedOwnVoice,
+  ) async {
+    if (recorder != null) {
+      if (recorder.isRecording) {
+        await _cancelOwnVoiceBestEffort(recorder);
+      }
+      try {
+        await recorder.dispose();
+      } catch (_) {}
+    }
+    if (recordedOwnVoice != null) {
+      await _deleteOwnVoiceBestEffort(recordedOwnVoice);
+    }
+  }
+
   void _setState(ReviewSessionState state) {
     _state = state;
     notifyListeners();
+  }
+}
+
+Future<void> _deleteOwnVoiceFile(Uri uri) async {
+  if (uri.scheme != 'file') return;
+  final file = File.fromUri(uri);
+  if (await file.exists()) {
+    await file.delete();
   }
 }
 
