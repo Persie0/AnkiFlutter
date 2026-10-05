@@ -27,63 +27,62 @@ abstract interface class ReviewAudioService {
 }
 
 class PlayerBackedReviewAudioService implements ReviewAudioService {
-  PlayerBackedReviewAudioService({required ReviewAudioPlayerAdapter player})
-    : _player = player;
+  PlayerBackedReviewAudioService({required this.player});
 
-  final ReviewAudioPlayerAdapter _player;
+  final ReviewAudioPlayerAdapter player;
   List<Uri> _currentQueue = const [];
   bool _disposed = false;
 
   @override
-  bool get isPlaying => _disposed ? false : _player.isPlaying;
+  bool get isPlaying => _disposed ? false : player.isPlaying;
 
   @override
   Stream<bool> get playingChanges =>
-      _disposed ? const Stream<bool>.empty() : _player.playingChanges;
+      _disposed ? const Stream<bool>.empty() : player.playingChanges;
 
   @override
   Future<void> playQueue(List<Uri> items) async {
     if (_disposed) return;
     _currentQueue = List<Uri>.unmodifiable(items);
     if (_currentQueue.isEmpty) {
-      await _player.stop();
+      await player.stop();
       return;
     }
-    await _player.openQueue(_currentQueue);
+    await player.openQueue(_currentQueue);
   }
 
   @override
   Future<void> playOneShot(Uri item) async {
     if (_disposed) return;
-    await _player.openOneShot(item);
+    await player.openOneShot(item);
   }
 
   @override
   Future<void> replay() async {
     if (_disposed || _currentQueue.isEmpty) return;
-    await _player.openQueue(_currentQueue);
+    await player.openQueue(_currentQueue);
   }
 
   @override
   Future<void> togglePause() async {
     if (_disposed) return;
-    if (_player.isPlaying) {
-      await _player.pause();
+    if (player.isPlaying) {
+      await player.pause();
     } else {
-      await _player.play();
+      await player.play();
     }
   }
 
   @override
   Future<void> seekRelative(Duration delta) async {
     if (_disposed) return;
-    await _player.seekRelative(delta);
+    await player.seekRelative(delta);
   }
 
   @override
   Future<void> stop() async {
     if (_disposed) return;
-    await _player.stop();
+    await player.stop();
   }
 
   @override
@@ -91,6 +90,6 @@ class PlayerBackedReviewAudioService implements ReviewAudioService {
     if (_disposed) return;
     _disposed = true;
     _currentQueue = const [];
-    await _player.dispose();
+    await player.dispose();
   }
 }
