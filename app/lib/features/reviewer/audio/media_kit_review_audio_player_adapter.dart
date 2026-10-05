@@ -40,6 +40,11 @@ class MediaKitReviewAudioPlayerAdapter implements ReviewAudioPlayerAdapter {
   }
 
   @override
+  Future<void> openOneShot(Uri item) {
+    return _player.openSources([item.toString()], play: true);
+  }
+
+  @override
   Future<void> play() => _player.play();
 
   @override

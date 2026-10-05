@@ -20,6 +20,16 @@ void main() {
     expect(player.openPlay, isTrue);
   });
 
+  test('openOneShot opens exactly one source and starts immediately', () async {
+    final player = _FakeMediaKitPlayerPort();
+    final adapter = MediaKitReviewAudioPlayerAdapter(player: player);
+
+    await adapter.openOneShot(Uri.parse('file:///tmp/reviewer-own-voice.wav'));
+
+    expect(player.openedSources, ['file:///tmp/reviewer-own-voice.wav']);
+    expect(player.openPlay, isTrue);
+  });
+
   test('seekRelative uses current position and clamps before zero', () async {
     final player = _FakeMediaKitPlayerPort()
       ..position = const Duration(seconds: 3);

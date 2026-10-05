@@ -49,6 +49,8 @@ enum _ReviewAction {
   buryNote,
   suspendCard,
   suspendNote,
+  recordOwnVoice,
+  replayOwnVoice,
   replayAudio,
   toggleAudioPause,
   seekAudioBack,
@@ -177,6 +179,10 @@ class _ReviewPageState extends State<ReviewPage> {
       ): () => _actionShortcut(_ReviewAction.previousCardInfo),
       const SingleActivator(LogicalKeyboardKey.keyI): () =>
           _actionShortcut(_ReviewAction.cardInfo),
+      const SingleActivator(LogicalKeyboardKey.keyV, shift: true): () =>
+          _actionShortcut(_ReviewAction.recordOwnVoice),
+      const SingleActivator(LogicalKeyboardKey.keyV): () =>
+          _actionShortcut(_ReviewAction.replayOwnVoice),
       const SingleActivator(LogicalKeyboardKey.keyR): () =>
           _actionShortcut(_ReviewAction.replayAudio),
       const SingleActivator(LogicalKeyboardKey.f5): () =>
@@ -428,6 +434,40 @@ class _ReviewPageState extends State<ReviewPage> {
     }
   }
 
+  Future<void> _recordOwnVoice() async {
+    if (!widget.controller.canRecordOwnVoice) return;
+    final token = widget.controller.pauseForSecondarySurface();
+    if (token == null) return;
+    _OwnVoiceDialogResult? result;
+    try {
+      result = await showDialog<_OwnVoiceDialogResult>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _OwnVoiceRecordingDialog(
+          controller: widget.controller,
+        ),
+      );
+    } finally {
+      widget.controller.resumeAfterSecondarySurface(token);
+    }
+    if (!mounted || result == null) return;
+    switch (result.kind) {
+      case _OwnVoiceDialogResultKind.completed:
+      case _OwnVoiceDialogResultKind.cancelled:
+        return;
+      case _OwnVoiceDialogResultKind.permissionDenied:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Microphone permission is required to record your voice.',
+            ),
+          ),
+        );
+      case _OwnVoiceDialogResultKind.error:
+        throw result.error ?? StateError('Voice recording failed');
+    }
+  }
+
   Future<void> _runReviewAction(_ReviewAction action) async {
     if (_manualActionInProgress) return;
     setState(() => _manualActionInProgress = true);
@@ -517,6 +557,19 @@ class _ReviewPageState extends State<ReviewPage> {
           break;
         case _ReviewAction.suspendNote:
           await widget.controller.suspendCurrentNote();
+          break;
+        case _ReviewAction.recordOwnVoice:
+          await _recordOwnVoice();
+          break;
+        case _ReviewAction.replayOwnVoice:
+          final replayed = await widget.controller.replayOwnVoice();
+          if (!replayed && mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text("You haven't recorded your voice yet."),
+              ),
+            );
+          }
           break;
         case _ReviewAction.replayAudio:
           await widget.controller.replayAudio();
@@ -687,6 +740,25 @@ class _ReviewPageState extends State<ReviewPage> {
         title: Text('Suspend note'),
       ),
     ),
+    if (widget.controller.canRecordOwnVoice) ...[
+      const PopupMenuDivider(),
+      const PopupMenuItem(
+        value: _ReviewAction.recordOwnVoice,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.mic_outlined),
+          title: Text('Record Own Voice'),
+        ),
+      ),
+      const PopupMenuItem(
+        value: _ReviewAction.replayOwnVoice,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.record_voice_over_outlined),
+          title: Text('Replay Own Voice'),
+        ),
+      ),
+    ],
     if (widget.controller.hasReplayableAudio) ...[
       const PopupMenuDivider(),
       const PopupMenuItem(
@@ -987,6 +1059,161 @@ class _ReviewPageState extends State<ReviewPage> {
 
   String _label(ReviewRating rating, String interval) =>
       '${_ratingName(rating)}\n$interval';
+}
+
+enum _OwnVoiceDialogResultKind {
+  completed,
+  cancelled,
+  permissionDenied,
+  error,
+}
+
+final class _OwnVoiceDialogResult {
+  const _OwnVoiceDialogResult(this.kind, [this.error]);
+
+  final _OwnVoiceDialogResultKind kind;
+  final Object? error;
+}
+
+class _OwnVoiceRecordingDialog extends StatefulWidget {
+  const _OwnVoiceRecordingDialog({required this.controller});
+
+  final ReviewController controller;
+
+  @override
+  State<_OwnVoiceRecordingDialog> createState() =>
+      _OwnVoiceRecordingDialogState();
+}
+
+class _OwnVoiceRecordingDialogState extends State<_OwnVoiceRecordingDialog> {
+  bool _recording = false;
+  bool _finishing = false;
+  bool _terminal = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => unawaited(_begin()));
+  }
+
+  Future<void> _begin() async {
+    try {
+      final result = await widget.controller.beginOwnVoiceRecording();
+      if (!mounted) return;
+      if (result == ReviewOwnVoiceStartResult.permissionDenied) {
+        _terminal = true;
+        Navigator.of(context).pop(
+          const _OwnVoiceDialogResult(
+            _OwnVoiceDialogResultKind.permissionDenied,
+          ),
+        );
+        return;
+      }
+      setState(() => _recording = true);
+    } catch (error) {
+      if (!mounted) return;
+      _terminal = true;
+      Navigator.of(context).pop(
+        _OwnVoiceDialogResult(_OwnVoiceDialogResultKind.error, error),
+      );
+    }
+  }
+
+  Future<void> _stopAndClose() async {
+    if (_finishing || _terminal || !_recording) return;
+    setState(() => _finishing = true);
+    try {
+      await widget.controller.stopOwnVoiceRecording();
+      if (!mounted) return;
+      _terminal = true;
+      Navigator.of(context).pop(
+        const _OwnVoiceDialogResult(_OwnVoiceDialogResultKind.completed),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _terminal = true;
+      Navigator.of(context).pop(
+        _OwnVoiceDialogResult(_OwnVoiceDialogResultKind.error, error),
+      );
+    }
+  }
+
+  Future<void> _cancelAndClose() async {
+    if (_finishing || _terminal) return;
+    setState(() => _finishing = true);
+    try {
+      await widget.controller.cancelOwnVoiceRecording();
+      if (!mounted) return;
+      _terminal = true;
+      Navigator.of(context).pop(
+        const _OwnVoiceDialogResult(_OwnVoiceDialogResultKind.cancelled),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      _terminal = true;
+      Navigator.of(context).pop(
+        _OwnVoiceDialogResult(_OwnVoiceDialogResultKind.error, error),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!_terminal && !_finishing) {
+      unawaited(widget.controller.cancelOwnVoiceRecording());
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: false,
+    onPopInvokedWithResult: (didPop, _) {
+      if (!didPop) unawaited(_cancelAndClose());
+    },
+    child: AlertDialog(
+      title: Text(_recording ? 'Recording your voice' : 'Preparing microphone…'),
+      content: _recording
+          ? StreamBuilder<Duration>(
+              stream: widget.controller.ownVoiceRecordingElapsed,
+              initialData: Duration.zero,
+              builder: (context, snapshot) => Text(
+                _formatVoiceElapsed(snapshot.data ?? Duration.zero),
+                key: const ValueKey('own-voice-recording-elapsed'),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.headlineSmall,
+              ),
+            )
+          : const SizedBox(
+              width: 36,
+              height: 36,
+              child: Center(child: CircularProgressIndicator()),
+            ),
+      actions: _recording
+          ? [
+              TextButton(
+                onPressed: _finishing
+                    ? null
+                    : () => unawaited(_cancelAndClose()),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: _finishing
+                    ? null
+                    : () => unawaited(_stopAndClose()),
+                child: const Text('Stop'),
+              ),
+            ]
+          : null,
+    ),
+  );
+}
+
+String _formatVoiceElapsed(Duration elapsed) {
+  final totalSeconds = elapsed.inSeconds;
+  final minutes = totalSeconds ~/ 60;
+  final seconds = (totalSeconds % 60).toString().padLeft(2, '0');
+  return '$minutes:$seconds';
 }
 
 class _ReviewTimer extends StatefulWidget {

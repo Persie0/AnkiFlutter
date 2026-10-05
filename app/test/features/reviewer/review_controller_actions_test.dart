@@ -426,6 +426,9 @@ class _FakeAudioService implements ReviewAudioService {
   }
 
   @override
+  Future<void> playOneShot(Uri item) async {}
+
+  @override
   Future<void> replay() async {}
 
   @override

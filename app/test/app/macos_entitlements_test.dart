@@ -15,6 +15,13 @@ void main() {
     expect(project, contains('cargo build --locked --manifest-path'));
   });
 
+  test('macOS explains Reviewer microphone access', () {
+    final info = File('macos/Runner/Info.plist').readAsStringSync();
+
+    expect(info, contains('<key>NSMicrophoneUsageDescription</key>'));
+    expect(info, contains('Record Own Voice'));
+  });
+
   for (final fileName in const [
     'DebugProfile.entitlements',
     'Release.entitlements',
@@ -41,6 +48,16 @@ void main() {
       expect(entitlements, contains('com.apple.security.app-sandbox'));
       expect(entitlements, contains('com.apple.security.network.client'));
       expect(entitlements, contains('com.apple.security.network.server'));
+    });
+
+    test('macOS $fileName allows Reviewer microphone input', () {
+      final entitlements = File('macos/Runner/$fileName').readAsStringSync();
+
+      expect(entitlements, contains('com.apple.security.device.audio-input'));
+      expect(
+        entitlements,
+        contains('<key>com.apple.security.device.audio-input</key>\n\t<true/>'),
+      );
     });
   }
 }
