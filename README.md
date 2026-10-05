@@ -19,6 +19,12 @@ The repository and CI pin the development toolchain used for this slice:
 
 Linux development requires the Flutter Linux toolchain (`clang`, CMake, Ninja, pkg-config, GTK 3 development headers) plus `protobuf-compiler`. Android builds additionally require Android SDK/NDK, Rust Android targets, and `cargo-ndk`. iOS builds require macOS with Xcode and Rust Apple targets.
 
+Reviewer **Record Own Voice** uses the microphone only when the user explicitly starts a recording, and the recording is kept only as a temporary Reviewer-session file. On Linux, microphone recording requires `parecord`, `pactl`, and `ffmpeg`; on Ubuntu install them with:
+
+```bash
+sudo apt-get install pulseaudio-utils ffmpeg
+```
+
 ## Development setup
 
 Clone with the pinned Anki submodules:
