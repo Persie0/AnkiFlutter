@@ -17,6 +17,14 @@ void main() {
     },
   );
 
+  test('Android declares microphone permission for Reviewer Own Voice', () {
+    final manifest = File(
+      'android/app/src/main/AndroidManifest.xml',
+    ).readAsStringSync();
+
+    expect(manifest, contains('android.permission.RECORD_AUDIO'));
+  });
+
   test('iOS build links the static bridge into the sandboxed app process', () {
     final project = File('ios/Runner.xcodeproj/project.pbxproj')
         .readAsStringSync();
@@ -32,5 +40,12 @@ void main() {
     expect(project, contains(r'cat \"$CARGO_LOG\" >&2'));
     expect(project, contains(r'MACOS_SDKROOT=\"$(xcrun --sdk macosx --show-sdk-path)\"'));
     expect(project, contains(r'SDKROOT=\"$MACOS_SDKROOT\"'));
+  });
+
+  test('iOS explains Reviewer microphone access', () {
+    final info = File('ios/Runner/Info.plist').readAsStringSync();
+
+    expect(info, contains('<key>NSMicrophoneUsageDescription</key>'));
+    expect(info, contains('Record Own Voice'));
   });
 }
