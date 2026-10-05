@@ -66,6 +66,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   ReviewVoiceTimerHandle? _elapsedTimer;
   DateTime? _recordingStartedAt;
   bool _recording = false;
+  bool _starting = false;
   bool _disposed = false;
   int _pathSequence = 0;
   int _activeOperations = 0;
@@ -87,12 +88,13 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<void> start() {
     _ensureUsable();
-    if (_recording) {
+    if (_recording || _starting) {
       return Future<void>.error(
         StateError('A Reviewer voice recording is already active.'),
       );
     }
-    return _runOperation(_startInternal);
+    _starting = true;
+    return _runOperation(_startInternal).whenComplete(() => _starting = false);
   }
 
   Future<void> _startInternal() async {
@@ -146,10 +148,13 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   }
 
   @override
-  Future<void> cancel() {
+  Future<void> cancel() async {
     _ensureUsable();
-    if (!_recording) return Future<void>.value();
-    return _runOperation(_cancelInternal);
+    if (_starting) {
+      await _waitForActiveOperations();
+    }
+    if (!_recording) return;
+    await _runOperation(_cancelInternal);
   }
 
   Future<void> _cancelInternal() async {

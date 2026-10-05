@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:anki_flutter/features/reviewer/audio/record_review_voice_recorder.dart';
@@ -56,6 +57,28 @@ void main() {
 
     await expectLater(recorder.start(), throwsStateError);
     expect(port.starts, hasLength(1));
+  });
+
+  test('cancel waits for an in-flight start and cancels it once active', () async {
+    final startGate = Completer<void>();
+    port.startFuture = startGate.future;
+
+    final start = recorder.start();
+    await _flush();
+    expect(port.starts, hasLength(1));
+
+    var cancelCompleted = false;
+    final cancel = recorder.cancel().whenComplete(() => cancelCompleted = true);
+    await _flush();
+    final completedBeforeStartSettled = cancelCompleted;
+
+    startGate.complete();
+    await start;
+    await cancel;
+
+    expect(completedBeforeStartSettled, isFalse);
+    expect(port.cancelCalls, 1);
+    expect(recorder.isRecording, isFalse);
   });
 
   test('elapsed stream resets to zero and advances only while active', () async {
@@ -171,6 +194,7 @@ class _FakeRecorderPort implements ReviewVoiceRecorderPort {
   int disposeCalls = 0;
   final starts = <_StartCall>[];
   String? stopResult;
+  Future<void>? startFuture;
   Object? startError;
   Object? stopError;
   Object? cancelError;
@@ -184,6 +208,8 @@ class _FakeRecorderPort implements ReviewVoiceRecorderPort {
   @override
   Future<void> start(RecordConfig config, {required String path}) async {
     starts.add(_StartCall(config, path));
+    final pending = startFuture;
+    if (pending != null) await pending;
     final error = startError;
     if (error != null) throw error;
   }
