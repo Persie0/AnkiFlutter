@@ -61,34 +61,39 @@ extension ReviewCardInfoLifecycle on ReviewController {
 
 final class _ReviewCardInfoTracker {
   _ReviewCardInfoTracker(this.controller) {
-    _capture(controller.state, initial: true);
+    _capture(controller.state);
     controller.addListener(_onControllerChanged);
   }
 
   final ReviewController controller;
   int? previousCardId;
   int? _lastVisibleCardId;
+  int? _lastVisibleGenerationId;
 
   void _onControllerChanged() => _capture(controller.state);
 
-  void _capture(ReviewSessionState state, {bool initial = false}) {
+  void _capture(ReviewSessionState state) {
     if (state is ReviewLoading) {
       previousCardId = null;
       _lastVisibleCardId = null;
+      _lastVisibleGenerationId = null;
       return;
     }
 
     final cardId = _visibleCardId(state);
-    if (cardId == null) return;
-    if (_lastVisibleCardId == null) {
+    final generationId = _visibleGenerationId(state);
+    if (cardId == null || generationId == null) return;
+
+    if (_lastVisibleGenerationId == null) {
       _lastVisibleCardId = cardId;
+      _lastVisibleGenerationId = generationId;
       return;
     }
-    if (_lastVisibleCardId != cardId) {
+
+    if (_lastVisibleGenerationId != generationId) {
       previousCardId = _lastVisibleCardId;
       _lastVisibleCardId = cardId;
-    } else if (initial) {
-      _lastVisibleCardId = cardId;
+      _lastVisibleGenerationId = generationId;
     }
   }
 }
