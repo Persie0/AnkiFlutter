@@ -17,6 +17,7 @@ import 'package:anki_flutter/features/profiles/data/file_profile_repository.dart
 import 'package:anki_flutter/features/profiles/profile_picker_dialog.dart';
 import 'package:anki_flutter/features/reviewer/audio/media_kit_review_audio_player_adapter.dart';
 import 'package:anki_flutter/features/reviewer/audio/native_media_kit_player_port.dart';
+import 'package:anki_flutter/features/reviewer/audio/record_review_voice_recorder.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
 import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
@@ -128,6 +129,9 @@ class _AnkiAppRootState extends State<AnkiAppRoot> {
           player: MediaKitReviewAudioPlayerAdapter(
             player: NativeMediaKitPlayerPort(),
           ),
+        ),
+        voiceRecorder: RecordReviewVoiceRecorder(
+          tempDirectoryProvider: () async => Directory.systemTemp,
         ),
         tts: AnkiReviewTtsService(
           backend: _client!,
