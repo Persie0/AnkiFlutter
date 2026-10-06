@@ -104,6 +104,8 @@ class ReviewPage extends StatefulWidget {
 
 class _ReviewPageState extends State<ReviewPage> {
   final FocusNode _typedAnswerFocusNode = FocusNode();
+  final GlobalKey<PopupMenuButtonState<_ReviewAction>> _actionsMenuKey =
+      GlobalKey();
   bool _finishedNotified = false;
   bool _manualActionInProgress = false;
 
@@ -148,6 +150,14 @@ class _ReviewPageState extends State<ReviewPage> {
     unawaited(_setFlag(flag));
   }
 
+  void _showActionsMenu() {
+    if (_manualActionInProgress ||
+        widget.controller.state is ReviewTransition) {
+      return;
+    }
+    _actionsMenuKey.currentState?.showButtonMenu();
+  }
+
   Map<ShortcutActivator, VoidCallback> get _shortcuts {
     if (_typedAnswerFocusNode.hasFocus) {
       return const {};
@@ -156,6 +166,7 @@ class _ReviewPageState extends State<ReviewPage> {
       const SingleActivator(LogicalKeyboardKey.space): _defaultShortcut,
       const SingleActivator(LogicalKeyboardKey.enter): _defaultShortcut,
       const SingleActivator(LogicalKeyboardKey.numpadEnter): _defaultShortcut,
+      const SingleActivator(LogicalKeyboardKey.keyM): _showActionsMenu,
       const SingleActivator(LogicalKeyboardKey.digit1): () =>
           _rateShortcut(ReviewRating.again),
       const SingleActivator(LogicalKeyboardKey.digit2): () =>
@@ -958,6 +969,7 @@ class _ReviewPageState extends State<ReviewPage> {
                     ),
                   ),
                   PopupMenuButton<_ReviewAction>(
+                    key: _actionsMenuKey,
                     tooltip: 'Review actions',
                     enabled: !_manualActionInProgress &&
                         state is! ReviewTransition,
