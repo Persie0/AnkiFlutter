@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:anki_flutter/features/reviewer/audio/review_audio_service.dart';
