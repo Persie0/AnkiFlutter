@@ -159,6 +159,49 @@ void main() {
     expect(find.byKey(const ValueKey('add-note-error')), findsOneWidget);
   });
 
+  testWidgets('create copy prefills fields and tags but saves a fresh note', (tester) async {
+    final repository = _NoteRepository()
+      ..sourceNote = notes.Note(
+        id: Int64(999),
+        notetypeId: Int64(1),
+        fields: ['copied front', 'copied back'],
+        tags: ['source-tag'],
+      );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AddNotePage(
+          deck: deck,
+          repository: repository,
+          sourceNoteId: 999,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('note-field-0'))).controller!.text,
+      'copied front',
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('note-field-1'))).controller!.text,
+      'copied back',
+    );
+    expect(
+      tester.widget<TextField>(find.byKey(const ValueKey('note-tags'))).controller!.text,
+      'source-tag',
+    );
+
+    await tester.tap(find.text('Add note'));
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNoteIds, [999]);
+    expect(repository.savedDeckId, 72);
+    expect(repository.savedNote!.id.toInt(), isNot(999));
+    expect(repository.savedNote!.fields, ['copied front', 'copied back']);
+    expect(repository.savedNote!.tags, ['source-tag']);
+  });
+
   testWidgets('explains when the collection has no note types', (tester) async {
     final repository = _NoteRepository(notetypeChoices: []);
     await _showPage(tester, repository, deck);
@@ -200,6 +243,8 @@ class _NoteRepository implements NoteEntryRepository, NoteValidationRepository {
   int? savedDeckId;
   notes.Note? savedNote;
   notes.Note? validatedNote;
+  notes.Note? sourceNote;
+  final requestedNoteIds = <int>[];
   Completer<void>? pendingSave;
   bool failSave = false;
   var validationState = notes.NoteFieldsCheckResponse_State.NORMAL;
@@ -266,7 +311,12 @@ class _NoteRepository implements NoteEntryRepository, NoteValidationRepository {
   }
 
   @override
-  Future<notes.Note> getNote(int noteId) async => throw UnimplementedError();
+  Future<notes.Note> getNote(int noteId) async {
+    requestedNoteIds.add(noteId);
+    final note = sourceNote;
+    if (note == null) throw StateError('missing source note');
+    return notes.Note.fromBuffer(note.writeToBuffer());
+  }
 
   @override
   Future<void> updateNote(notes.Note note) async => throw UnimplementedError();
