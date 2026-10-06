@@ -147,6 +147,36 @@ void main() {
     expect((controller.state as ReviewQuestion).card.cardId, 1);
   });
 
+  testWidgets('M shortcut opens Reviewer actions menu', (tester) async {
+    final repository = _Repository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer(),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    addTearDown(controller.dispose);
+    await controller.start(7);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, _) => const Text('Card'),
+        ),
+      ),
+    );
+
+    expect(find.text('Bury card'), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyM);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Bury card'), findsOneWidget);
+    expect(find.text('Suspend card'), findsOneWidget);
+  });
+
   testWidgets('undo bury-note and suspend shortcuts are wired', (tester) async {
     final repository = _Repository();
     final controller = ReviewController(
