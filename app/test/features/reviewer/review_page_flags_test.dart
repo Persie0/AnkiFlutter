@@ -44,6 +44,40 @@ void main() {
     expect(find.byTooltip('Flag 3'), findsOneWidget);
   });
 
+  testWidgets('Ctrl+current flag toggles the flag off', (tester) async {
+    final repository = _Repository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer(),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    addTearDown(controller.dispose);
+    await controller.start(7);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onFinished: () {},
+          cardSurfaceBuilder: (_, _) => const Text('Card'),
+        ),
+      ),
+    );
+
+    expect(controller.currentFlag, 2);
+    expect(find.byTooltip('Flag 2'), findsOneWidget);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.digit2);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(repository.setFlags, [0]);
+    expect(controller.currentFlag, 0);
+    expect(find.byTooltip('Flag 2'), findsNothing);
+  });
+
   testWidgets('review actions can clear the current flag', (tester) async {
     final repository = _Repository();
     final controller = ReviewController(
