@@ -65,8 +65,10 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
 
   ReviewVoiceTimerHandle? _elapsedTimer;
   DateTime? _recordingStartedAt;
+  String? _activePath;
   bool _recording = false;
   bool _starting = false;
+  bool _stopping = false;
   bool _disposed = false;
   int _pathSequence = 0;
   int _activeOperations = 0;
@@ -88,7 +90,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<void> start() {
     _ensureUsable();
-    if (_recording || _starting) {
+    if (_recording || _starting || _stopping) {
       return Future<void>.error(
         StateError('A Reviewer voice recording is already active.'),
       );
@@ -104,6 +106,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
     }
 
     final path = _nextRecordingPath(directory);
+    _activePath = path;
     try {
       await _recorder.start(
         const RecordConfig(encoder: AudioEncoder.wav),
@@ -115,6 +118,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
       } catch (_) {
         // Preserve the original start failure.
       }
+      await _deleteActivePathBestEffort();
       rethrow;
     }
 
@@ -124,6 +128,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
       } catch (_) {
         // Disposal has already won the lifecycle race.
       }
+      await _deleteActivePathBestEffort();
       throw StateError('The Reviewer voice recorder has been disposed.');
     }
 
@@ -136,21 +141,42 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<Uri?> stop() {
     _ensureUsable();
-    if (!_recording) return Future<Uri?>.value();
-    return _runOperation(_stopInternal);
+    if (!_recording || _stopping) return Future<Uri?>.value();
+    _stopping = true;
+    return _runOperation(_stopInternal).whenComplete(() => _stopping = false);
   }
 
   Future<Uri?> _stopInternal() async {
+    final activePath = _activePath;
     _clearActiveState();
-    final path = await _recorder.stop();
-    if (path == null || path.isEmpty) return null;
-    return Uri.file(path);
+    try {
+      final finalizedPath = await _recorder.stop();
+      if (finalizedPath == null || finalizedPath.isEmpty) {
+        await _deletePathBestEffort(activePath);
+        _activePath = null;
+        return null;
+      }
+      if (activePath != null && activePath != finalizedPath) {
+        await _deletePathBestEffort(activePath);
+      }
+      _activePath = null;
+      return Uri.file(finalizedPath);
+    } catch (_) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {
+        // Preserve the original stop failure.
+      }
+      await _deletePathBestEffort(activePath);
+      _activePath = null;
+      rethrow;
+    }
   }
 
   @override
   Future<void> cancel() async {
     _ensureUsable();
-    if (_starting) {
+    if (_starting || _stopping) {
       await _waitForActiveOperations();
     }
     if (!_recording) return;
@@ -158,8 +184,14 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   }
 
   Future<void> _cancelInternal() async {
+    final activePath = _activePath;
     _clearActiveState();
-    await _recorder.cancel();
+    try {
+      await _recorder.cancel();
+    } finally {
+      await _deletePathBestEffort(activePath);
+      _activePath = null;
+    }
   }
 
   @override
@@ -183,6 +215,8 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
         await _recorder.cancel();
       } catch (_) {
         // Cleanup is best-effort during disposal.
+      } finally {
+        await _deleteActivePathBestEffort();
       }
     }
 
@@ -239,6 +273,24 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
     _elapsedTimer = null;
     _recordingStartedAt = null;
     _recording = false;
+  }
+
+  Future<void> _deleteActivePathBestEffort() async {
+    final path = _activePath;
+    await _deletePathBestEffort(path);
+    _activePath = null;
+  }
+
+  Future<void> _deletePathBestEffort(String? path) async {
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Temporary-file cleanup must not hide the recorder result/error.
+    }
   }
 
   void _ensureUsable() {

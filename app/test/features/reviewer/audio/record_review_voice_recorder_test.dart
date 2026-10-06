@@ -59,6 +59,21 @@ void main() {
     expect(port.starts, hasLength(1));
   });
 
+  test('start is rejected while stop finalization is pending', () async {
+    await recorder.start();
+    final stopGate = Completer<String?>();
+    port.stopFuture = stopGate.future;
+
+    final stop = recorder.stop();
+    await _flush();
+
+    await expectLater(recorder.start(), throwsStateError);
+    expect(port.starts, hasLength(1));
+
+    stopGate.complete(port.starts.single.path);
+    await stop;
+  });
+
   test('cancel waits for an in-flight start and cancels it once active', () async {
     final startGate = Completer<void>();
     port.startFuture = startGate.future;
@@ -166,6 +181,30 @@ void main() {
     expect(timers.created.single.cancelled, isTrue);
   });
 
+  test('null stop result removes abandoned temporary output', () async {
+    await recorder.start();
+    final output = File(port.starts.single.path);
+    await output.parent.create(recursive: true);
+    await output.writeAsString('partial');
+
+    port.stopResult = null;
+    expect(await recorder.stop(), isNull);
+
+    expect(await output.exists(), isFalse);
+  });
+
+  test('stop failure removes abandoned temporary output', () async {
+    await recorder.start();
+    final output = File(port.starts.single.path);
+    await output.parent.create(recursive: true);
+    await output.writeAsString('partial');
+    port.stopError = StateError('stop failed');
+
+    await expectLater(recorder.stop(), throwsStateError);
+
+    expect(await output.exists(), isFalse);
+  });
+
   test('cancel failure still clears local active state', () async {
     await recorder.start();
     port.cancelError = StateError('cancel failed');
@@ -194,6 +233,7 @@ class _FakeRecorderPort implements ReviewVoiceRecorderPort {
   int disposeCalls = 0;
   final starts = <_StartCall>[];
   String? stopResult;
+  Future<String?>? stopFuture;
   Future<void>? startFuture;
   Object? startError;
   Object? stopError;
@@ -219,6 +259,8 @@ class _FakeRecorderPort implements ReviewVoiceRecorderPort {
     stopCalls++;
     final error = stopError;
     if (error != null) throw error;
+    final pending = stopFuture;
+    if (pending != null) return pending;
     return stopResult;
   }
 
