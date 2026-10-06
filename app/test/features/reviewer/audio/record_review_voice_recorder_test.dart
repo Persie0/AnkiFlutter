@@ -166,6 +166,30 @@ void main() {
     expect(timers.created.single.cancelled, isTrue);
   });
 
+  test('null stop result removes abandoned temporary output', () async {
+    await recorder.start();
+    final output = File(port.starts.single.path);
+    await output.parent.create(recursive: true);
+    await output.writeAsString('partial');
+
+    port.stopResult = null;
+    expect(await recorder.stop(), isNull);
+
+    expect(await output.exists(), isFalse);
+  });
+
+  test('stop failure removes abandoned temporary output', () async {
+    await recorder.start();
+    final output = File(port.starts.single.path);
+    await output.parent.create(recursive: true);
+    await output.writeAsString('partial');
+    port.stopError = StateError('stop failed');
+
+    await expectLater(recorder.stop(), throwsStateError);
+
+    expect(await output.exists(), isFalse);
+  });
+
   test('cancel failure still clears local active state', () async {
     await recorder.start();
     port.cancelError = StateError('cancel failed');
