@@ -12,10 +12,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 typedef ReviewNoteEditor = Future<bool> Function(int noteId);
+typedef ReviewCreateCopyOpener = Future<void> Function(
+  ReviewCreateCopyTarget target,
+);
 typedef ReviewDeckOptionsOpener = Future<void> Function(
   ReviewDeckOptionsTarget target,
 );
 typedef ReviewCardInfoOpener = Future<void> Function(ReviewCardInfoTarget target);
+
+final class ReviewCreateCopyTarget {
+  const ReviewCreateCopyTarget({
+    required this.noteId,
+    required this.deckId,
+    required this.deckName,
+  });
+
+  final int noteId;
+  final int deckId;
+  final String deckName;
+}
 
 final class ReviewDeckOptionsTarget {
   const ReviewDeckOptionsTarget({
@@ -36,6 +51,7 @@ final class ReviewCardInfoTarget {
 
 enum _ReviewAction {
   editNote,
+  createCopy,
   setFlag,
   toggleMark,
   forgetCard,
@@ -65,6 +81,7 @@ class ReviewPage extends StatefulWidget {
     this.cardSurfaceBuilder,
     this.mediaBaseUri,
     this.onEditNote,
+    this.onCreateCopy,
     this.studyDeckId,
     this.onOpenDeckOptions,
     this.onOpenCardInfo,
@@ -76,6 +93,7 @@ class ReviewPage extends StatefulWidget {
   final Widget Function(BuildContext context, String html)? cardSurfaceBuilder;
   final Uri? mediaBaseUri;
   final ReviewNoteEditor? onEditNote;
+  final ReviewCreateCopyOpener? onCreateCopy;
   final int? studyDeckId;
   final ReviewDeckOptionsOpener? onOpenDeckOptions;
   final ReviewCardInfoOpener? onOpenCardInfo;
@@ -170,6 +188,11 @@ class _ReviewPageState extends State<ReviewPage> {
           _flagShortcut(7),
       const SingleActivator(LogicalKeyboardKey.keyE): () =>
           _actionShortcut(_ReviewAction.editNote),
+      const SingleActivator(
+        LogicalKeyboardKey.keyE,
+        control: true,
+        alt: true,
+      ): () => _actionShortcut(_ReviewAction.createCopy),
       const SingleActivator(LogicalKeyboardKey.keyO): () =>
           _actionShortcut(_ReviewAction.options),
       const SingleActivator(
@@ -490,6 +513,24 @@ class _ReviewPageState extends State<ReviewPage> {
             }
           }
           break;
+        case _ReviewAction.createCopy:
+          final opener = widget.onCreateCopy;
+          final card = _currentCard();
+          if (opener == null || card == null) return;
+          final token = widget.controller.pauseForSecondarySurface();
+          if (token == null) return;
+          try {
+            await opener(
+              ReviewCreateCopyTarget(
+                noteId: card.noteId,
+                deckId: card.currentDeckId,
+                deckName: card.deckName,
+              ),
+            );
+          } finally {
+            widget.controller.resumeAfterSecondarySurface(token);
+          }
+          break;
         case _ReviewAction.setFlag:
           final flag = await _chooseFlag();
           if (flag != null) await widget.controller.setCurrentFlag(flag);
@@ -684,6 +725,17 @@ class _ReviewPageState extends State<ReviewPage> {
           dense: true,
           leading: Icon(Icons.history),
           title: Text('Previous Card Info'),
+        ),
+      ),
+      const PopupMenuDivider(),
+    ],
+    if (widget.onCreateCopy != null) ...[
+      const PopupMenuItem(
+        value: _ReviewAction.createCopy,
+        child: ListTile(
+          dense: true,
+          leading: Icon(Icons.copy_outlined),
+          title: Text('Create Copy…'),
         ),
       ),
       const PopupMenuDivider(),
