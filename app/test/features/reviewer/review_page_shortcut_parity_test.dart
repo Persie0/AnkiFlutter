@@ -108,6 +108,44 @@ void main() {
     expect(targets.last.cardId, isNull);
   });
 
+  testWidgets('Create Copy shortcut targets current note and current deck', (tester) async {
+    final repository = _Repository();
+    final controller = ReviewController(
+      repository: repository,
+      renderer: _Renderer(),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    addTearDown(controller.dispose);
+    await controller.start(7);
+    final targets = <ReviewCreateCopyTarget>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ReviewPage(
+          controller: controller,
+          onCreateCopy: (target) async => targets.add(target),
+          onFinished: () {},
+          cardSurfaceBuilder: (_, _) => const Text('Card'),
+        ),
+      ),
+    );
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyE);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.altLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+
+    expect(targets, hasLength(1));
+    expect(targets.single.noteId, 101);
+    expect(targets.single.deckId, 7);
+    expect(targets.single.deckName, 'First');
+    expect(controller.state, isA<ReviewQuestion>());
+    expect((controller.state as ReviewQuestion).card.cardId, 1);
+  });
+
   testWidgets('undo bury-note and suspend shortcuts are wired', (tester) async {
     final repository = _Repository();
     final controller = ReviewController(
