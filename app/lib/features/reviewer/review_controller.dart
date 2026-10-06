@@ -658,7 +658,8 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    await flagRepository.setFlag(card, flag);
+    final appliedFlag = flag != 0 && card.flag == flag ? 0 : flag;
+    await flagRepository.setFlag(card, appliedFlag);
     if (!_isCurrentGeneration(generationId)) return;
     final latest = _state;
     final stillSameCard = switch (latest) {
@@ -676,7 +677,7 @@ class ReviewController extends ChangeNotifier {
     };
     if (!stillSameCard) return;
 
-    final updatedCard = card.withFlag(flag);
+    final updatedCard = card.withFlag(appliedFlag);
     if (answerSide) {
       _setState(
         ReviewAnswer(
