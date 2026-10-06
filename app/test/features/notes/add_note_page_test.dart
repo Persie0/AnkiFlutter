@@ -196,6 +196,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repository.requestedNoteIds, [999]);
+    expect(repository.defaultsDeckId, isNull);
     expect(repository.savedDeckId, 72);
     expect(repository.savedNote!.id.toInt(), isNot(999));
     expect(repository.savedNote!.fields, ['copied front', 'copied back']);
