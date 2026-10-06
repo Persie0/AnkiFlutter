@@ -68,6 +68,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   String? _activePath;
   bool _recording = false;
   bool _starting = false;
+  bool _stopping = false;
   bool _disposed = false;
   int _pathSequence = 0;
   int _activeOperations = 0;
@@ -89,7 +90,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<void> start() {
     _ensureUsable();
-    if (_recording || _starting) {
+    if (_recording || _starting || _stopping) {
       return Future<void>.error(
         StateError('A Reviewer voice recording is already active.'),
       );
@@ -140,8 +141,9 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<Uri?> stop() {
     _ensureUsable();
-    if (!_recording) return Future<Uri?>.value();
-    return _runOperation(_stopInternal);
+    if (!_recording || _stopping) return Future<Uri?>.value();
+    _stopping = true;
+    return _runOperation(_stopInternal).whenComplete(() => _stopping = false);
   }
 
   Future<Uri?> _stopInternal() async {
@@ -174,7 +176,7 @@ class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
   @override
   Future<void> cancel() async {
     _ensureUsable();
-    if (_starting) {
+    if (_starting || _stopping) {
       await _waitForActiveOperations();
     }
     if (!_recording) return;
