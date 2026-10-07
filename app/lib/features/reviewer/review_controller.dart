@@ -516,9 +516,13 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    final choice = current.card.choices.singleWhere(
-      (choice) => choice.rating == rating,
-    );
+    ReviewAnswerChoice? selectedChoice;
+    for (final choice in current.card.choices) {
+      if (choice.rating == rating) {
+        selectedChoice = choice;
+        break;
+      }
+    }
     _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
@@ -574,11 +578,13 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    final leechNotice = await _leechNoticeAfterAnswer(
-      card: current.card,
-      choice: choice,
-      generationId: nextGeneration,
-    );
+    final leechNotice = selectedChoice == null
+        ? null
+        : await _leechNoticeAfterAnswer(
+            card: current.card,
+            choice: selectedChoice,
+            generationId: nextGeneration,
+          );
     if (_isCurrentGeneration(nextGeneration) && leechNotice != null) {
       _publishLeechNotice(leechNotice);
     }
