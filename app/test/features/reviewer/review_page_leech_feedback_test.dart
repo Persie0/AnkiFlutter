@@ -39,6 +39,7 @@ void main() {
     await tester.pump();
     await controller.rate(ReviewRating.good);
     await tester.pump();
+    await tester.pump();
 
     expect(find.byType(SnackBar), findsOneWidget);
     expect(find.text('Card was a leech.'), findsOneWidget);
