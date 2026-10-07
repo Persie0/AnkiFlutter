@@ -568,17 +568,17 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    final leechNotice = await _leechNoticeAfterAnswer(
-      card: current.card,
-      choice: choice,
-      generationId: generationId,
-    );
-    if (!_isCurrentGeneration(generationId)) {
+    final nextGeneration = ++_generation;
+    await _loadNextCard(nextGeneration);
+    if (!_isCurrentGeneration(nextGeneration)) {
       return;
     }
 
-    final nextGeneration = ++_generation;
-    await _loadNextCard(nextGeneration);
+    final leechNotice = await _leechNoticeAfterAnswer(
+      card: current.card,
+      choice: choice,
+      generationId: nextGeneration,
+    );
     if (_isCurrentGeneration(nextGeneration) && leechNotice != null) {
       _publishLeechNotice(leechNotice);
     }
