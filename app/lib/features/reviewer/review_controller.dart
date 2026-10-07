@@ -6,6 +6,7 @@ import 'package:anki_flutter/features/reviewer/audio/review_tts_service.dart';
 import 'package:anki_flutter/features/reviewer/audio/review_voice_recorder.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_answer_choice.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/models/review_deck_settings.dart';
