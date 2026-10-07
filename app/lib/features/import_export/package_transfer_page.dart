@@ -83,16 +83,30 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
   Future<void> _importPackage() async {
     final options = _importOptions;
     if (_busy || options == null) return;
-    final path = await widget.fileTransfer.pickImportPackage();
-    if (!mounted || path == null) return;
 
+    // Lock before opening the native picker to prevent multiple concurrent
+    // dialogs or imports against the same Anki collection.
+    String? path;
     setState(() {
       _busy = true;
       _error = null;
-      _status = 'Importing package…';
+      _status = 'Choosing package…';
     });
     try {
-      final response = await widget.repository.importPackage(path, options.deepCopy());
+      path = await widget.fileTransfer.pickImportPackage();
+      if (!mounted) return;
+      if (path == null) {
+        setState(() {
+          _busy = false;
+          _status = null;
+        });
+        return;
+      }
+      setState(() => _status = 'Importing package…');
+      final response = await widget.repository.importPackage(
+        path,
+        options.deepCopy(),
+      );
       await widget.onCollectionChanged?.call();
       if (!mounted) return;
       final log = response.log;
@@ -109,6 +123,22 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
         _status = null;
         _error = 'Could not import package: $error';
       });
+    } finally {
+      // Only the file-transfer adapter knows whether it created a temporary
+      // byte-backed copy. Never remove a user-selected local package.
+      if (path != null &&
+          widget.fileTransfer is TemporaryPackageImportCleanup) {
+        try {
+          await (widget.fileTransfer as TemporaryPackageImportCleanup)
+              .releasePickedPackage(path);
+        } catch (error) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Could not clean temporary package: $error')),
+            );
+          }
+        }
+      }
     }
   }
 
