@@ -10,6 +10,8 @@ import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
     as anki_cards;
+import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart'
+    as anki_decks;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as anki_search;
 import 'package:anki_flutter/core/backend/generated/anki/tags.pb.dart'
@@ -40,6 +42,20 @@ abstract interface class CardBrowserTagRepository {
     String tags, {
     required bool remove,
   });
+}
+
+/// Optional browser capability for moving cards into a regular deck.
+abstract interface class CardBrowserDeckMoveRepository {
+  Future<List<CardBrowserDeckTarget>> moveTargets();
+
+  Future<void> moveCardsToDeck(List<int> cardIds, int deckId);
+}
+
+class CardBrowserDeckTarget {
+  const CardBrowserDeckTarget({required this.id, required this.label});
+
+  final int id;
+  final String label;
 }
 
 class CardBrowserSortOption {
@@ -79,7 +95,10 @@ class CardBrowserResult {
 }
 
 class AnkiCardBrowserRepository
-    implements CardBrowserRepository, CardBrowserTagRepository {
+    implements
+        CardBrowserRepository,
+        CardBrowserTagRepository,
+        CardBrowserDeckMoveRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
@@ -231,6 +250,55 @@ class AnkiCardBrowserRepository
     );
     await backend.invoke(
       remove ? BackendOperation.removeNoteTags : BackendOperation.addNoteTags,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<List<CardBrowserDeckTarget>> moveTargets() async {
+    // Deck-tree counts are unnecessary for selecting a destination.
+    final request = anki_decks.DeckTreeRequest();
+    final response = await backend.invoke(
+      BackendOperation.deckTree,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    final root = anki_decks.DeckTreeNode.fromBuffer(response);
+    final targets = <CardBrowserDeckTarget>[];
+
+    void collect(anki_decks.DeckTreeNode node, String parentName) {
+      // Filtered decks cannot receive cards as their permanent home.
+      if (node.filtered) return;
+      final name = parentName.isEmpty
+          ? node.name
+          : '$parentName::${node.name}';
+      if (node.deckId.toInt() > 0) {
+        targets.add(
+          CardBrowserDeckTarget(id: node.deckId.toInt(), label: name),
+        );
+      }
+      for (final child in node.children) {
+        collect(child, name);
+      }
+    }
+
+    for (final child in root.children) {
+      collect(child, '');
+    }
+    return List.unmodifiable(targets);
+  }
+
+  @override
+  Future<void> moveCardsToDeck(List<int> cardIds, int deckId) async {
+    if (cardIds.isEmpty) return;
+    if (deckId <= 0) {
+      throw ArgumentError.value(deckId, 'deckId', 'Choose a valid deck.');
+    }
+    final request = anki_cards.SetDeckRequest(
+      cardIds: cardIds.toSet().map(Int64.new),
+      deckId: Int64(deckId),
+    );
+    await backend.invoke(
+      BackendOperation.setDeck,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
