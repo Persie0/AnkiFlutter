@@ -73,7 +73,9 @@ enum BackendOperation {
   scheduleCardsAsNewDefaults(72),
   getConfigString(73),
   setDueDate(74),
-  cardStats(75);
+  cardStats(75),
+  trashMediaFiles(76),
+  restoreMediaTrash(77);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
