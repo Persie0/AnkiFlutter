@@ -48,7 +48,7 @@ void main() {
     ]);
     expect(backend.calls.single.operation, BackendOperation.deckTree);
     final request = decks.DeckTreeRequest.fromBuffer(backend.calls.single.request);
-    expect(request.now.toInt(), greaterThan(0));
+    expect(request.now.toInt(), 0); // Skip due-count computation.
   });
 
   test('moves unique card IDs using Anki native setDeck request', () async {
