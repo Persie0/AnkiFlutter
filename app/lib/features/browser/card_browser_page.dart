@@ -236,6 +236,47 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _tagSelectedCards({required bool remove}) async {
+    final tagRepository = widget.repository is CardBrowserTagRepository
+        ? widget.repository as CardBrowserTagRepository
+        : null;
+    if (tagRepository == null ||
+        _selectedCardIds.isEmpty ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    final selectedIds = _selectedCardIds.toList(growable: false);
+    final tags = await showDialog<String>(
+      context: context,
+      builder: (_) => _BrowserTagsDialog(remove: remove),
+    );
+    if (!mounted || tags == null || _bulkActionInProgress) return;
+
+    setState(() => _bulkActionInProgress = true);
+    try {
+      await tagRepository.applyTagsToCards(
+        selectedIds,
+        tags,
+        remove: remove,
+      );
+      if (!mounted) return;
+      setState(() {
+        _selectedCardIds.clear();
+        _bulkActionInProgress = false;
+      });
+      await _search();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _bulkActionInProgress = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not ${remove ? 'remove' : 'add'} tags: $error'),
+        ),
+      );
+    }
+  }
+
   void _toggleCardSelection(int cardId, bool selected) {
     setState(() {
       if (selected) {
@@ -377,6 +418,22 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     : () => unawaited(_confirmBulkAction(CardBulkAction.bury)),
                 child: const Text('Bury selected'),
               ),
+              if (widget.repository is CardBrowserTagRepository) ...[
+                OutlinedButton(
+                  key: const ValueKey('browser-add-tags'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_tagSelectedCards(remove: false)),
+                  child: const Text('Add tags'),
+                ),
+                OutlinedButton(
+                  key: const ValueKey('browser-remove-tags'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_tagSelectedCards(remove: true)),
+                  child: const Text('Remove tags'),
+                ),
+              ],
               OutlinedButton(
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Theme.of(context).colorScheme.error,
@@ -464,6 +521,64 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _BrowserTagsDialog extends StatefulWidget {
+  const _BrowserTagsDialog({required this.remove});
+
+  final bool remove;
+
+  @override
+  State<_BrowserTagsDialog> createState() => _BrowserTagsDialogState();
+}
+
+class _BrowserTagsDialogState extends State<_BrowserTagsDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(String value) {
+    final tags = value.trim();
+    if (tags.isNotEmpty) Navigator.of(context).pop(tags);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.remove
+          ? 'Remove tags from selected notes'
+          : 'Add tags to selected notes'),
+      content: TextField(
+        key: const ValueKey('browser-tags-input'),
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Tags (separated by spaces)',
+        ),
+        onSubmitted: _submit,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) => FilledButton(
+            key: const ValueKey('browser-apply-tags'),
+            onPressed: value.text.trim().isEmpty
+                ? null
+                : () => _submit(value.text),
+            child: Text(widget.remove ? 'Remove tags' : 'Add tags'),
+          ),
+        ),
+      ],
     );
   }
 }

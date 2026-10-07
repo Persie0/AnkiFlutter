@@ -12,6 +12,8 @@ import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
     as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as anki_search;
+import 'package:anki_flutter/core/backend/generated/anki/tags.pb.dart'
+    as anki_tags;
 import 'package:anki_flutter/core/backend/generated/anki/scheduler.pb.dart'
     as anki_scheduler;
 import 'package:fixnum/fixnum.dart';
@@ -29,6 +31,15 @@ abstract interface class CardBrowserRepository {
   Future<int> noteIdForCard(int cardId);
 
   Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action);
+}
+
+/// Optional capability for actions that operate on notes, not individual cards.
+abstract interface class CardBrowserTagRepository {
+  Future<void> applyTagsToCards(
+    List<int> cardIds,
+    String tags, {
+    required bool remove,
+  });
 }
 
 class CardBrowserSortOption {
@@ -67,7 +78,8 @@ class CardBrowserResult {
   final List<String> cells;
 }
 
-class AnkiCardBrowserRepository implements CardBrowserRepository {
+class AnkiCardBrowserRepository
+    implements CardBrowserRepository, CardBrowserTagRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
@@ -193,6 +205,32 @@ class AnkiCardBrowserRepository implements CardBrowserRepository {
     );
     await backend.invoke(
       BackendOperation.buryOrSuspendCards,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<void> applyTagsToCards(
+    List<int> cardIds,
+    String tags, {
+    required bool remove,
+  }) async {
+    final normalizedTags = tags.trim();
+    if (cardIds.isEmpty || normalizedTags.isEmpty) return;
+
+    // Anki tags belong to notes. Resolve all cards before writing so a
+    // failed lookup never leaves a partially tagged selection.
+    final noteIds = <int>{};
+    for (final cardId in cardIds.toSet()) {
+      noteIds.add(await noteIdForCard(cardId));
+    }
+
+    final request = anki_tags.NoteIdsAndTagsRequest(
+      noteIds: noteIds.map(Int64.new),
+      tags: normalizedTags,
+    );
+    await backend.invoke(
+      remove ? BackendOperation.removeNoteTags : BackendOperation.addNoteTags,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
