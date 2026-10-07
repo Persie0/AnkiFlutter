@@ -56,6 +56,12 @@ abstract interface class CardBrowserFlagRepository {
   Future<void> setCardsFlag(List<int> cardIds, int flag);
 }
 
+/// Optional capability to restore cards previously buried or suspended
+/// using the official Anki scheduler operation.
+abstract interface class CardBrowserRestoreRepository {
+  Future<void> restoreCards(List<int> cardIds);
+}
+
 /// Optional browser capability for moving cards into a regular deck.
 abstract interface class CardBrowserDeckMoveRepository {
   Future<List<CardBrowserDeckTarget>> moveTargets();
@@ -117,7 +123,8 @@ class AnkiCardBrowserRepository
         CardBrowserTagRepository,
         CardBrowserDeckMoveRepository,
         CardBrowserFlagRepository,
-        CardBrowserPagingRepository {
+        CardBrowserPagingRepository,
+        CardBrowserRestoreRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
@@ -293,6 +300,20 @@ class AnkiCardBrowserRepository
     await backend.invoke(
       remove ? BackendOperation.removeNoteTags : BackendOperation.addNoteTags,
       Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<void> restoreCards(List<int> cardIds) async {
+    if (cardIds.isEmpty) return;
+    if (cardIds.any((id) => id <= 0)) {
+      throw ArgumentError.value(cardIds, 'cardIds', 'Invalid card ID.');
+    }
+    await backend.invoke(
+      BackendOperation.restoreBuriedAndSuspendedCards,
+      Uint8List.fromList(
+        anki_cards.CardIds(cids: cardIds.toSet().map(Int64.new)).writeToBuffer(),
+      ),
     );
   }
 
