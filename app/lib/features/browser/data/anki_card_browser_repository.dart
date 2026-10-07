@@ -35,6 +35,13 @@ abstract interface class CardBrowserRepository {
   Future<void> applyBulkAction(List<int> cardIds, CardBulkAction action);
 }
 
+/// Optional capability for fetching additional rows without re-running search.
+abstract interface class CardBrowserPagingRepository {
+  int get pageSize;
+
+  Future<List<CardBrowserResult>> renderMore(List<int> cardIds);
+}
+
 /// Optional capability for actions that operate on notes, not individual cards.
 abstract interface class CardBrowserTagRepository {
   Future<void> applyTagsToCards(
@@ -86,10 +93,15 @@ class CardBrowserSearchResult {
   const CardBrowserSearchResult({
     required this.totalCount,
     required this.cards,
+    this.matchingCardIds = const [],
   });
 
   final int totalCount;
   final List<CardBrowserResult> cards;
+
+  /// Full ordered search IDs, populated by native search implementations
+  /// that support loading more without re-executing the query.
+  final List<int> matchingCardIds;
 }
 
 class CardBrowserResult {
@@ -104,13 +116,17 @@ class AnkiCardBrowserRepository
         CardBrowserRepository,
         CardBrowserTagRepository,
         CardBrowserDeckMoveRepository,
-        CardBrowserFlagRepository {
+        CardBrowserFlagRepository,
+        CardBrowserPagingRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
 
   final BackendInvoker backend;
   final int maxRows;
+
+  @override
+  int get pageSize => maxRows;
 
   @override
   Future<List<CardBrowserSortOption>> sortOptions() async {
@@ -188,7 +204,27 @@ class AnkiCardBrowserRepository
     return CardBrowserSearchResult(
       totalCount: ids.length,
       cards: List.unmodifiable(cards),
+      matchingCardIds: List.unmodifiable(ids.map((id) => id.toInt())),
     );
+  }
+
+  @override
+  Future<List<CardBrowserResult>> renderMore(List<int> cardIds) async {
+    final rows = <CardBrowserResult>[];
+    for (final cardId in cardIds) {
+      final rowBytes = await backend.invoke(
+        BackendOperation.browserRowForId,
+        Uint8List.fromList(generic.Int64(val: Int64(cardId)).writeToBuffer()),
+      );
+      final row = anki_search.BrowserRow.fromBuffer(rowBytes);
+      rows.add(
+        CardBrowserResult(
+          cardId: cardId,
+          cells: List.unmodifiable(row.cells.map((cell) => cell.text)),
+        ),
+      );
+    }
+    return List.unmodifiable(rows);
   }
 
   @override

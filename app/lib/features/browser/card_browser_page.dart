@@ -29,6 +29,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   Object? _error;
   int _generation = 0;
   bool _loading = true;
+  bool _loadingMore = false;
   bool _bulkActionInProgress = false;
   final Set<int> _selectedCardIds = <int>{};
   List<CardBrowserSortOption> _sortOptions = const [];
@@ -133,6 +134,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     setState(() {
       if (clearSelection) _selectedCardIds.clear();
       _loading = true;
+      _loadingMore = false;
       _error = null;
     });
     try {
@@ -151,6 +153,53 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         _error = error;
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadMore() async {
+    final pagingRepository = widget.repository is CardBrowserPagingRepository
+        ? widget.repository as CardBrowserPagingRepository
+        : null;
+    final current = _result;
+    if (pagingRepository == null ||
+        current == null ||
+        _loading ||
+        _loadingMore ||
+        _bulkActionInProgress ||
+        current.matchingCardIds.length != current.totalCount ||
+        current.cards.length >= current.totalCount) {
+      return;
+    }
+
+    final nextIds = current.matchingCardIds
+        .skip(current.cards.length)
+        .take(pagingRepository.pageSize)
+        .toList(growable: false);
+    if (nextIds.isEmpty) return;
+    final generation = _generation;
+    setState(() => _loadingMore = true);
+    try {
+      final nextRows = await pagingRepository.renderMore(nextIds);
+      if (!mounted || generation != _generation) return;
+      if (nextRows.length != nextIds.length) {
+        throw StateError('Backend returned an incomplete page.');
+      }
+      setState(() {
+        _result = CardBrowserSearchResult(
+          totalCount: current.totalCount,
+          cards: List.unmodifiable([...current.cards, ...nextRows]),
+          matchingCardIds: current.matchingCardIds,
+        );
+      });
+    } catch (error) {
+      if (!mounted || generation != _generation) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load more cards: $error')),
+      );
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _loadingMore = false);
+      }
     }
   }
 
@@ -645,16 +694,40 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
 
     final truncated = result.cards.length < result.totalCount;
+    final canLoadMore = widget.repository is CardBrowserPagingRepository &&
+        result.matchingCardIds.length == result.totalCount;
     return ListView.builder(
       itemCount: result.cards.length + (truncated ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == result.cards.length) {
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: Text(
-              'Showing ${result.cards.length} of ${result.totalCount} matches. Refine your search.',
-              textAlign: TextAlign.center,
-            ),
+            child: canLoadMore
+                ? Column(
+                    children: [
+                      Text(
+                        'Showing ${result.cards.length} of ${result.totalCount} matches.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        key: const ValueKey('browser-load-more'),
+                        onPressed: _loadingMore || _bulkActionInProgress
+                            ? null
+                            : () => unawaited(_loadMore()),
+                        child: _loadingMore
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Load more'),
+                      ),
+                    ],
+                  )
+                : Text(
+                    'Showing ${result.cards.length} of ${result.totalCount} matches. Refine your search.',
+                    textAlign: TextAlign.center,
+                  ),
           );
         }
 
