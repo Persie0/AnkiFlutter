@@ -230,6 +230,8 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
     ),
     ("SET_DUE_DATE", "BackendSchedulerService", "set_due_date"),
     ("CARD_STATS", "BackendStatsService", "card_stats"),
+    ("TRASH_MEDIA_FILES", "BackendMediaService", "trash_media_files"),
+    ("RESTORE_TRASH", "BackendMediaService", "restore_trash"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
