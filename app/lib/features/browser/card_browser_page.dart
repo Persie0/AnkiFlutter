@@ -247,50 +247,10 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
 
     final selectedIds = _selectedCardIds.toList(growable: false);
-    final controller = TextEditingController();
-    String? tags;
-    try {
-      tags = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: Text(remove
-              ? 'Remove tags from selected notes'
-              : 'Add tags to selected notes'),
-          content: TextField(
-            key: const ValueKey('browser-tags-input'),
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Tags (separated by spaces)',
-            ),
-            onSubmitted: (value) {
-              final entered = value.trim();
-              if (entered.isNotEmpty) {
-                Navigator.of(dialogContext).pop(entered);
-              }
-            },
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (context, value, _) => FilledButton(
-                key: const ValueKey('browser-apply-tags'),
-                onPressed: value.text.trim().isEmpty
-                    ? null
-                    : () => Navigator.of(dialogContext).pop(value.text.trim()),
-                child: Text(remove ? 'Remove tags' : 'Add tags'),
-              ),
-            ),
-          ],
-        ),
-      );
-    } finally {
-      controller.dispose();
-    }
+    final tags = await showDialog<String>(
+      context: context,
+      builder: (_) => _BrowserTagsDialog(remove: remove),
+    );
     if (!mounted || tags == null || _bulkActionInProgress) return;
 
     setState(() => _bulkActionInProgress = true);
@@ -561,6 +521,64 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _BrowserTagsDialog extends StatefulWidget {
+  const _BrowserTagsDialog({required this.remove});
+
+  final bool remove;
+
+  @override
+  State<_BrowserTagsDialog> createState() => _BrowserTagsDialogState();
+}
+
+class _BrowserTagsDialogState extends State<_BrowserTagsDialog> {
+  final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit(String value) {
+    final tags = value.trim();
+    if (tags.isNotEmpty) Navigator.of(context).pop(tags);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.remove
+          ? 'Remove tags from selected notes'
+          : 'Add tags to selected notes'),
+      content: TextField(
+        key: const ValueKey('browser-tags-input'),
+        controller: _controller,
+        autofocus: true,
+        decoration: const InputDecoration(
+          labelText: 'Tags (separated by spaces)',
+        ),
+        onSubmitted: _submit,
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ValueListenableBuilder<TextEditingValue>(
+          valueListenable: _controller,
+          builder: (context, value, _) => FilledButton(
+            key: const ValueKey('browser-apply-tags'),
+            onPressed: value.text.trim().isEmpty
+                ? null
+                : () => _submit(value.text),
+            child: Text(widget.remove ? 'Remove tags' : 'Add tags'),
+          ),
+        ),
+      ],
     );
   }
 }
