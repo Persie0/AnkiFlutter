@@ -4,6 +4,7 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks;
+import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards;
 import 'package:fixnum/fixnum.dart';
 import 'package:anki_flutter/core/backend/generated/anki/import_export.pb.dart'
     as import_export;
@@ -40,6 +41,16 @@ abstract interface class DeckScopedPackageRepository {
   });
 }
 
+/// Optional native Anki export of selected browser cards.
+abstract interface class CardScopedPackageRepository {
+  Future<int> exportSelectedCards(
+    String outPath, {
+    required List<int> cardIds,
+    required bool withScheduling,
+    required bool withMedia,
+  });
+}
+
 class PackageExportDeck {
   const PackageExportDeck({required this.id, required this.name});
 
@@ -47,7 +58,11 @@ class PackageExportDeck {
   final String name;
 }
 
-class AnkiPackageRepository implements PackageRepository, DeckScopedPackageRepository {
+class AnkiPackageRepository
+    implements
+        PackageRepository,
+        DeckScopedPackageRepository,
+        CardScopedPackageRepository {
   const AnkiPackageRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -108,6 +123,32 @@ class AnkiPackageRepository implements PackageRepository, DeckScopedPackageRepos
       visit(child, '');
     }
     return List.unmodifiable(targets);
+  }
+
+  @override
+  Future<int> exportSelectedCards(
+    String outPath, {
+    required List<int> cardIds,
+    required bool withScheduling,
+    required bool withMedia,
+  }) async {
+    if (cardIds.isEmpty || cardIds.any((id) => id <= 0)) {
+      throw ArgumentError.value(
+        cardIds,
+        'cardIds',
+        'Choose at least one valid card to export.',
+      );
+    }
+    return _exportPackage(
+      outPath,
+      limit: import_export.ExportLimit(
+        cardIds: cards.CardIds(cids: cardIds.toSet().map(Int64.new)),
+      ),
+      withScheduling: withScheduling,
+      withDeckConfigs: true,
+      withMedia: withMedia,
+      legacy: false,
+    );
   }
 
   @override
