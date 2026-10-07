@@ -75,6 +75,8 @@ class ReviewController extends ChangeNotifier {
   _DeferredAutoAdvance? _deferredAutoAdvance;
   bool _autoAdvanceEnabled = false;
   String? _autoAdvanceReminder;
+  String? _leechNotice;
+  int _leechNoticeVersion = 0;
   bool _currentMarked = false;
   int _generation = 0;
   int _ownVoiceOperation = 0;
@@ -90,6 +92,8 @@ class ReviewController extends ChangeNotifier {
   ReviewSessionState get state => _state;
   bool get autoAdvanceEnabled => _autoAdvanceEnabled;
   String? get autoAdvanceReminder => _autoAdvanceReminder;
+  String? get leechNotice => _leechNotice;
+  int get leechNoticeVersion => _leechNoticeVersion;
   bool get isAudioPlaying => _audio?.isPlaying ?? false;
   bool get supportsFlags => _repository is ReviewFlagRepository;
   bool get supportsMarking => _repository is ReviewMarkRepository;
@@ -511,6 +515,9 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
+    final choice = current.card.choices.singleWhere(
+      (choice) => choice.rating == rating,
+    );
     _autoAdvanceReminder = null;
     _clearAutoAdvanceTimer();
     _deferredAutoAdvance = null;
@@ -560,7 +567,20 @@ class ReviewController extends ChangeNotifier {
       return;
     }
 
-    await _loadNextCard(++_generation);
+    final leechNotice = await _leechNoticeAfterAnswer(
+      card: current.card,
+      choice: choice,
+      generationId: generationId,
+    );
+    if (!_isCurrentGeneration(generationId)) {
+      return;
+    }
+
+    final nextGeneration = ++_generation;
+    await _loadNextCard(nextGeneration);
+    if (_isCurrentGeneration(nextGeneration) && leechNotice != null) {
+      _publishLeechNotice(leechNotice);
+    }
   }
 
   Future<bool> canUndo() => _repository.canUndo();
@@ -1116,6 +1136,43 @@ class ReviewController extends ChangeNotifier {
     if (uris.isNotEmpty && _isCurrentGeneration(generationId)) {
       await audio.playQueue(uris);
     }
+  }
+
+  Future<String?> _leechNoticeAfterAnswer({
+    required ReviewCard card,
+    required ReviewAnswerChoice choice,
+    required int generationId,
+  }) async {
+    try {
+      final isLeech = await _repository.stateIsLeech(choice);
+      if (!_isCurrentGeneration(generationId) || !isLeech) {
+        return null;
+      }
+
+      var suspended = false;
+      if (_repository case final ReviewLeechRepository repository) {
+        try {
+          suspended = await repository.isCardSuspended(card);
+        } catch (_) {
+          suspended = false;
+        }
+        if (!_isCurrentGeneration(generationId)) {
+          return null;
+        }
+      }
+
+      return suspended
+          ? 'Card was a leech. It has been suspended.'
+          : 'Card was a leech.';
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _publishLeechNotice(String message) {
+    _leechNotice = message;
+    _leechNoticeVersion += 1;
+    notifyListeners();
   }
 
   bool _isCurrentGeneration(int generationId) => generationId == _generation;
