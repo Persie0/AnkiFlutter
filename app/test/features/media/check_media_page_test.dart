@@ -29,10 +29,9 @@ void main() {
     expect(find.text('Anki media report'), findsOneWidget);
     expect(find.text('Media trash exists.'), findsOneWidget);
 
-    final scrollable = find.descendant(
-      of: find.byType(ListView),
-      matching: find.byType(Scrollable),
-    );
+    // SelectableText creates its own internal Scrollable. Only the outer
+    // page scroll view should drive the viewport.
+    final scrollable = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(
       find.text('old.wav'),
       220,
