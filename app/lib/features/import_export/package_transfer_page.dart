@@ -22,6 +22,9 @@ class PackageTransferPage extends StatefulWidget {
 
 class _PackageTransferPageState extends State<PackageTransferPage> {
   import_export.ImportAnkiPackageOptions? _importOptions;
+  List<PackageExportDeck> _exportDecks = const [];
+  String? _deckListError;
+  int _exportDeckId = 0; // 0 = whole collection; real Anki deck IDs are >0.
   bool _loading = true;
   bool _busy = false;
   bool _exportWithScheduling = true;
@@ -45,8 +48,27 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
     try {
       final presets = await widget.repository.getImportPresets();
       if (!mounted) return;
+      List<PackageExportDeck> decks = const [];
+      String? deckListError;
+      if (widget.repository is DeckScopedPackageRepository &&
+          widget.fileTransfer is DeckScopedPackageFileTransfer) {
+        try {
+          decks = await (widget.repository as DeckScopedPackageRepository)
+              .exportDeckTargets();
+        } catch (error) {
+          // Exporting the complete collection must remain usable if deck
+          // metadata cannot be retrieved.
+          deckListError = 'Could not list decks for export: $error';
+        }
+      }
+      if (!mounted) return;
       setState(() {
         _importOptions = presets.deepCopy();
+        _exportDecks = decks;
+        _deckListError = deckListError;
+        if (!decks.any((deck) => deck.id == _exportDeckId)) {
+          _exportDeckId = 0;
+        }
         _loading = false;
       });
     } catch (error) {
@@ -98,13 +120,26 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
       _status = 'Exporting package…';
     });
     try {
-      final result = await widget.fileTransfer.exportPackage(
-        widget.repository,
-        withScheduling: _exportWithScheduling,
-        withDeckConfigs: _exportWithDeckConfigs,
-        withMedia: _exportWithMedia,
-        legacy: _exportLegacy,
-      );
+      final selectedDeckId = _exportDeckId;
+      final result = selectedDeckId != 0 &&
+              widget.repository is DeckScopedPackageRepository &&
+              widget.fileTransfer is DeckScopedPackageFileTransfer
+          ? await (widget.fileTransfer as DeckScopedPackageFileTransfer)
+                .exportDeckPackage(
+                  widget.repository as DeckScopedPackageRepository,
+                  deckId: selectedDeckId,
+                  withScheduling: _exportWithScheduling,
+                  withDeckConfigs: _exportWithDeckConfigs,
+                  withMedia: _exportWithMedia,
+                  legacy: _exportLegacy,
+                )
+          : await widget.fileTransfer.exportPackage(
+              widget.repository,
+              withScheduling: _exportWithScheduling,
+              withDeckConfigs: _exportWithDeckConfigs,
+              withMedia: _exportWithMedia,
+              legacy: _exportLegacy,
+            );
       if (!mounted) return;
       if (result == null) {
         setState(() {
@@ -113,12 +148,21 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
         });
         return;
       }
+      final selectedDeckName = selectedDeckId == 0
+          ? null
+          : _exportDecks
+              .where((deck) => deck.id == selectedDeckId)
+              .map((deck) => deck.name)
+              .firstOrNull;
       setState(() {
         _busy = false;
+        final prefix = selectedDeckName == null
+            ? 'Export complete'
+            : 'Export complete ($selectedDeckName)';
         _status = _exportWithMedia
-            ? 'Export complete: ${result.mediaFiles} media '
+            ? '$prefix: ${result.mediaFiles} media '
                 '${result.mediaFiles == 1 ? 'file' : 'files'} included.'
-            : 'Export complete.';
+            : '$prefix.';
       });
     } catch (error) {
       if (!mounted) return;
@@ -276,8 +320,47 @@ class _PackageTransferPageState extends State<PackageTransferPage> {
         const SizedBox(height: 20),
         Text('Export .apkg', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 4),
-        const Text('Export the whole open collection as a standard Anki package.'),
+        const Text(
+          'Export the whole open collection or a selected deck as a '
+          'standard Anki package.',
+        ),
         const SizedBox(height: 12),
+        if (_deckListError case final error?) ...[
+          Text(error, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          const Text('Whole-collection export is still available.'),
+          const SizedBox(height: 12),
+        ],
+        if (_exportDecks.isNotEmpty) ...[
+          InputDecorator(
+            decoration: const InputDecoration(
+              labelText: 'Export scope',
+              border: OutlineInputBorder(),
+            ),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<int>(
+                key: const ValueKey('export-scope-dropdown'),
+                isExpanded: true,
+                value: _exportDeckId,
+                items: [
+                  const DropdownMenuItem<int>(
+                    value: 0,
+                    child: Text('Whole collection'),
+                  ),
+                  ..._exportDecks.map(
+                    (deck) => DropdownMenuItem<int>(
+                      value: deck.id,
+                      child: Text(deck.name, overflow: TextOverflow.ellipsis),
+                    ),
+                  ),
+                ],
+                onChanged: _busy
+                    ? null
+                    : (deckId) => setState(() => _exportDeckId = deckId ?? 0),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text('Include scheduling'),
