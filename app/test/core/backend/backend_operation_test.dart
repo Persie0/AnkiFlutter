@@ -84,6 +84,8 @@ void main() {
         'getConfigString': 73,
         'setDueDate': 74,
         'cardStats': 75,
+        'trashMediaFiles': 76,
+        'restoreMediaTrash': 77,
       },
     );
 
