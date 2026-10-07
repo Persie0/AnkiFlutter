@@ -108,16 +108,33 @@ class _ReviewPageState extends State<ReviewPage> {
       GlobalKey();
   bool _finishedNotified = false;
   bool _manualActionInProgress = false;
+  int _lastLeechNoticeVersion = 0;
 
   @override
   void initState() {
     super.initState();
     widget.controller.enableCardInfoLifecycleTracking();
+    _lastLeechNoticeVersion = widget.controller.leechNoticeVersion;
     _typedAnswerFocusNode.addListener(_onTypedAnswerFocusChanged);
   }
 
   void _onTypedAnswerFocusChanged() {
     if (mounted) setState(() {});
+  }
+
+  void _scheduleLeechNoticeIfNeeded() {
+    final version = widget.controller.leechNoticeVersion;
+    final message = widget.controller.leechNotice;
+    if (version == _lastLeechNoticeVersion || message == null) {
+      return;
+    }
+    _lastLeechNoticeVersion = version;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    });
   }
 
   @override
@@ -875,6 +892,7 @@ class _ReviewPageState extends State<ReviewPage> {
       child: AnimatedBuilder(
         animation: widget.controller,
         builder: (context, _) {
+          _scheduleLeechNoticeIfNeeded();
           final state = widget.controller.state;
           if (state is ReviewFinished) {
             if (!_finishedNotified) {
