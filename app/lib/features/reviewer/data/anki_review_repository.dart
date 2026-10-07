@@ -30,6 +30,7 @@ import 'package:fixnum/fixnum.dart';
 class AnkiReviewRepository
     implements
         ReviewRepository,
+        ReviewLeechRepository,
         ReviewFlagRepository,
         ReviewMarkRepository,
         ReviewDeleteNoteRepository,
@@ -357,6 +358,17 @@ class AnkiReviewRepository
       Uint8List.fromList(state.writeToBuffer()),
     );
     return generic_pb.Bool.fromBuffer(response).val;
+  }
+
+  @override
+  Future<bool> isCardSuspended(ReviewCard card) async {
+    final response = await backend.invoke(
+      BackendOperation.getCard,
+      Uint8List.fromList(
+        cards_pb.CardId(cid: Int64(card.cardId)).writeToBuffer(),
+      ),
+    );
+    return cards_pb.Card.fromBuffer(response).queue < 0;
   }
 
   @override
