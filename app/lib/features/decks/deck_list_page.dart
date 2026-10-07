@@ -13,6 +13,8 @@ import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/import_export/data/anki_package_repository.dart';
 import 'package:anki_flutter/features/import_export/native_package_file_transfer.dart';
 import 'package:anki_flutter/features/import_export/package_transfer_page.dart';
+import 'package:anki_flutter/features/media/check_media_page.dart';
+import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
@@ -35,6 +37,7 @@ enum _CollectionAction {
   preferences,
   noteTypes,
   importExport,
+  mediaCheck,
   sync,
   browse,
 }
@@ -297,6 +300,18 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
+  void _openMediaCheck() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CheckMediaPage(
+          repository: AnkiMediaRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
   void _openSync() {
     final backend = widget.backend;
     if (backend == null) return;
@@ -341,6 +356,9 @@ class _DeckListPageState extends State<DeckListPage> {
         break;
       case _CollectionAction.importExport:
         _openImportExport();
+        break;
+      case _CollectionAction.mediaCheck:
+        _openMediaCheck();
         break;
       case _CollectionAction.sync:
         _openSync();
@@ -455,6 +473,14 @@ class _DeckListPageState extends State<DeckListPage> {
                   ),
                 ),
                 PopupMenuItem(
+                  value: _CollectionAction.mediaCheck,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.fact_check_outlined),
+                    title: Text('Check media'),
+                  ),
+                ),
+                PopupMenuItem(
                   value: _CollectionAction.sync,
                   child: ListTile(
                     dense: true,
@@ -494,6 +520,11 @@ class _DeckListPageState extends State<DeckListPage> {
               tooltip: 'Import & export',
               icon: const Icon(Icons.import_export),
               onPressed: _opening ? null : _openImportExport,
+            ),
+            IconButton(
+              tooltip: 'Check media',
+              icon: const Icon(Icons.fact_check_outlined),
+              onPressed: _opening ? null : _openMediaCheck,
             ),
             IconButton(
               tooltip: 'Sync',
