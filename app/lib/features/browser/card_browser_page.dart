@@ -702,33 +702,32 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         if (index == result.cards.length) {
           return Padding(
             padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                Text(
-                  'Showing ${result.cards.length} of ${result.totalCount} matches.',
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                if (canLoadMore)
-                  OutlinedButton(
-                    key: const ValueKey('browser-load-more'),
-                    onPressed: _loadingMore || _bulkActionInProgress
-                        ? null
-                        : () => unawaited(_loadMore()),
-                    child: _loadingMore
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Load more'),
+            child: canLoadMore
+                ? Column(
+                    children: [
+                      Text(
+                        'Showing ${result.cards.length} of ${result.totalCount} matches.',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton(
+                        key: const ValueKey('browser-load-more'),
+                        onPressed: _loadingMore || _bulkActionInProgress
+                            ? null
+                            : () => unawaited(_loadMore()),
+                        child: _loadingMore
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Text('Load more'),
+                      ),
+                    ],
                   )
-                else
-                  const Text(
-                    'Refine your search.',
+                : Text(
+                    'Showing ${result.cards.length} of ${result.totalCount} matches. Refine your search.',
                     textAlign: TextAlign.center,
                   ),
-              ],
-            ),
           );
         }
 
