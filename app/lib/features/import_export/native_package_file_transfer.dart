@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:anki_flutter/features/import_export/data/anki_package_repository.dart';
+import 'package:anki_flutter/features/import_export/staged_package_import_store.dart';
 import 'package:file_picker/file_picker.dart';
 
 class PackageExportResult {
@@ -22,6 +23,11 @@ abstract interface class PackageFileTransfer {
   });
 }
 
+/// Optional lifecycle for adapter-owned temporary imports.
+abstract interface class TemporaryPackageImportCleanup {
+  Future<void> releasePickedPackage(String path);
+}
+
 /// Optional platform adapter for exporting only one regular deck.
 abstract interface class DeckScopedPackageFileTransfer {
   Future<PackageExportResult?> exportDeckPackage(
@@ -35,8 +41,17 @@ abstract interface class DeckScopedPackageFileTransfer {
 }
 
 class NativePackageFileTransfer
-    implements PackageFileTransfer, DeckScopedPackageFileTransfer {
-  const NativePackageFileTransfer();
+    implements
+        PackageFileTransfer,
+        DeckScopedPackageFileTransfer,
+        TemporaryPackageImportCleanup {
+  NativePackageFileTransfer({StagedPackageImportStore? stagedImports})
+    : _stagedImports = stagedImports ?? StagedPackageImportStore();
+
+  final StagedPackageImportStore _stagedImports;
+
+  @override
+  Future<void> releasePickedPackage(String path) => _stagedImports.release(path);
 
   @override
   Future<String?> pickImportPackage() async {
@@ -50,11 +65,10 @@ class NativePackageFileTransfer
     final path = file.path;
     if (path != null && path.isNotEmpty) return path;
 
+    // A platform picker can provide bytes without an accessible path. Keep
+    // this copy only until Anki finishes importing it; never persist it.
     final bytes = await file.readAsBytes();
-    final directory = await Directory.systemTemp.createTemp('ankiflutter-import-');
-    final fallback = File('${directory.path}${Platform.pathSeparator}${file.name}');
-    await fallback.writeAsBytes(bytes, flush: true);
-    return fallback.path;
+    return _stagedImports.stage(bytes);
   }
 
   @override
