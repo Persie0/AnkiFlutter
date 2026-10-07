@@ -15,7 +15,13 @@ abstract interface class MediaRepository {
   Future<String> absolutePath(String filename);
 }
 
-class AnkiMediaRepository implements MediaRepository {
+/// Optional safe media-trash operations backed by Anki's own media service.
+abstract interface class MediaTrashRepository {
+  Future<void> trashMediaFiles(List<String> filenames);
+  Future<void> restoreMediaTrash();
+}
+
+class AnkiMediaRepository implements MediaRepository, MediaTrashRepository {
   const AnkiMediaRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -71,6 +77,29 @@ class AnkiMediaRepository implements MediaRepository {
       Uint8List.fromList(generic.Empty().writeToBuffer()),
     );
     return media.CheckMediaResponse.fromBuffer(response);
+  }
+
+  @override
+  Future<void> trashMediaFiles(List<String> filenames) async {
+    final unique = filenames.toSet().toList(growable: false);
+    if (unique.isEmpty) return;
+    if (unique.any((filename) => filename.trim().isEmpty)) {
+      throw ArgumentError.value(filenames, 'filenames', 'Empty media filename.');
+    }
+    await backend.invoke(
+      BackendOperation.trashMediaFiles,
+      Uint8List.fromList(
+        media.TrashMediaFilesRequest(fnames: unique).writeToBuffer(),
+      ),
+    );
+  }
+
+  @override
+  Future<void> restoreMediaTrash() async {
+    await backend.invoke(
+      BackendOperation.restoreMediaTrash,
+      Uint8List.fromList(generic.Empty().writeToBuffer()),
+    );
   }
 
   @override
