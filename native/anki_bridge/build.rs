@@ -236,6 +236,11 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "trash_media_files",
     ),
     ("RESTORE_TRASH", "BackendMediaService", "restore_trash"),
+    (
+        "RESTORE_BURIED_AND_SUSPENDED_CARDS",
+        "BackendSchedulerService",
+        "restore_buried_and_suspended_cards",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
