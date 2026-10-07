@@ -29,6 +29,8 @@ void main() {
 
     expect(transfer.deckExportIds, [3]);
     expect(transfer.wholeExportCount, 0);
+    await tester.drag(find.byType(ListView), const Offset(0, 1200));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Export complete (Languages::French)'), findsOneWidget);
     expect(find.textContaining('2 media files included'), findsOneWidget);
   });
