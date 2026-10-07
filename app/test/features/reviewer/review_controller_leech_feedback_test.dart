@@ -13,6 +13,24 @@ import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('answer advances before probing leech state', () async {
+    final repository = _Repository(
+      cards: [_card(1), _card(2)],
+      leech: false,
+    );
+    final controller = _controller(repository);
+    addTearDown(controller.dispose);
+
+    await controller.start(7);
+    await controller.showAnswer();
+    repository.events.clear();
+
+    await controller.rate(ReviewRating.good);
+
+    expect(repository.events, ['answer', 'nextCard', 'stateIsLeech']);
+    expect((controller.state as ReviewQuestion).card.cardId, 2);
+  });
+
   test('successful answer checks selected state and publishes suspended leech notice after advancing', () async {
     final first = _card(1);
     final second = _card(2);
@@ -132,14 +150,17 @@ class _Repository implements ReviewRepository, ReviewLeechRepository {
   final Object? suspensionError;
   final List<ReviewAnswerChoice> leechChoices = [];
   final List<int> suspensionChecks = [];
+  final List<String> events = [];
   var index = 0;
 
   @override
   Future<void> selectDeck(int deckId) async {}
 
   @override
-  Future<ReviewCard?> nextCard() async =>
-      index < _cards.length ? _cards[index++] : null;
+  Future<ReviewCard?> nextCard() async {
+    events.add('nextCard');
+    return index < _cards.length ? _cards[index++] : null;
+  }
 
   @override
   Future<ReviewDeckSettings> settingsForDeck(int deckId) async => _settings;
@@ -150,10 +171,13 @@ class _Repository implements ReviewRepository, ReviewLeechRepository {
     ReviewRating rating, {
     required int answeredAtMillis,
     required int millisecondsTaken,
-  }) async {}
+  }) async {
+    events.add('answer');
+  }
 
   @override
   Future<bool> stateIsLeech(ReviewAnswerChoice choice) async {
+    events.add('stateIsLeech');
     leechChoices.add(choice);
     if (leechError != null) throw leechError!;
     return leech;
@@ -161,6 +185,7 @@ class _Repository implements ReviewRepository, ReviewLeechRepository {
 
   @override
   Future<bool> isCardSuspended(ReviewCard card) async {
+    events.add('isCardSuspended');
     suspensionChecks.add(card.cardId);
     if (suspensionError != null) throw suspensionError!;
     return suspended;
