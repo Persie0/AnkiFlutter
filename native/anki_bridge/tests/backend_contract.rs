@@ -346,7 +346,10 @@ fn browser_sort_metadata_is_available_through_ffi() {
 fn media_audit_trash_and_restore_use_upstream_anki_storage() {
     let temp = TempDir::new().unwrap();
     let open = collection_request(&temp);
-    let media_path = temp.path().join("collection.media").join("unused-by-note.png");
+    let media_path = temp
+        .path()
+        .join("collection.media")
+        .join("unused-by-note.png");
     fs::write(&media_path, b"unreferenced-media").unwrap();
 
     let backend = TestBackend::new();
@@ -380,7 +383,10 @@ fn media_audit_trash_and_restore_use_upstream_anki_storage() {
         "trash media failed: {}",
         String::from_utf8_lossy(&bytes)
     );
-    assert!(!media_path.exists(), "trash must remove original media path");
+    assert!(
+        !media_path.exists(),
+        "trash must remove original media path"
+    );
 
     let (status, bytes) = backend.invoke(77, &Empty::default());
     assert_eq!(
@@ -389,7 +395,10 @@ fn media_audit_trash_and_restore_use_upstream_anki_storage() {
         "restore media failed: {}",
         String::from_utf8_lossy(&bytes)
     );
-    assert!(media_path.exists(), "restoring trash must recover original media");
+    assert!(
+        media_path.exists(),
+        "restoring trash must recover original media"
+    );
 }
 
 #[test]
