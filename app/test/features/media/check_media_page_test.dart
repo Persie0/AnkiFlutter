@@ -26,11 +26,26 @@ void main() {
     expect(find.text('Affected notes: 2'), findsOneWidget);
     expect(find.text('missing.mp3'), findsOneWidget);
     expect(find.text('missing-image.png'), findsOneWidget);
-    expect(find.text('old.wav'), findsOneWidget);
-    expect(find.text('Note ID 42'), findsOneWidget);
-    expect(find.text('Note ID 91'), findsOneWidget);
     expect(find.text('Anki media report'), findsOneWidget);
     expect(find.text('Media trash exists.'), findsOneWidget);
+
+    final scrollable = find.descendant(
+      of: find.byType(ListView),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(
+      find.text('old.wav'),
+      220,
+      scrollable: scrollable,
+    );
+    expect(find.text('old.wav'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Note ID 91'),
+      220,
+      scrollable: scrollable,
+    );
+    expect(find.text('Note ID 42'), findsOneWidget);
+    expect(find.text('Note ID 91'), findsOneWidget);
   });
 
   testWidgets('long native lists are initially limited, with Show more',
