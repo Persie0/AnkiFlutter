@@ -82,6 +82,14 @@ Ensure `anki_flutter_bridge.dll` is copied beside `AnkiFlutter.exe` in the relea
 
 ## Linux
 
+Install the runtime tools needed by the own-voice recorder:
+
+```bash
+sudo apt-get install -y pulseaudio-utils ffmpeg
+```
+
+`pulseaudio-utils` provides `parecord` and `pactl`; `ffmpeg` is used by the Linux recorder backend for WAV output.
+
 Build the release bundle:
 
 ```bash
@@ -99,4 +107,5 @@ Before publishing a platform artifact, verify:
 - the native Anki bridge is bundled for the target architecture;
 - a real disposable collection can be opened and studied;
 - import/export and file pickers work on the target OS;
+- Record Own Voice and Replay Own Voice work on a disposable profile when a microphone is available;
 - the artifact is signed with release credentials where the platform requires signing.
