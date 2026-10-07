@@ -118,11 +118,11 @@ class AnkiPackageRepository implements PackageRepository, DeckScopedPackageRepos
     required bool withDeckConfigs,
     required bool withMedia,
     required bool legacy,
-  }) {
+  }) async {
     if (deckId <= 0) {
       throw ArgumentError.value(deckId, 'deckId', 'Choose a valid deck.');
     }
-    return _exportPackage(
+    return await _exportPackage(
       outPath,
       limit: import_export.ExportLimit(deckId: Int64(deckId)),
       withScheduling: withScheduling,
