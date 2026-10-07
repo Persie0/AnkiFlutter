@@ -75,7 +75,8 @@ enum BackendOperation {
   setDueDate(74),
   cardStats(75),
   trashMediaFiles(76),
-  restoreMediaTrash(77);
+  restoreMediaTrash(77),
+  restoreBuriedAndSuspendedCards(78);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
