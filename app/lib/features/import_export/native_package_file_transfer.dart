@@ -23,6 +23,16 @@ abstract interface class PackageFileTransfer {
   });
 }
 
+/// Optional adapter for saving packages containing selected card IDs.
+abstract interface class CardScopedPackageFileTransfer {
+  Future<PackageExportResult?> exportSelectedCards(
+    CardScopedPackageRepository repository, {
+    required List<int> cardIds,
+    required bool withScheduling,
+    required bool withMedia,
+  });
+}
+
 /// Optional lifecycle for adapter-owned temporary imports.
 abstract interface class TemporaryPackageImportCleanup {
   Future<void> releasePickedPackage(String path);
@@ -44,6 +54,7 @@ class NativePackageFileTransfer
     implements
         PackageFileTransfer,
         DeckScopedPackageFileTransfer,
+        CardScopedPackageFileTransfer,
         TemporaryPackageImportCleanup {
   NativePackageFileTransfer({StagedPackageImportStore? stagedImports})
     : _stagedImports = stagedImports ?? StagedPackageImportStore();
@@ -104,6 +115,21 @@ class NativePackageFileTransfer
       withDeckConfigs: withDeckConfigs,
       withMedia: withMedia,
       legacy: legacy,
+    ),
+  );
+
+  @override
+  Future<PackageExportResult?> exportSelectedCards(
+    CardScopedPackageRepository repository, {
+    required List<int> cardIds,
+    required bool withScheduling,
+    required bool withMedia,
+  }) => _savePackage(
+    (path) => repository.exportSelectedCards(
+      path,
+      cardIds: cardIds,
+      withScheduling: withScheduling,
+      withMedia: withMedia,
     ),
   );
 
