@@ -277,6 +277,71 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _moveSelectedCards() async {
+    final deckRepository = widget.repository is CardBrowserDeckMoveRepository
+        ? widget.repository as CardBrowserDeckMoveRepository
+        : null;
+    if (deckRepository == null ||
+        _selectedCardIds.isEmpty ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    // Freeze the selection while the destination is being fetched/chosen.
+    final cardIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final targets = await deckRepository.moveTargets();
+      if (!mounted) return;
+      if (targets.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No regular destination decks found.')),
+        );
+        return;
+      }
+      final deckId = await showDialog<int>(
+        context: context,
+        builder: (_) => _BrowserMoveDeckDialog(
+          targets: targets,
+          cardCount: cardIds.length,
+        ),
+      );
+      if (!mounted || deckId == null) return;
+
+      await deckRepository.moveCardsToDeck(cardIds, deckId);
+      if (!mounted) return;
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not move selected cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
+  Future<void> _searchAfterBulkMove() async {
+    // _search normally blocks requests while a bulk operation is active.
+    // Release the lock only once the native setDeck operation has completed.
+    setState(() => _bulkActionInProgress = false);
+    await _search();
+  }
+
+  void _selectVisibleCards() {
+    final result = _result;
+    if (_loading || _bulkActionInProgress || result == null) return;
+    setState(() {
+      _selectedCardIds.addAll(result.cards.map((card) => card.cardId));
+    });
+  }
+
+  void _clearCardSelection() {
+    if (_bulkActionInProgress) return;
+    setState(() => _selectedCardIds.clear());
+  }
+
   void _toggleCardSelection(int cardId, bool selected) {
     setState(() {
       if (selected) {
@@ -328,6 +393,8 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
               ),
             ),
             if (_sortOptions.isNotEmpty) _buildSortControls(),
+            if (!_loading && _error == null && _result?.cards.isNotEmpty == true)
+              _buildSelectionToolbar(),
             if (_selectedCardIds.isNotEmpty) _buildSelectionActions(),
             Expanded(child: _buildResults()),
           ],
@@ -391,6 +458,39 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     );
   }
 
+  Widget _buildSelectionToolbar() {
+    final cards = _result!.cards;
+    final allVisibleSelected = cards.every(
+      (card) => _selectedCardIds.contains(card.cardId),
+    );
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            TextButton.icon(
+              key: const ValueKey('browser-select-visible'),
+              onPressed: allVisibleSelected || _bulkActionInProgress
+                  ? null
+                  : _selectVisibleCards,
+              icon: const Icon(Icons.select_all),
+              label: Text('Select visible (${cards.length})'),
+            ),
+            if (_selectedCardIds.isNotEmpty)
+              TextButton(
+                key: const ValueKey('browser-clear-selection'),
+                onPressed: _bulkActionInProgress ? null : _clearCardSelection,
+                child: const Text('Clear selection'),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSelectionActions() {
     final count = _selectedCardIds.length;
     final cardLabel = count == 1 ? 'card' : 'cards';
@@ -418,6 +518,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     : () => unawaited(_confirmBulkAction(CardBulkAction.bury)),
                 child: const Text('Bury selected'),
               ),
+              if (widget.repository is CardBrowserDeckMoveRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-move-deck'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_moveSelectedCards()),
+                  child: const Text('Change deck'),
+                ),
               if (widget.repository is CardBrowserTagRepository) ...[
                 OutlinedButton(
                   key: const ValueKey('browser-add-tags'),
@@ -577,6 +685,70 @@ class _BrowserTagsDialogState extends State<_BrowserTagsDialog> {
                 : () => _submit(value.text),
             child: Text(widget.remove ? 'Remove tags' : 'Add tags'),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _BrowserMoveDeckDialog extends StatefulWidget {
+  const _BrowserMoveDeckDialog({
+    required this.targets,
+    required this.cardCount,
+  });
+
+  final List<CardBrowserDeckTarget> targets;
+  final int cardCount;
+
+  @override
+  State<_BrowserMoveDeckDialog> createState() => _BrowserMoveDeckDialogState();
+}
+
+class _BrowserMoveDeckDialogState extends State<_BrowserMoveDeckDialog> {
+  int? _selectedDeckId;
+
+  @override
+  Widget build(BuildContext context) {
+    final count = widget.cardCount;
+    return AlertDialog(
+      title: Text('Move $count ${count == 1 ? 'card' : 'cards'} to deck'),
+      content: SizedBox(
+        width: 420,
+        child: InputDecorator(
+          decoration: const InputDecoration(
+            labelText: 'Destination deck',
+            border: OutlineInputBorder(),
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<int>(
+              key: const ValueKey('browser-move-target'),
+              value: _selectedDeckId,
+              isExpanded: true,
+              hint: const Text('Choose a regular deck'),
+              items: widget.targets
+                  .map(
+                    (deck) => DropdownMenuItem<int>(
+                      value: deck.id,
+                      child: Text(deck.label, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(growable: false),
+              onChanged: (id) => setState(() => _selectedDeckId = id),
+            ),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('browser-confirm-move'),
+          onPressed: _selectedDeckId == null
+              ? null
+              : () => Navigator.of(context).pop(_selectedDeckId),
+          child: const Text('Move cards'),
         ),
       ],
     );
