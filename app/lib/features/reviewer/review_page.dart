@@ -179,10 +179,12 @@ class _ReviewPageState extends State<ReviewPage> {
       ): () => _actionShortcut(_ReviewAction.previousCardInfo),
       const SingleActivator(LogicalKeyboardKey.keyI): () =>
           _actionShortcut(_ReviewAction.cardInfo),
-      const SingleActivator(LogicalKeyboardKey.keyV, shift: true): () =>
-          _actionShortcut(_ReviewAction.recordOwnVoice),
-      const SingleActivator(LogicalKeyboardKey.keyV): () =>
-          _actionShortcut(_ReviewAction.replayOwnVoice),
+      if (widget.controller.canRecordOwnVoice) ...{
+        const SingleActivator(LogicalKeyboardKey.keyV, shift: true): () =>
+            _actionShortcut(_ReviewAction.recordOwnVoice),
+        const SingleActivator(LogicalKeyboardKey.keyV): () =>
+            _actionShortcut(_ReviewAction.replayOwnVoice),
+      },
       const SingleActivator(LogicalKeyboardKey.keyR): () =>
           _actionShortcut(_ReviewAction.replayAudio),
       const SingleActivator(LogicalKeyboardKey.f5): () =>
