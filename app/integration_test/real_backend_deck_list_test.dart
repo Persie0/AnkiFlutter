@@ -7,6 +7,11 @@ import 'package:anki_flutter/core/backend/generated/anki/backend.pb.dart';
 import 'package:anki_flutter/core/backend/native/ffi_native_anki_bindings.dart';
 import 'package:anki_flutter/core/backend/native/native_library_loader.dart';
 import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.dart';
+import 'package:anki_flutter/features/reviewer/data/anki_card_render_repository.dart';
+import 'package:anki_flutter/features/reviewer/data/anki_review_repository.dart';
+import 'package:anki_flutter/features/reviewer/models/review_rating.dart';
+import 'package:anki_flutter/features/reviewer/models/review_session_state.dart';
+import 'package:anki_flutter/features/reviewer/review_controller.dart';
 import 'package:anki_flutter/features/collection/collection_location.dart';
 import 'package:anki_flutter/features/collection/collection_session.dart';
 import 'package:anki_flutter/features/decks/anki_deck_repository.dart';
@@ -190,4 +195,77 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Study'), findsOneWidget);
   });
+
+  testWidgets(
+    'real backend completes queue render reveal grade and finish lifecycle',
+    (tester) async {
+      const overridePath = String.fromEnvironment('ANKIFLUTTER_NATIVE_LIB');
+      final bindings = FfiNativeAnkiBindings.fromLibrary(
+        openPlatformNativeLibrary(
+          platform: defaultTargetPlatform,
+          executablePath: Platform.resolvedExecutable,
+          environmentOverride: overridePath,
+        ),
+      );
+      final client = AnkiBackendClient.create(
+        bindings: bindings,
+        init: Uint8List.fromList(BackendInit(server: false).writeToBuffer()),
+      );
+      final session = CollectionSession(
+        backend: client,
+        mediaServer: ReviewMediaServer(),
+      );
+      final sandboxHome =
+          Platform.environment['HOME'] ?? Directory.current.path;
+      final temp = await Directory('$sandboxHome${Platform.pathSeparator}tmp')
+          .createTemp('anki_flutter_reviewer_lifecycle_');
+      final location = CollectionLocation.fromCollectionPath(
+        '${temp.path}${Platform.pathSeparator}collection.anki2',
+      );
+      await Directory(location.mediaFolderPath).create(recursive: true);
+      await session.open(location);
+
+      final noteRepository = AnkiNoteRepository(backend: client);
+      final defaults = await noteRepository.defaultsForAdding(1);
+      final note = await noteRepository.newNote(defaults.notetypeId.toInt());
+      note.fields[0] = 'reviewer integration front';
+      note.fields[1] = 'reviewer integration back';
+      await noteRepository.addNote(deckId: 1, note: note);
+
+      final reviewController = ReviewController(
+        repository: AnkiReviewRepository(backend: client),
+        renderer: AnkiCardRenderRepository(backend: client),
+        wallClockMillis: () => DateTime.now().millisecondsSinceEpoch,
+        stopwatchFactory: Stopwatch.new,
+      );
+
+      addTearDown(() async {
+        reviewController.dispose();
+        await session.close();
+        client.dispose();
+        await temp.delete(recursive: true);
+      });
+
+      await reviewController.start(1);
+
+      expect(reviewController.state, isA<ReviewQuestion>());
+      final question = reviewController.state as ReviewQuestion;
+      expect(question.content.questionHtml, contains('reviewer integration front'));
+      expect(question.card.choices, hasLength(4));
+      expect(
+        question.card.choices.every((choice) => choice.intervalLabel.isNotEmpty),
+        isTrue,
+      );
+
+      await reviewController.showAnswer();
+
+      expect(reviewController.state, isA<ReviewAnswer>());
+      final answer = reviewController.state as ReviewAnswer;
+      expect(answer.content.answerHtml, contains('reviewer integration back'));
+
+      await reviewController.rate(ReviewRating.good);
+
+      expect(reviewController.state, isA<ReviewFinished>());
+    },
+  );
 }
