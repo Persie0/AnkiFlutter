@@ -27,14 +27,8 @@ void main() {
     expect(find.text('Showing 4 of 5 matches.'), findsOneWidget);
 
     final button = find.byKey(const ValueKey('browser-load-more'));
-    await tester.scrollUntilVisible(
-      button,
-      220,
-      scrollable: find.descendant(
-        of: find.byType(ListView),
-        matching: find.byType(Scrollable),
-      ),
-    );
+    await tester.ensureVisible(button);
+    await tester.pumpAndSettle();
     await tester.tap(button);
     await tester.pumpAndSettle();
 
