@@ -33,6 +33,32 @@ void main() {
     expect(find.text('Replay audio'), findsNothing);
   });
 
+  testWidgets('unsupported controller ignores V and Shift+V', (tester) async {
+    final controller = ReviewController(
+      repository: _Repository(),
+      renderer: _Renderer(),
+      wallClockMillis: () => 100,
+      stopwatchFactory: Stopwatch.new,
+    );
+    addTearDown(controller.dispose);
+    await controller.start(7);
+    await _pumpPage(tester, controller);
+
+    await tester.tap(find.byTooltip('Review actions'));
+    await tester.pumpAndSettle();
+    expect(find.text('Record Own Voice'), findsNothing);
+    expect(find.text('Replay Own Voice'), findsNothing);
+    await tester.tapAt(Offset.zero);
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyV);
+    await _pressShiftV(tester);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preparing microphone…'), findsNothing);
+    expect(find.text("You haven't recorded your voice yet."), findsNothing);
+  });
+
   testWidgets('plain V reports empty own-voice state', (tester) async {
     final controller = await _controller(
       recorder: _VoiceRecorder(),
