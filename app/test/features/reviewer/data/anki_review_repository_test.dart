@@ -419,6 +419,30 @@ void main() {
     );
   });
 
+  test('isCardSuspended reads the answered card queue from Anki', () async {
+    final backend = _FakeBackend(
+      responses: {
+        BackendOperation.getCard: Uint8List.fromList(
+          cards_pb.Card(
+            id: Int64(101),
+            noteId: Int64(202),
+            deckId: Int64(303),
+            queue: -1,
+          ).writeToBuffer(),
+        ),
+      },
+    );
+    final repository = AnkiReviewRepository(backend: backend);
+    final card = _mutationCard();
+
+    expect(await repository.isCardSuspended(card), isTrue);
+
+    expect(backend.calls, hasLength(1));
+    expect(backend.calls.single.operation, BackendOperation.getCard);
+    final request = cards_pb.CardId.fromBuffer(backend.calls.single.request);
+    expect(request.cid.toInt(), card.cardId);
+  });
+
   test('canUndo reflects Anki GetUndoStatus instead of local state', () async {
     final backend = _FakeBackend(
       responses: {
