@@ -33,10 +33,10 @@ jobs:
             ~/.cargo/git
             native/anki_bridge/target
           key: rust-1.88-${{ runner.os }}-${{ hashFiles('third_party/anki/Cargo.lock', 'native/anki_bridge/Cargo.toml') }}
-      - name: Install Linux desktop and protoc dependencies
+      - name: Install Linux desktop, audio, and protoc dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb protobuf-compiler
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev xvfb protobuf-compiler pulseaudio-utils ffmpeg
       - name: Install Android NDK and Rust Android target
         run: |
           rustup target add aarch64-linux-android x86_64-linux-android
