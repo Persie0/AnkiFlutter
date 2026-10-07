@@ -289,7 +289,7 @@ class _DeckListPageState extends State<DeckListPage> {
       MaterialPageRoute<void>(
         builder: (_) => PackageTransferPage(
           repository: AnkiPackageRepository(backend: backend),
-          fileTransfer: const NativePackageFileTransfer(),
+          fileTransfer: NativePackageFileTransfer(),
           onCollectionChanged: widget.controller.load,
         ),
       ),
