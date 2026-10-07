@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anki_flutter/features/browser/browser_state_store.dart';
+import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
@@ -11,12 +12,14 @@ class CardBrowserPage extends StatefulWidget {
     required this.repository,
     required this.noteRepository,
     this.stateStore,
+    this.cardExporter,
     super.key,
   });
 
   final CardBrowserRepository repository;
   final NoteEntryRepository noteRepository;
   final BrowserStateStore? stateStore;
+  final BrowserCardExporter? cardExporter;
 
   @override
   State<CardBrowserPage> createState() => _CardBrowserPageState();
@@ -326,6 +329,47 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _exportSelectedCards() async {
+    final exporter = widget.cardExporter;
+    if (exporter == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+    final selectedIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final options = await showDialog<_BrowserCardExportOptions>(
+        context: context,
+        builder: (_) => _BrowserCardExportDialog(cardCount: selectedIds.length),
+      );
+      if (!mounted || options == null) return;
+      final saved = await exporter.exportCards(
+        selectedIds,
+        withScheduling: options.withScheduling,
+        withMedia: options.withMedia,
+      );
+      if (!mounted || !saved) return;
+      // Export does not change the collection; keep the selection in place.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Exported ${selectedIds.length} '
+            '${selectedIds.length == 1 ? 'card' : 'cards'} to Anki package.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not export selected cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _setSelectedFlags() async {
     final flagRepository = widget.repository is CardBrowserFlagRepository
         ? widget.repository as CardBrowserFlagRepository
@@ -615,6 +659,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     : () => unawaited(_confirmBulkAction(CardBulkAction.bury)),
                 child: const Text('Bury selected'),
               ),
+              if (widget.cardExporter != null)
+                OutlinedButton(
+                  key: const ValueKey('browser-export-selected'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_exportSelectedCards()),
+                  child: const Text('Export selected'),
+                ),
               if (widget.repository is CardBrowserFlagRepository)
                 OutlinedButton(
                   key: const ValueKey('browser-set-flags'),
@@ -878,6 +930,80 @@ class _BrowserMoveDeckDialogState extends State<_BrowserMoveDeckDialog> {
               ? null
               : () => Navigator.of(context).pop(_selectedDeckId),
           child: const Text('Move cards'),
+        ),
+      ],
+    );
+  }
+}
+
+class _BrowserCardExportOptions {
+  const _BrowserCardExportOptions({
+    required this.withScheduling,
+    required this.withMedia,
+  });
+
+  final bool withScheduling;
+  final bool withMedia;
+}
+
+class _BrowserCardExportDialog extends StatefulWidget {
+  const _BrowserCardExportDialog({required this.cardCount});
+
+  final int cardCount;
+
+  @override
+  State<_BrowserCardExportDialog> createState() => _BrowserCardExportDialogState();
+}
+
+class _BrowserCardExportDialogState extends State<_BrowserCardExportDialog> {
+  bool _withScheduling = true;
+  bool _withMedia = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Export selected cards'),
+      content: SizedBox(
+        width: 400,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Save ${widget.cardCount} selected '
+              '${widget.cardCount == 1 ? 'card' : 'cards'} '
+              'to an Anki package (.apkg).',
+            ),
+            SwitchListTile(
+              key: const ValueKey('browser-export-scheduling'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include scheduling'),
+              value: _withScheduling,
+              onChanged: (value) => setState(() => _withScheduling = value),
+            ),
+            SwitchListTile(
+              key: const ValueKey('browser-export-media'),
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Include media'),
+              value: _withMedia,
+              onChanged: (value) => setState(() => _withMedia = value),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('browser-confirm-export'),
+          onPressed: () => Navigator.of(context).pop(
+            _BrowserCardExportOptions(
+              withScheduling: _withScheduling,
+              withMedia: _withMedia,
+            ),
+          ),
+          child: const Text('Export'),
         ),
       ],
     );

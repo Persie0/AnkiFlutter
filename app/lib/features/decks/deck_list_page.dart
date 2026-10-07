@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
+import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
@@ -318,6 +319,10 @@ class _DeckListPageState extends State<DeckListPage> {
         builder: (_) => CardBrowserPage(
           repository: AnkiCardBrowserRepository(backend: backend),
           noteRepository: AnkiNoteRepository(backend: backend),
+          cardExporter: NativeBrowserCardExporter(
+            repository: AnkiPackageRepository(backend: backend),
+            fileTransfer: NativePackageFileTransfer(),
+          ),
         ),
       ),
     );
