@@ -57,7 +57,8 @@ void main() {
     await tester.pumpWidget(_app(repository, transfer));
     await tester.pumpAndSettle();
 
-    await _showExportControls(tester);
+    await tester.drag(find.byType(ListView), const Offset(0, -750));
+    await tester.pumpAndSettle();
     expect(find.textContaining('Could not list decks for export'), findsOneWidget);
     expect(find.byKey(const ValueKey('export-scope-dropdown')), findsNothing);
     await tester.tap(find.byKey(const ValueKey('export-apkg')));
