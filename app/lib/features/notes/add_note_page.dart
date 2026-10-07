@@ -14,11 +14,13 @@ class AddNotePage extends StatefulWidget {
   const AddNotePage({
     required this.deck,
     required this.repository,
+    this.sourceNoteId,
     super.key,
   });
 
   final DeckNode deck;
   final NoteEntryRepository repository;
+  final int? sourceNoteId;
 
   @override
   State<AddNotePage> createState() => _AddNotePageState();
@@ -72,6 +74,22 @@ class _AddNotePageState extends State<AddNotePage> {
       }
 
       _notetypes = notetypes.entries.toList(growable: false);
+      final sourceNoteId = widget.sourceNoteId;
+      if (sourceNoteId != null) {
+        final sourceNote = await widget.repository.getNote(sourceNoteId);
+        if (!_isCurrent(generation)) return;
+        final sourceNotetypeId = sourceNote.notetypeId.toInt();
+        if (!_notetypes.any(
+          (entry) => entry.id.toInt() == sourceNotetypeId,
+        )) {
+          throw StateError(
+            'Source note type $sourceNotetypeId is not available',
+          );
+        }
+        await _loadNotetype(sourceNotetypeId, sourceNote: sourceNote);
+        return;
+      }
+
       final defaults = await widget.repository.defaultsForAdding(widget.deck.id);
       if (!_isCurrent(generation)) return;
       final defaultId = defaults.notetypeId.toInt();
@@ -89,7 +107,10 @@ class _AddNotePageState extends State<AddNotePage> {
     }
   }
 
-  Future<void> _loadNotetype(int notetypeId) async {
+  Future<void> _loadNotetype(
+    int notetypeId, {
+    notes.Note? sourceNote,
+  }) async {
     final generation = ++_generation;
     setState(() {
       _selectedNotetypeId = notetypeId;
@@ -106,11 +127,16 @@ class _AddNotePageState extends State<AddNotePage> {
       final note = await widget.repository.newNote(notetypeId);
       if (!_isCurrent(generation)) return;
 
+      final sourceFields = sourceNote?.fields;
       _fields = [
-        for (final value in note.fields)
-          TextEditingController(text: value),
+        for (var index = 0; index < note.fields.length; index++)
+          TextEditingController(
+            text: sourceFields != null && index < sourceFields.length
+                ? sourceFields[index]
+                : note.fields[index],
+          ),
       ];
-      _tags.text = note.tags.join(' ');
+      _tags.text = (sourceNote?.tags ?? note.tags).join(' ');
       setState(() {
         _selectedNotetype = type;
         _note = note;

@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
+import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.dart';
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:anki_flutter/features/preferences/data/anki_preferences_repository.dart';
@@ -138,6 +141,14 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 controller: controller,
                 mediaBaseUri: widget.mediaBaseUri,
                 onEditNote: widget.backend == null ? null : _editReviewNote,
+                onCreateCopy: widget.backend == null ? null : _openReviewCreateCopy,
+                studyDeckId: widget.deck.id,
+                onOpenDeckOptions: widget.backend == null
+                    ? null
+                    : _openReviewDeckOptions,
+                onOpenCardInfo: widget.backend == null
+                    ? null
+                    : _openReviewCardInfo,
                 onFinished: () {
                   unawaited(widget.onChanged?.call());
                   Navigator.of(context).maybePop();
@@ -167,6 +178,68 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       ),
     );
     return saved == true;
+  }
+
+  Future<void> _openReviewCreateCopy(ReviewCreateCopyTarget target) async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    final deck = DeckNode(
+      id: target.deckId,
+      name: target.deckName,
+      newCount: 0,
+      learnCount: 0,
+      reviewCount: 0,
+      filtered: false,
+      children: const [],
+    );
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AddNotePage(
+          deck: deck,
+          repository: AnkiNoteRepository(backend: backend),
+          sourceNoteId: target.noteId,
+        ),
+      ),
+    );
+    await widget.onChanged?.call();
+  }
+
+  Future<void> _openReviewDeckOptions(ReviewDeckOptionsTarget target) async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    if (target.filtered) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Filtered deck configuration is not available yet.'),
+          ),
+        );
+      }
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DeckOptionsPage(
+          deckId: target.deckId,
+          repository: AnkiDeckOptionsRepository(backend: backend),
+          onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openReviewCardInfo(ReviewCardInfoTarget target) async {
+    final backend = widget.backend;
+    if (backend == null) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CardInfoPage(
+          repository: AnkiCardInfoRepository(backend: backend),
+          cardId: target.cardId,
+          kind: target.kind,
+        ),
+      ),
+    );
   }
 
   Future<void> _addNote() async {

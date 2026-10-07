@@ -45,6 +45,27 @@ void main() {
     expect(player.openedQueues.single, orderedEquals(items));
   });
 
+  test('playOneShot preserves the current logical queue for replay', () async {
+    final queue = [
+      Uri.parse('file:///tmp/card-question.mp3'),
+      Uri.parse('file:///tmp/card-answer.mp3'),
+    ];
+    final voice = Uri.parse('file:///tmp/reviewer-own-voice.wav');
+    await service.playQueue(queue);
+    player.openedQueues.clear();
+
+    await service.playOneShot(voice);
+
+    expect(player.openedOneShots, orderedEquals([voice]));
+    expect(player.openedQueues, isEmpty);
+
+    await service.replay();
+
+    expect(player.openedQueues, hasLength(1));
+    expect(player.openedQueues.single, orderedEquals(queue));
+    expect(player.openedOneShots, orderedEquals([voice]));
+  });
+
   test('replay without a queue is a no-op', () async {
     await service.replay();
 
@@ -107,6 +128,7 @@ void main() {
 class _FakePlayerAdapter implements ReviewAudioPlayerAdapter {
   final _playingController = StreamController<bool>.broadcast();
   final List<List<Uri>> openedQueues = [];
+  final List<Uri> openedOneShots = [];
   final List<Duration> seekDeltas = [];
 
   bool playing = false;
@@ -130,6 +152,11 @@ class _FakePlayerAdapter implements ReviewAudioPlayerAdapter {
   @override
   Future<void> openQueue(List<Uri> items) async {
     openedQueues.add(List<Uri>.from(items));
+  }
+
+  @override
+  Future<void> openOneShot(Uri item) async {
+    openedOneShots.add(item);
   }
 
   @override

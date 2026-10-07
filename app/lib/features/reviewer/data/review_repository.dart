@@ -43,6 +43,48 @@ abstract interface class ReviewMarkRepository {
   Future<void> setMarked(ReviewCard card, bool marked);
 }
 
+abstract interface class ReviewDeleteNoteRepository {
+  Future<void> deleteNote(ReviewCard card);
+}
+
+final class ReviewForgetCardOptions {
+  const ReviewForgetCardOptions({
+    required this.restoreOriginalPosition,
+    required this.resetRepetitionAndLapseCounts,
+  });
+
+  final bool restoreOriginalPosition;
+  final bool resetRepetitionAndLapseCounts;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is ReviewForgetCardOptions &&
+          other.restoreOriginalPosition == restoreOriginalPosition &&
+          other.resetRepetitionAndLapseCounts == resetRepetitionAndLapseCounts;
+
+  @override
+  int get hashCode => Object.hash(
+    restoreOriginalPosition,
+    resetRepetitionAndLapseCounts,
+  );
+}
+
+abstract interface class ReviewForgetCardRepository {
+  Future<ReviewForgetCardOptions> forgetCardDefaults();
+
+  Future<void> forgetCard(
+    ReviewCard card,
+    ReviewForgetCardOptions options,
+  );
+}
+
+abstract interface class ReviewSetDueDateRepository {
+  Future<String> dueDateDefault();
+
+  Future<void> setDueDate(ReviewCard card, String days);
+}
+
 abstract interface class ReviewTypedAnswerRepository {
   Future<ReviewTypedAnswerPreparation> prepareTypedAnswer(
     ReviewCard card,

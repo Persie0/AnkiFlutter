@@ -212,6 +212,24 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendCardRenderingService",
         "extract_cloze_for_typing",
     ),
+    ("REMOVE_NOTES", "BackendNotesService", "remove_notes"),
+    (
+        "SCHEDULE_CARDS_AS_NEW",
+        "BackendSchedulerService",
+        "schedule_cards_as_new",
+    ),
+    (
+        "SCHEDULE_CARDS_AS_NEW_DEFAULTS",
+        "BackendSchedulerService",
+        "schedule_cards_as_new_defaults",
+    ),
+    (
+        "GET_CONFIG_STRING",
+        "BackendConfigService",
+        "get_config_string",
+    ),
+    ("SET_DUE_DATE", "BackendSchedulerService", "set_due_date"),
+    ("CARD_STATS", "BackendStatsService", "card_stats"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

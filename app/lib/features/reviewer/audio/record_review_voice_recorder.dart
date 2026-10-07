@@ -1,0 +1,319 @@
+import 'dart:async';
+import 'dart:io';
+
+import 'package:anki_flutter/features/reviewer/audio/review_voice_recorder.dart';
+import 'package:record/record.dart';
+
+abstract interface class ReviewVoiceRecorderPort {
+  Future<bool> hasPermission();
+  Future<void> start(RecordConfig config, {required String path});
+  Future<String?> stop();
+  Future<void> cancel();
+  Future<void> dispose();
+}
+
+abstract interface class ReviewVoiceTimerHandle {
+  void cancel();
+}
+
+typedef ReviewVoiceTimerFactory =
+    ReviewVoiceTimerHandle Function(Duration interval, void Function() callback);
+
+class AudioRecorderReviewVoicePort implements ReviewVoiceRecorderPort {
+  AudioRecorderReviewVoicePort({AudioRecorder? recorder})
+    : _recorder = recorder ?? AudioRecorder();
+
+  final AudioRecorder _recorder;
+
+  @override
+  Future<bool> hasPermission() => _recorder.hasPermission();
+
+  @override
+  Future<void> start(RecordConfig config, {required String path}) =>
+      _recorder.start(config, path: path);
+
+  @override
+  Future<String?> stop() => _recorder.stop();
+
+  @override
+  Future<void> cancel() => _recorder.cancel();
+
+  @override
+  Future<void> dispose() => _recorder.dispose();
+}
+
+class RecordReviewVoiceRecorder implements ReviewVoiceRecorder {
+  RecordReviewVoiceRecorder({
+    ReviewVoiceRecorderPort? recorder,
+    Future<Directory> Function()? tempDirectoryProvider,
+    DateTime Function()? now,
+    ReviewVoiceTimerFactory? timerFactory,
+  }) : _recorder = recorder ?? AudioRecorderReviewVoicePort(),
+       _tempDirectoryProvider =
+           tempDirectoryProvider ?? (() async => Directory.systemTemp),
+       _now = now ?? DateTime.now,
+       _timerFactory = timerFactory ?? _defaultTimerFactory;
+
+  static const _elapsedInterval = Duration(seconds: 1);
+
+  final ReviewVoiceRecorderPort _recorder;
+  final Future<Directory> Function() _tempDirectoryProvider;
+  final DateTime Function() _now;
+  final ReviewVoiceTimerFactory _timerFactory;
+  final StreamController<Duration> _elapsedController =
+      StreamController<Duration>.broadcast(sync: true);
+
+  ReviewVoiceTimerHandle? _elapsedTimer;
+  DateTime? _recordingStartedAt;
+  String? _activePath;
+  bool _recording = false;
+  bool _starting = false;
+  bool _stopping = false;
+  bool _disposed = false;
+  int _pathSequence = 0;
+  int _activeOperations = 0;
+  Completer<void>? _operationsIdleCompleter;
+  Future<void>? _disposeFuture;
+
+  @override
+  bool get isRecording => _recording;
+
+  @override
+  Stream<Duration> get elapsedChanges => _elapsedController.stream;
+
+  @override
+  Future<bool> ensurePermission() {
+    _ensureUsable();
+    return _runOperation(_recorder.hasPermission);
+  }
+
+  @override
+  Future<void> start() {
+    _ensureUsable();
+    if (_recording || _starting || _stopping) {
+      return Future<void>.error(
+        StateError('A Reviewer voice recording is already active.'),
+      );
+    }
+    _starting = true;
+    return _runOperation(_startInternal).whenComplete(() => _starting = false);
+  }
+
+  Future<void> _startInternal() async {
+    final directory = await _tempDirectoryProvider();
+    if (_disposed) {
+      throw StateError('The Reviewer voice recorder has been disposed.');
+    }
+
+    final path = _nextRecordingPath(directory);
+    _activePath = path;
+    try {
+      await _recorder.start(
+        const RecordConfig(encoder: AudioEncoder.wav),
+        path: path,
+      );
+    } catch (_) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {
+        // Preserve the original start failure.
+      }
+      await _deleteActivePathBestEffort();
+      rethrow;
+    }
+
+    if (_disposed) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {
+        // Disposal has already won the lifecycle race.
+      }
+      await _deleteActivePathBestEffort();
+      throw StateError('The Reviewer voice recorder has been disposed.');
+    }
+
+    _recording = true;
+    _recordingStartedAt = _now();
+    _elapsedController.add(Duration.zero);
+    _elapsedTimer = _timerFactory(_elapsedInterval, _emitElapsed);
+  }
+
+  @override
+  Future<Uri?> stop() {
+    _ensureUsable();
+    if (!_recording || _stopping) return Future<Uri?>.value();
+    _stopping = true;
+    return _runOperation(_stopInternal).whenComplete(() => _stopping = false);
+  }
+
+  Future<Uri?> _stopInternal() async {
+    final activePath = _activePath;
+    _clearActiveState();
+    try {
+      final finalizedPath = await _recorder.stop();
+      if (finalizedPath == null || finalizedPath.isEmpty) {
+        await _deletePathBestEffort(activePath);
+        _activePath = null;
+        return null;
+      }
+      if (activePath != null && activePath != finalizedPath) {
+        await _deletePathBestEffort(activePath);
+      }
+      _activePath = null;
+      return Uri.file(finalizedPath);
+    } catch (_) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {
+        // Preserve the original stop failure.
+      }
+      await _deletePathBestEffort(activePath);
+      _activePath = null;
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> cancel() async {
+    _ensureUsable();
+    if (_starting || _stopping) {
+      await _waitForActiveOperations();
+    }
+    if (!_recording) return;
+    await _runOperation(_cancelInternal);
+  }
+
+  Future<void> _cancelInternal() async {
+    final activePath = _activePath;
+    _clearActiveState();
+    try {
+      await _recorder.cancel();
+    } finally {
+      await _deletePathBestEffort(activePath);
+      _activePath = null;
+    }
+  }
+
+  @override
+  Future<void> dispose() {
+    final existing = _disposeFuture;
+    if (existing != null) return existing;
+    final future = _disposeInternal();
+    _disposeFuture = future;
+    return future;
+  }
+
+  Future<void> _disposeInternal() async {
+    _disposed = true;
+
+    final wasRecording = _recording;
+    _clearActiveState();
+    await _waitForActiveOperations();
+
+    if (wasRecording) {
+      try {
+        await _recorder.cancel();
+      } catch (_) {
+        // Cleanup is best-effort during disposal.
+      } finally {
+        await _deleteActivePathBestEffort();
+      }
+    }
+
+    try {
+      await _recorder.dispose();
+    } finally {
+      if (!_elapsedController.isClosed) {
+        await _elapsedController.close();
+      }
+    }
+  }
+
+  Future<T> _runOperation<T>(Future<T> Function() operation) async {
+    if (_activeOperations == 0) {
+      _operationsIdleCompleter = Completer<void>();
+    }
+    _activeOperations += 1;
+    try {
+      return await operation();
+    } finally {
+      _activeOperations -= 1;
+      if (_activeOperations == 0) {
+        final idle = _operationsIdleCompleter;
+        _operationsIdleCompleter = null;
+        if (idle != null && !idle.isCompleted) {
+          idle.complete();
+        }
+      }
+    }
+  }
+
+  Future<void> _waitForActiveOperations() {
+    if (_activeOperations == 0) return Future<void>.value();
+    return _operationsIdleCompleter!.future;
+  }
+
+  String _nextRecordingPath(Directory directory) {
+    _pathSequence += 1;
+    final timestamp = _now().microsecondsSinceEpoch;
+    final filename = 'review-own-voice-$timestamp-$_pathSequence.wav';
+    return '${directory.path}${Platform.pathSeparator}$filename';
+  }
+
+  void _emitElapsed() {
+    if (_disposed || !_recording) return;
+    final startedAt = _recordingStartedAt;
+    if (startedAt == null) return;
+    final elapsed = _now().difference(startedAt);
+    _elapsedController.add(elapsed.isNegative ? Duration.zero : elapsed);
+  }
+
+  void _clearActiveState() {
+    _elapsedTimer?.cancel();
+    _elapsedTimer = null;
+    _recordingStartedAt = null;
+    _recording = false;
+  }
+
+  Future<void> _deleteActivePathBestEffort() async {
+    final path = _activePath;
+    await _deletePathBestEffort(path);
+    _activePath = null;
+  }
+
+  Future<void> _deletePathBestEffort(String? path) async {
+    if (path == null || path.isEmpty) return;
+    try {
+      final file = File(path);
+      if (await file.exists()) {
+        await file.delete();
+      }
+    } catch (_) {
+      // Temporary-file cleanup must not hide the recorder result/error.
+    }
+  }
+
+  void _ensureUsable() {
+    if (_disposed) {
+      throw StateError('The Reviewer voice recorder has been disposed.');
+    }
+  }
+
+  static ReviewVoiceTimerHandle _defaultTimerFactory(
+    Duration interval,
+    void Function() callback,
+  ) {
+    return _DartReviewVoiceTimer(
+      Timer.periodic(interval, (_) => callback()),
+    );
+  }
+}
+
+class _DartReviewVoiceTimer implements ReviewVoiceTimerHandle {
+  _DartReviewVoiceTimer(this._timer);
+
+  final Timer _timer;
+
+  @override
+  void cancel() => _timer.cancel();
+}

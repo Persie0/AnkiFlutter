@@ -1,106 +1,95 @@
+import 'dart:async';
+
 abstract interface class ReviewAudioPlayerAdapter {
   bool get isPlaying;
-
   Stream<bool> get playingChanges;
 
   Future<void> openQueue(List<Uri> items);
-
+  Future<void> openOneShot(Uri item);
   Future<void> play();
-
   Future<void> pause();
-
-  Future<void> seekRelative(Duration delta);
-
   Future<void> stop();
-
+  Future<void> seekRelative(Duration delta);
   Future<void> dispose();
 }
 
 abstract interface class ReviewAudioService {
   bool get isPlaying;
-
   Stream<bool> get playingChanges;
 
   Future<void> playQueue(List<Uri> items);
-
+  Future<void> playOneShot(Uri item);
   Future<void> replay();
-
   Future<void> togglePause();
-
   Future<void> seekRelative(Duration delta);
-
   Future<void> stop();
-
   Future<void> dispose();
 }
 
 class PlayerBackedReviewAudioService implements ReviewAudioService {
-  PlayerBackedReviewAudioService({required this._player});
+  PlayerBackedReviewAudioService({required this.player});
 
-  final ReviewAudioPlayerAdapter _player;
+  final ReviewAudioPlayerAdapter player;
   List<Uri> _currentQueue = const [];
   bool _disposed = false;
 
   @override
-  bool get isPlaying => _player.isPlaying;
+  bool get isPlaying => _disposed ? false : player.isPlaying;
 
   @override
-  Stream<bool> get playingChanges => _player.playingChanges;
+  Stream<bool> get playingChanges =>
+      _disposed ? const Stream<bool>.empty() : player.playingChanges;
 
   @override
   Future<void> playQueue(List<Uri> items) async {
-    _ensureUsable();
+    if (_disposed) return;
     _currentQueue = List<Uri>.unmodifiable(items);
     if (_currentQueue.isEmpty) {
-      await _player.stop();
+      await player.stop();
       return;
     }
-    await _player.openQueue(_currentQueue);
+    await player.openQueue(_currentQueue);
+  }
+
+  @override
+  Future<void> playOneShot(Uri item) async {
+    if (_disposed) return;
+    await player.openOneShot(item);
   }
 
   @override
   Future<void> replay() async {
-    if (_disposed || _currentQueue.isEmpty) {
-      return;
-    }
-    await _player.openQueue(_currentQueue);
+    if (_disposed || _currentQueue.isEmpty) return;
+    await player.openQueue(_currentQueue);
   }
 
   @override
   Future<void> togglePause() async {
-    _ensureUsable();
-    if (_player.isPlaying) {
-      await _player.pause();
+    if (_disposed) return;
+    if (player.isPlaying) {
+      await player.pause();
     } else {
-      await _player.play();
+      await player.play();
     }
   }
 
   @override
   Future<void> seekRelative(Duration delta) async {
-    _ensureUsable();
-    await _player.seekRelative(delta);
+    if (_disposed) return;
+    await player.seekRelative(delta);
   }
 
   @override
   Future<void> stop() async {
-    _ensureUsable();
-    await _player.stop();
+    if (_disposed) return;
+    await player.stop();
   }
 
   @override
   Future<void> dispose() async {
-    if (_disposed) {
-      return;
-    }
+    if (_disposed) return;
     _disposed = true;
     _currentQueue = const [];
-    await _player.dispose();
-  }
-
-  void _ensureUsable() {
-    if (_disposed) {
-      throw StateError('ReviewAudioService has been disposed');
-    }
+    await player.dispose();
   }
 }

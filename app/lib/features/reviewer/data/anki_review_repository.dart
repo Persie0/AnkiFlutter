@@ -7,6 +7,7 @@ import 'package:anki_flutter/core/backend/generated/anki/card_rendering.pb.dart'
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart' as cards_pb;
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
     as collection_pb;
+import 'package:anki_flutter/core/backend/generated/anki/config.pb.dart' as config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/deck_config.pb.dart'
     as deck_config_pb;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks_pb;
@@ -31,6 +32,9 @@ class AnkiReviewRepository
         ReviewRepository,
         ReviewFlagRepository,
         ReviewMarkRepository,
+        ReviewDeleteNoteRepository,
+        ReviewForgetCardRepository,
+        ReviewSetDueDateRepository,
         ReviewTypedAnswerRepository {
   AnkiReviewRepository({required this.backend});
 
@@ -137,6 +141,80 @@ class AnkiReviewRepository
     );
     await backend.invoke(
       marked ? BackendOperation.addNoteTags : BackendOperation.removeNoteTags,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<void> deleteNote(ReviewCard card) async {
+    final request = notes_pb.RemoveNotesRequest(
+      noteIds: [Int64(card.noteId)],
+    );
+    await backend.invoke(
+      BackendOperation.removeNotes,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<ReviewForgetCardOptions> forgetCardDefaults() async {
+    final request = scheduler_pb.ScheduleCardsAsNewDefaultsRequest(
+      context: scheduler_pb.ScheduleCardsAsNewRequest_Context.REVIEWER,
+    );
+    final response = await backend.invoke(
+      BackendOperation.scheduleCardsAsNewDefaults,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    final defaults = scheduler_pb.ScheduleCardsAsNewDefaultsResponse.fromBuffer(
+      response,
+    );
+    return ReviewForgetCardOptions(
+      restoreOriginalPosition: defaults.restorePosition,
+      resetRepetitionAndLapseCounts: defaults.resetCounts,
+    );
+  }
+
+  @override
+  Future<void> forgetCard(
+    ReviewCard card,
+    ReviewForgetCardOptions options,
+  ) async {
+    final request = scheduler_pb.ScheduleCardsAsNewRequest(
+      cardIds: [Int64(card.cardId)],
+      log: true,
+      restorePosition: options.restoreOriginalPosition,
+      resetCounts: options.resetRepetitionAndLapseCounts,
+      context: scheduler_pb.ScheduleCardsAsNewRequest_Context.REVIEWER,
+    );
+    await backend.invoke(
+      BackendOperation.scheduleCardsAsNew,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<String> dueDateDefault() async {
+    final request = config_pb.GetConfigStringRequest(
+      key: config_pb.ConfigKey_String.SET_DUE_REVIEWER,
+    );
+    final response = await backend.invoke(
+      BackendOperation.getConfigString,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return generic_pb.String.fromBuffer(response).val;
+  }
+
+  @override
+  Future<void> setDueDate(ReviewCard card, String days) async {
+    final request = scheduler_pb.SetDueDateRequest(
+      cardIds: [Int64(card.cardId)],
+      days: days,
+      configKey: config_pb.OptionalStringConfigKey(
+        key: config_pb.ConfigKey_String.SET_DUE_REVIEWER,
+      ),
+    );
+    await backend.invoke(
+      BackendOperation.setDueDate,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
