@@ -478,6 +478,20 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     });
   }
 
+  void _selectAllMatchingCards() {
+    final result = _result;
+    if (_loading ||
+        _bulkActionInProgress ||
+        result == null ||
+        result.matchingCardIds.length != result.totalCount ||
+        result.matchingCardIds.isEmpty) {
+      return;
+    }
+    // Search IDs are already returned in order by the native Anki backend,
+    // including results not yet materialized by the paginated browser.
+    setState(() => _selectedCardIds.addAll(result.matchingCardIds));
+  }
+
   void _clearCardSelection() {
     if (_bulkActionInProgress) return;
     setState(() => _selectedCardIds.clear());
@@ -604,6 +618,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     final allVisibleSelected = cards.every(
       (card) => _selectedCardIds.contains(card.cardId),
     );
+    final canSelectAllMatches =
+        _result!.matchingCardIds.length == _result!.totalCount &&
+        _result!.totalCount > cards.length;
+    final allMatchingSelected = canSelectAllMatches &&
+        _result!.matchingCardIds.every(_selectedCardIds.contains);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
       child: Align(
@@ -620,6 +639,15 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
               icon: const Icon(Icons.select_all),
               label: Text('Select visible (${cards.length})'),
             ),
+            if (canSelectAllMatches)
+              TextButton.icon(
+                key: const ValueKey('browser-select-all-matches'),
+                onPressed: allMatchingSelected || _bulkActionInProgress
+                    ? null
+                    : _selectAllMatchingCards,
+                icon: const Icon(Icons.done_all),
+                label: Text('Select all matches (${_result!.totalCount})'),
+              ),
             if (_selectedCardIds.isNotEmpty)
               TextButton(
                 key: const ValueKey('browser-clear-selection'),

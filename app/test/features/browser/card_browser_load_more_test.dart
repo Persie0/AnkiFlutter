@@ -24,6 +24,10 @@ void main() {
     expect(find.text('Card 30'), findsOneWidget);
     expect(find.text('Card 40'), findsOneWidget);
     expect(find.text('1 card selected'), findsOneWidget);
+    // The select-all-matches toolbar adds height; the lazily built footer
+    // can fall below the test viewport after additional cards are loaded.
+    await tester.drag(find.byType(ListView), const Offset(0, -300));
+    await tester.pumpAndSettle();
     expect(find.text('Showing 4 of 5 matches.'), findsOneWidget);
 
     final button = find.byKey(const ValueKey('browser-load-more'));
