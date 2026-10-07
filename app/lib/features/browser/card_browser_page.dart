@@ -277,6 +277,54 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _setSelectedFlags() async {
+    final flagRepository = widget.repository is CardBrowserFlagRepository
+        ? widget.repository as CardBrowserFlagRepository
+        : null;
+    if (flagRepository == null ||
+        _selectedCardIds.isEmpty ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    final cardIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final flag = await showDialog<int>(
+        context: context,
+        builder: (dialogContext) => SimpleDialog(
+          title: const Text('Set card flags'),
+          children: [
+            SimpleDialogOption(
+              key: const ValueKey('browser-flag-choice-0'),
+              onPressed: () => Navigator.of(dialogContext).pop(0),
+              child: const Text('Clear flags'),
+            ),
+            for (var index = 1; index <= 7; index++)
+              SimpleDialogOption(
+                key: ValueKey('browser-flag-choice-$index'),
+                onPressed: () => Navigator.of(dialogContext).pop(index),
+                child: Text('Flag $index'),
+              ),
+          ],
+        ),
+      );
+      if (!mounted || flag == null) return;
+
+      await flagRepository.setCardsFlag(cardIds, flag);
+      if (!mounted) return;
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not set selected card flags: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _moveSelectedCards() async {
     final deckRepository = widget.repository is CardBrowserDeckMoveRepository
         ? widget.repository as CardBrowserDeckMoveRepository
@@ -518,6 +566,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     : () => unawaited(_confirmBulkAction(CardBulkAction.bury)),
                 child: const Text('Bury selected'),
               ),
+              if (widget.repository is CardBrowserFlagRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-set-flags'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_setSelectedFlags()),
+                  child: const Text('Set flags'),
+                ),
               if (widget.repository is CardBrowserDeckMoveRepository)
                 OutlinedButton(
                   key: const ValueKey('browser-move-deck'),

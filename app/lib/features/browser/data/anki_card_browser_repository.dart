@@ -44,6 +44,11 @@ abstract interface class CardBrowserTagRepository {
   });
 }
 
+/// Optional browser capability for Anki's per-card flags (0 clears, 1-7 set).
+abstract interface class CardBrowserFlagRepository {
+  Future<void> setCardsFlag(List<int> cardIds, int flag);
+}
+
 /// Optional browser capability for moving cards into a regular deck.
 abstract interface class CardBrowserDeckMoveRepository {
   Future<List<CardBrowserDeckTarget>> moveTargets();
@@ -98,7 +103,8 @@ class AnkiCardBrowserRepository
     implements
         CardBrowserRepository,
         CardBrowserTagRepository,
-        CardBrowserDeckMoveRepository {
+        CardBrowserDeckMoveRepository,
+        CardBrowserFlagRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
@@ -250,6 +256,23 @@ class AnkiCardBrowserRepository
     );
     await backend.invoke(
       remove ? BackendOperation.removeNoteTags : BackendOperation.addNoteTags,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+  }
+
+  @override
+  Future<void> setCardsFlag(List<int> cardIds, int flag) async {
+    if (flag < 0 || flag > 7) {
+      throw ArgumentError.value(flag, 'flag', 'Anki card flags are 0 through 7.');
+    }
+    if (cardIds.isEmpty) return;
+
+    final request = anki_cards.SetFlagRequest(
+      cardIds: cardIds.toSet().map(Int64.new),
+      flag: flag,
+    );
+    await backend.invoke(
+      BackendOperation.setFlag,
       Uint8List.fromList(request.writeToBuffer()),
     );
   }
