@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart' as generic;
+import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart' as decks;
+import 'package:fixnum/fixnum.dart';
 import 'package:anki_flutter/core/backend/generated/anki/import_export.pb.dart'
     as import_export;
 
@@ -23,7 +25,29 @@ abstract interface class PackageRepository {
   });
 }
 
-class AnkiPackageRepository implements PackageRepository {
+/// Optional capability for exporting one regular deck without changing the
+/// existing package repository contract used by platform-specific callers.
+abstract interface class DeckScopedPackageRepository {
+  Future<List<PackageExportDeck>> exportDeckTargets();
+
+  Future<int> exportDeckPackage(
+    String outPath, {
+    required int deckId,
+    required bool withScheduling,
+    required bool withDeckConfigs,
+    required bool withMedia,
+    required bool legacy,
+  });
+}
+
+class PackageExportDeck {
+  const PackageExportDeck({required this.id, required this.name});
+
+  final int id;
+  final String name;
+}
+
+class AnkiPackageRepository implements PackageRepository, DeckScopedPackageRepository {
   const AnkiPackageRepository({required this.backend});
 
   final BackendInvoker backend;
@@ -59,8 +83,74 @@ class AnkiPackageRepository implements PackageRepository {
   }
 
   @override
+  Future<List<PackageExportDeck>> exportDeckTargets() async {
+    // Skip deck-tree due counts; only names/identifiers are required.
+    final response = await backend.invoke(
+      BackendOperation.deckTree,
+      Uint8List.fromList(decks.DeckTreeRequest().writeToBuffer()),
+    );
+    final tree = decks.DeckTreeNode.fromBuffer(response);
+    final targets = <PackageExportDeck>[];
+
+    void visit(decks.DeckTreeNode node, String parent) {
+      // Filtered decks are temporary views, not permanent deck exports.
+      if (node.filtered) return;
+      final path = parent.isEmpty ? node.name : '$parent::${node.name}';
+      if (node.deckId.toInt() > 0) {
+        targets.add(PackageExportDeck(id: node.deckId.toInt(), name: path));
+      }
+      for (final child in node.children) {
+        visit(child, path);
+      }
+    }
+
+    for (final child in tree.children) {
+      visit(child, '');
+    }
+    return List.unmodifiable(targets);
+  }
+
+  @override
+  Future<int> exportDeckPackage(
+    String outPath, {
+    required int deckId,
+    required bool withScheduling,
+    required bool withDeckConfigs,
+    required bool withMedia,
+    required bool legacy,
+  }) async {
+    if (deckId <= 0) {
+      throw ArgumentError.value(deckId, 'deckId', 'Choose a valid deck.');
+    }
+    return await _exportPackage(
+      outPath,
+      limit: import_export.ExportLimit(deckId: Int64(deckId)),
+      withScheduling: withScheduling,
+      withDeckConfigs: withDeckConfigs,
+      withMedia: withMedia,
+      legacy: legacy,
+    );
+  }
+
+  @override
   Future<int> exportPackage(
     String outPath, {
+    required bool withScheduling,
+    required bool withDeckConfigs,
+    required bool withMedia,
+    required bool legacy,
+  }) => _exportPackage(
+        outPath,
+        limit: import_export.ExportLimit(wholeCollection: generic.Empty()),
+        withScheduling: withScheduling,
+        withDeckConfigs: withDeckConfigs,
+        withMedia: withMedia,
+        legacy: legacy,
+      );
+
+  Future<int> _exportPackage(
+    String outPath, {
+    required import_export.ExportLimit limit,
     required bool withScheduling,
     required bool withDeckConfigs,
     required bool withMedia,
@@ -78,7 +168,7 @@ class AnkiPackageRepository implements PackageRepository {
         withMedia: withMedia,
         legacy: legacy,
       ),
-      limit: import_export.ExportLimit(wholeCollection: generic.Empty()),
+      limit: limit,
     );
     final response = await backend.invoke(
       BackendOperation.exportAnkiPackage,

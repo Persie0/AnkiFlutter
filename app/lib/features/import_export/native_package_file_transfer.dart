@@ -22,7 +22,20 @@ abstract interface class PackageFileTransfer {
   });
 }
 
-class NativePackageFileTransfer implements PackageFileTransfer {
+/// Optional platform adapter for exporting only one regular deck.
+abstract interface class DeckScopedPackageFileTransfer {
+  Future<PackageExportResult?> exportDeckPackage(
+    DeckScopedPackageRepository repository, {
+    required int deckId,
+    required bool withScheduling,
+    required bool withDeckConfigs,
+    required bool withMedia,
+    required bool legacy,
+  });
+}
+
+class NativePackageFileTransfer
+    implements PackageFileTransfer, DeckScopedPackageFileTransfer {
   const NativePackageFileTransfer();
 
   @override
@@ -51,19 +64,44 @@ class NativePackageFileTransfer implements PackageFileTransfer {
     required bool withDeckConfigs,
     required bool withMedia,
     required bool legacy,
-  }) async {
+  }) => _savePackage(
+    (path) => repository.exportPackage(
+      path,
+      withScheduling: withScheduling,
+      withDeckConfigs: withDeckConfigs,
+      withMedia: withMedia,
+      legacy: legacy,
+    ),
+  );
+
+  @override
+  Future<PackageExportResult?> exportDeckPackage(
+    DeckScopedPackageRepository repository, {
+    required int deckId,
+    required bool withScheduling,
+    required bool withDeckConfigs,
+    required bool withMedia,
+    required bool legacy,
+  }) => _savePackage(
+    (path) => repository.exportDeckPackage(
+      path,
+      deckId: deckId,
+      withScheduling: withScheduling,
+      withDeckConfigs: withDeckConfigs,
+      withMedia: withMedia,
+      legacy: legacy,
+    ),
+  );
+
+  Future<PackageExportResult?> _savePackage(
+    Future<int> Function(String path) export,
+  ) async {
     final directory = await Directory.systemTemp.createTemp('ankiflutter-export-');
     final package = File(
       '${directory.path}${Platform.pathSeparator}AnkiFlutter-export.apkg',
     );
     try {
-      final mediaFiles = await repository.exportPackage(
-        package.path,
-        withScheduling: withScheduling,
-        withDeckConfigs: withDeckConfigs,
-        withMedia: withMedia,
-        legacy: legacy,
-      );
+      final mediaFiles = await export(package.path);
       final bytes = await package.readAsBytes();
       final savedUri = await FilePicker.saveFile(
         dialogTitle: 'Save Anki package',
@@ -81,4 +119,5 @@ class NativePackageFileTransfer implements PackageFileTransfer {
       }
     }
   }
+
 }
