@@ -1,0 +1,216 @@
+import 'dart:async';
+
+import 'package:anki_flutter/core/backend/generated/anki/media.pb.dart'
+    as media;
+import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+/// Read-only media integrity audit delegated entirely to Anki's native
+/// backend. This page never guesses whether media is safe to delete.
+class CheckMediaPage extends StatefulWidget {
+  const CheckMediaPage({required this.repository, super.key});
+
+  final MediaRepository repository;
+
+  @override
+  State<CheckMediaPage> createState() => _CheckMediaPageState();
+}
+
+class _CheckMediaPageState extends State<CheckMediaPage> {
+  static const int _pageSize = 50;
+
+  bool _checking = false;
+  Object? _error;
+  media.CheckMediaResponse? _result;
+  int _missingVisible = _pageSize;
+  int _unusedVisible = _pageSize;
+  int _notesVisible = _pageSize;
+
+  Future<void> _check() async {
+    if (_checking) return;
+    setState(() {
+      _checking = true;
+      _error = null;
+    });
+    try {
+      final result = await widget.repository.checkMedia();
+      if (!mounted) return;
+      setState(() {
+        _result = result;
+        _missingVisible = _pageSize;
+        _unusedVisible = _pageSize;
+        _notesVisible = _pageSize;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = error);
+    } finally {
+      if (mounted) setState(() => _checking = false);
+    }
+  }
+
+  Future<void> _copyReport(String text) async {
+    try {
+      await Clipboard.setData(ClipboardData(text: text));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Media report copied.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not copy media report: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final result = _result;
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(title: const Text('Check media')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            Text('Collection media audit', style: theme.textTheme.titleLarge),
+            const SizedBox(height: 8),
+            const Text(
+              'Use Anki’s native media checker to find missing files, '
+              'unused media, and notes referencing missing media. '
+              'Checking does not delete or modify files.',
+            ),
+            const SizedBox(height: 16),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.icon(
+                key: const ValueKey('media-check-run'),
+                onPressed: _checking ? null : () => unawaited(_check()),
+                icon: _checking
+                    ? const SizedBox.square(
+                        dimension: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.fact_check_outlined),
+                label: Text(_checking
+                    ? 'Checking media…'
+                    : result == null
+                        ? 'Check collection media'
+                        : 'Check again'),
+              ),
+            ),
+            if (_error case final error?) ...[
+              const SizedBox(height: 12),
+              Text(
+                'Could not check media: $error',
+                key: const ValueKey('media-check-error'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ],
+            if (result case final result?) ...[
+              const SizedBox(height: 20),
+              const Divider(),
+              const SizedBox(height: 8),
+              Text('Missing files: ${result.missing.length}'),
+              const SizedBox(height: 4),
+              Text('Unused files: ${result.unused.length}'),
+              const SizedBox(height: 4),
+              Text('Affected notes: ${result.missingMediaNotes.length}'),
+              if (result.haveTrash) ...[
+                const SizedBox(height: 8),
+                const Text('Media trash exists.'),
+              ],
+              if (result.report.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text('Anki report', style: theme.textTheme.titleMedium),
+                const SizedBox(height: 8),
+                SelectableText(result.report),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: OutlinedButton.icon(
+                    key: const ValueKey('media-check-copy-report'),
+                    onPressed: () => unawaited(_copyReport(result.report)),
+                    icon: const Icon(Icons.copy_outlined),
+                    label: const Text('Copy report'),
+                  ),
+                ),
+              ],
+              _buildGroup(
+                title: 'Missing media',
+                description: 'Referenced in notes, but absent from the collection.',
+                filenames: result.missing,
+                visible: _missingVisible,
+                keyName: 'missing',
+                onShowMore: () => setState(() => _missingVisible += _pageSize),
+              ),
+              _buildGroup(
+                title: 'Unused media',
+                description: 'Present in the collection, but not referenced. '
+                    'No files are removed by this audit.',
+                filenames: result.unused,
+                visible: _unusedVisible,
+                keyName: 'unused',
+                onShowMore: () => setState(() => _unusedVisible += _pageSize),
+              ),
+              _buildGroup(
+                title: 'Notes with missing media',
+                description: 'Anki note IDs referencing missing files.',
+                filenames: result.missingMediaNotes
+                    .map((id) => 'Note ID ${id.toInt()}')
+                    .toList(growable: false),
+                visible: _notesVisible,
+                keyName: 'notes',
+                onShowMore: () => setState(() => _notesVisible += _pageSize),
+              ),
+              const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGroup({
+    required String title,
+    required String description,
+    required List<String> filenames,
+    required int visible,
+    required String keyName,
+    required VoidCallback onShowMore,
+  }) {
+    if (filenames.isEmpty) return const SizedBox.shrink();
+    final renderedCount = visible < filenames.length ? visible : filenames.length;
+    return Card(
+      key: ValueKey('media-check-group-$keyName'),
+      margin: const EdgeInsets.only(top: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text(description),
+            const SizedBox(height: 8),
+            for (final filename in filenames.take(renderedCount))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: SelectableText(filename),
+              ),
+            if (renderedCount < filenames.length) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                key: ValueKey('media-check-more-$keyName'),
+                onPressed: onShowMore,
+                child: Text('Show more (${filenames.length - renderedCount} remaining)'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
