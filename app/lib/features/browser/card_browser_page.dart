@@ -237,8 +237,10 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   }
 
   Future<void> _tagSelectedCards({required bool remove}) async {
-    final tagRepository = widget.repository;
-    if (tagRepository is! CardBrowserTagRepository ||
+    final tagRepository = widget.repository is CardBrowserTagRepository
+        ? widget.repository as CardBrowserTagRepository
+        : null;
+    if (tagRepository == null ||
         _selectedCardIds.isEmpty ||
         _bulkActionInProgress) {
       return;
