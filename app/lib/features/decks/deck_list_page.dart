@@ -16,6 +16,7 @@ import 'package:anki_flutter/features/import_export/package_transfer_page.dart';
 import 'package:anki_flutter/features/media/check_media_page.dart';
 import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
+import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
 import 'package:anki_flutter/features/notetypes/notetype_list_page.dart';
@@ -307,6 +308,21 @@ class _DeckListPageState extends State<DeckListPage> {
       MaterialPageRoute<void>(
         builder: (_) => CheckMediaPage(
           repository: AnkiMediaRepository(backend: backend),
+          onOpenNote: (noteId) => Navigator.of(context).push<bool>(
+            MaterialPageRoute<bool>(
+              builder: (_) => NoteEditorPage.edit(
+                noteId: noteId,
+                repository: AnkiNoteRepository(backend: backend),
+              ),
+            ),
+          ),
+          onBrowseAffectedNotes: (noteIds) {
+            // Use Anki's native note-ID search syntax. Every result remains
+            // editable through the existing browser and note editor.
+            _openBrowser(
+              initialQuery: noteIds.map((id) => 'nid:$id').join(' or '),
+            );
+          },
         ),
       ),
     );
@@ -326,12 +342,13 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
-  void _openBrowser() {
+  void _openBrowser({String? initialQuery}) {
     final backend = widget.backend;
     if (backend == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CardBrowserPage(
+          initialQuery: initialQuery,
           repository: AnkiCardBrowserRepository(backend: backend),
           noteRepository: AnkiNoteRepository(backend: backend),
           cardExporter: NativeBrowserCardExporter(
