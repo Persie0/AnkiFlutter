@@ -87,42 +87,37 @@ class _TagManagerPageState extends State<TagManagerPage> {
 
   Future<void> _rename(String tag) async {
     if (_busy) return;
-    final controller = TextEditingController(text: tag);
-    String? replacement;
-    try {
-      replacement = await showDialog<String>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('Rename tag'),
-          content: TextField(
-            key: const ValueKey('tag-rename-input'),
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'New tag name',
-              border: OutlineInputBorder(),
-            ),
-            onSubmitted: (value) =>
-                Navigator.of(dialogContext).pop(value.trim()),
+    String candidate = tag;
+    final replacement = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Rename tag'),
+        content: TextFormField(
+          key: const ValueKey('tag-rename-input'),
+          initialValue: tag,
+          autofocus: true,
+          decoration: const InputDecoration(
+            labelText: 'New tag name',
+            border: OutlineInputBorder(),
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              key: const ValueKey('tag-rename-confirm'),
-              onPressed: () =>
-                  Navigator.of(dialogContext).pop(controller.text.trim()),
-              child: const Text('Rename'),
-            ),
-          ],
+          onChanged: (value) => candidate = value,
+          onFieldSubmitted: (value) =>
+              Navigator.of(dialogContext).pop(value.trim()),
         ),
-      );
-    } finally {
-      // The dialog has already left the tree, so no TextField owns it.
-      controller.dispose();
-    }
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('tag-rename-confirm'),
+            onPressed: () =>
+                Navigator.of(dialogContext).pop(candidate.trim()),
+            child: const Text('Rename'),
+          ),
+        ],
+      ),
+    );
     if (!mounted || replacement == null) return;
     final newName = replacement.trim();
     if (newName.isEmpty || newName == tag) return;
