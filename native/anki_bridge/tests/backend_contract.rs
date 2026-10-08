@@ -17,13 +17,13 @@ use anki_proto::card_rendering::{
     RenderedTemplateNode,
 };
 use anki_proto::cards::{CardIds, RemoveCardsRequest};
-use anki_proto::scheduler::BuryOrSuspendCardsRequest;
 use anki_proto::collection::{
     CloseCollectionRequest, OpChangesWithCount, OpChangesWithId, OpenCollectionRequest,
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
 use anki_proto::media::{CheckMediaResponse, TrashMediaFilesRequest};
+use anki_proto::scheduler::BuryOrSuspendCardsRequest;
 use anki_proto::search::BrowserColumns;
 use prost::Message;
 use tempfile::TempDir;
