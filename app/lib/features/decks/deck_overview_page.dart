@@ -5,8 +5,10 @@ import 'package:anki_flutter/features/card_info/card_info_page.dart';
 import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.dart';
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
+import 'package:anki_flutter/features/deck_options/filtered_deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/data/anki_filtered_deck_repository.dart';
+import 'package:anki_flutter/features/decks/data/anki_filtered_deck_options_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
@@ -37,6 +39,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onAddNote,
     this.onBrowse,
     this.filteredDeckRepository,
+    this.filteredDeckOptionsRepository,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -54,6 +57,7 @@ class DeckOverviewPage extends StatefulWidget {
 
   /// Overrides the native repository in tests or custom backend integrations.
   final FilteredDeckRepository? filteredDeckRepository;
+  final FilteredDeckOptionsRepository? filteredDeckOptionsRepository;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -290,13 +294,7 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     final backend = widget.backend;
     if (backend == null) return;
     if (target.filtered) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Filtered deck configuration is not available yet.'),
-          ),
-        );
-      }
+      await _openFilteredOptions(target.deckId);
       return;
     }
     await Navigator.of(context).push(
@@ -382,7 +380,27 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     );
   }
 
+  Future<void> _openFilteredOptions(int deckId) async {
+    final backend = widget.backend;
+    final repository = widget.filteredDeckOptionsRepository ??
+        (backend == null ? null : AnkiFilteredDeckOptionsRepository(backend: backend));
+    if (repository == null || _mutating) return;
+    await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => FilteredDeckOptionsPage(
+          deckId: deckId,
+          repository: repository,
+          onChanged: widget.onChanged,
+        ),
+      ),
+    );
+  }
+
   Future<void> _deckOptions() async {
+    if (widget.deck.filtered) {
+      await _openFilteredOptions(widget.deck.id);
+      return;
+    }
     final backend = widget.backend;
     if (backend == null) return;
     await Navigator.of(context).push(
@@ -446,9 +464,11 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 ),
               ],
             ),
-          if (widget.backend != null)
+          if (widget.backend != null ||
+              (widget.deck.filtered &&
+                  widget.filteredDeckOptionsRepository != null))
             IconButton(
-              tooltip: 'Deck options',
+              tooltip: widget.deck.filtered ? 'Filtered deck options' : 'Deck options',
               onPressed: _mutating ? null : _deckOptions,
               icon: const Icon(Icons.settings_outlined),
             ),

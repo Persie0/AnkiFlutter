@@ -84,7 +84,9 @@ enum BackendOperation {
   sortCards(83),
   repositionDefaults(84),
   emptyFilteredDeck(85),
-  rebuildFilteredDeck(86);
+  rebuildFilteredDeck(86),
+  getOrCreateFilteredDeck(87),
+  addOrUpdateFilteredDeck(88);
 
   const BackendOperation(this.nativeId);
   final int nativeId;

@@ -95,6 +95,8 @@ void main() {
         'repositionDefaults': 84,
         'emptyFilteredDeck': 85,
         'rebuildFilteredDeck': 86,
+        'getOrCreateFilteredDeck': 87,
+        'addOrUpdateFilteredDeck': 88,
       },
     );
 
