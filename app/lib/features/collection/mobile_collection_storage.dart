@@ -64,35 +64,93 @@ class MobileCollectionStorage {
   final int Function() _timestampMicros;
 
   Future<String> copySelectedCollection(File source) async {
-    if (!RegExp(r'\.anki2$', caseSensitive: false).hasMatch(source.path)) {
+    if (!RegExp(r'\\.anki2$', caseSensitive: false).hasMatch(source.path)) {
       throw FormatException('Select an Anki .anki2 collection file.');
     }
     if (!await source.exists()) {
-      throw FileSystemException('The selected collection could not be read.', source.path);
+      throw FileSystemException(
+        'The selected collection could not be read.',
+        source.path,
+      );
     }
 
-    final basename = source.path.split(RegExp(r'[/\\]')).last;
-    final name = basename.replaceFirst(RegExp(r'\.anki2$', caseSensitive: false), '');
+    final basename = source.path.split(RegExp(r'[/\\\\]')).last;
+    final name = basename.replaceFirst(
+      RegExp(r'\\.anki2$', caseSensitive: false),
+      '',
+    );
+    final stem = '${name}_${_timestampMicros()}';
     final destinationPath =
-        '${collectionsDirectory.path}${Platform.pathSeparator}'
-        '${name}_${_timestampMicros()}.anki2';
-    final destination = File(destinationPath);
-    await collectionsDirectory.create(recursive: true);
-    await source.copy(destinationPath);
-
-    final sourceLocation = CollectionLocation.fromCollectionPath(source.path);
+        '${collectionsDirectory.path}${Platform.pathSeparator}$stem.anki2';
     final destinationLocation = CollectionLocation.fromCollectionPath(
       destinationPath,
     );
-    await _copyFileIfPresent(
-      sourceLocation.mediaDbPath,
-      destinationLocation.mediaDbPath,
-    );
-    await _copyDirectoryIfPresent(
-      Directory(sourceLocation.mediaFolderPath),
-      Directory(destinationLocation.mediaFolderPath),
-    );
-    return destination.path;
+    final sourceLocation = CollectionLocation.fromCollectionPath(source.path);
+
+    await collectionsDirectory.create(recursive: true);
+
+    // Never replace another previously imported collection or its media.
+    if (await File(destinationPath).exists() ||
+        await File(destinationLocation.mediaDbPath).exists() ||
+        await Directory(destinationLocation.mediaFolderPath).exists()) {
+      throw StateError('Collection import destination already exists.');
+    }
+
+    // Stage all three parts on the destination filesystem. The collection
+    // filename is made visible only after its companion media was copied.
+    // On any failure, delete only files created by this import.
+    final staging = await collectionsDirectory.createTemp('.anki-import-');
+    final separator = Platform.pathSeparator;
+    final stagedCollection = File('${staging.path}$separator$stem.anki2');
+    final stagedMediaDb = File('${staging.path}$separator$stem.media.db2');
+    final stagedMediaDir = Directory('${staging.path}$separator$stem.media');
+    var promotedMediaDb = false;
+    var promotedMediaDirectory = false;
+    var promotedCollection = false;
+
+    try {
+      await source.copy(stagedCollection.path);
+      await _copyFileIfPresent(sourceLocation.mediaDbPath, stagedMediaDb.path);
+      await _copyDirectoryIfPresent(
+        Directory(sourceLocation.mediaFolderPath),
+        stagedMediaDir,
+      );
+
+      // Destination can have appeared while staging. Refuse to overwrite it.
+      if (await File(destinationPath).exists() ||
+          await File(destinationLocation.mediaDbPath).exists() ||
+          await Directory(destinationLocation.mediaFolderPath).exists()) {
+        throw StateError('Collection import destination already exists.');
+      }
+
+      if (await stagedMediaDb.exists()) {
+        await stagedMediaDb.rename(destinationLocation.mediaDbPath);
+        promotedMediaDb = true;
+      }
+      if (await stagedMediaDir.exists()) {
+        await stagedMediaDir.rename(destinationLocation.mediaFolderPath);
+        promotedMediaDirectory = true;
+      }
+      await stagedCollection.rename(destinationPath);
+      promotedCollection = true;
+      return destinationPath;
+    } catch (_) {
+      if (promotedCollection) {
+        await File(destinationPath).delete();
+      }
+      if (promotedMediaDirectory) {
+        await Directory(destinationLocation.mediaFolderPath)
+            .delete(recursive: true);
+      }
+      if (promotedMediaDb) {
+        await File(destinationLocation.mediaDbPath).delete();
+      }
+      rethrow;
+    } finally {
+      if (await staging.exists()) {
+        await staging.delete(recursive: true);
+      }
+    }
   }
 
   Future<void> _copyFileIfPresent(String source, String destination) async {
