@@ -74,6 +74,8 @@ class MobileCollectionStorage {
       );
     }
 
+    await _rejectActiveSqliteJournal(source);
+    final sourceStat = await source.stat();
     final basename = source.path.split(RegExp(r'[/\\]')).last;
     final name = basename.replaceFirst(
       RegExp(r'\.anki2$', caseSensitive: false),
@@ -116,6 +118,18 @@ class MobileCollectionStorage {
         stagedMediaDir,
       );
 
+      // Anki uses SQLite WAL mode. A raw .anki2 copy taken while changes
+      // remain in a WAL/journal omits data, even when the copy succeeded.
+      await _rejectActiveSqliteJournal(source);
+      final currentStat = await source.stat();
+      if (currentStat.size != sourceStat.size ||
+          currentStat.modified != sourceStat.modified) {
+        throw StateError(
+          'The selected Anki collection changed during import. '
+          'Close it in the other application and try again.',
+        );
+      }
+
       // Destination can have appeared while staging. Refuse to overwrite it.
       if (await File(destinationPath).exists() ||
           await File(destinationLocation.mediaDbPath).exists() ||
@@ -149,6 +163,18 @@ class MobileCollectionStorage {
     } finally {
       if (await staging.exists()) {
         await staging.delete(recursive: true);
+      }
+    }
+  }
+
+  Future<void> _rejectActiveSqliteJournal(File source) async {
+    for (final suffix in const ['-wal', '-journal']) {
+      final companion = File('${source.path}$suffix');
+      if (await companion.exists() && await companion.length() > 0) {
+        throw StateError(
+          'The selected Anki collection has an active SQLite journal. '
+          'Close Anki before importing the collection.',
+        );
       }
     }
   }
