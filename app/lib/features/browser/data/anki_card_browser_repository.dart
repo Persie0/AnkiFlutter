@@ -110,6 +110,41 @@ abstract interface class CardBrowserSetDueDateRepository {
   Future<void> setCardsDueDate(List<int> cardIds, String days);
 }
 
+/// Reposition new cards with Anki's native scheduler. The backend ignores
+/// review cards and returns the number of new cards that were changed.
+abstract interface class CardBrowserRepositionRepository {
+  Future<CardBrowserRepositionDefaults> repositionDefaults();
+
+  Future<int> repositionNewCards(
+    List<int> cardIds,
+    CardBrowserRepositionOptions options,
+  );
+}
+
+class CardBrowserRepositionDefaults {
+  const CardBrowserRepositionDefaults({
+    required this.randomize,
+    required this.shiftExisting,
+  });
+
+  final bool randomize;
+  final bool shiftExisting;
+}
+
+class CardBrowserRepositionOptions {
+  const CardBrowserRepositionOptions({
+    required this.startingFrom,
+    required this.stepSize,
+    required this.randomize,
+    required this.shiftExisting,
+  });
+
+  final int startingFrom;
+  final int stepSize;
+  final bool randomize;
+  final bool shiftExisting;
+}
+
 class CardBrowserForgetOptions {
   const CardBrowserForgetOptions({
     required this.restoreOriginalPosition,
@@ -185,6 +220,7 @@ class AnkiCardBrowserRepository
         CardBrowserRestoreRepository,
         CardBrowserForgetRepository,
         CardBrowserSetDueDateRepository,
+        CardBrowserRepositionRepository,
         CardBrowserFindReplaceRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
@@ -303,6 +339,59 @@ class AnkiCardBrowserRepository
       Uint8List.fromList(request.writeToBuffer()),
     );
     return anki_cards.Card.fromBuffer(response).noteId.toInt();
+  }
+
+  @override
+  Future<CardBrowserRepositionDefaults> repositionDefaults() async {
+    final bytes = await backend.invoke(
+      BackendOperation.repositionDefaults,
+      Uint8List.fromList(generic.Empty().writeToBuffer()),
+    );
+    final defaults =
+        anki_scheduler.RepositionDefaultsResponse.fromBuffer(bytes);
+    return CardBrowserRepositionDefaults(
+      randomize: defaults.random,
+      shiftExisting: defaults.shift,
+    );
+  }
+
+  @override
+  Future<int> repositionNewCards(
+    List<int> cardIds,
+    CardBrowserRepositionOptions options,
+  ) async {
+    if (cardIds.isEmpty) return 0;
+    if (cardIds.any((id) => id <= 0)) {
+      throw ArgumentError.value(cardIds, 'cardIds', 'Invalid card ID.');
+    }
+    const maxUint32 = 0xffffffff;
+    if (options.startingFrom < 1 || options.startingFrom > maxUint32) {
+      throw ArgumentError.value(
+        options.startingFrom,
+        'startingFrom',
+        'Position must be between 1 and 4294967295.',
+      );
+    }
+    if (options.stepSize < 1 || options.stepSize > maxUint32) {
+      throw ArgumentError.value(
+        options.stepSize,
+        'stepSize',
+        'Step must be between 1 and 4294967295.',
+      );
+    }
+
+    final request = anki_scheduler.SortCardsRequest(
+      cardIds: cardIds.toSet().map(Int64.new),
+      startingFrom: options.startingFrom,
+      stepSize: options.stepSize,
+      randomize: options.randomize,
+      shiftExisting: options.shiftExisting,
+    );
+    final bytes = await backend.invoke(
+      BackendOperation.sortCards,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return anki_collection.OpChangesWithCount.fromBuffer(bytes).count;
   }
 
   @override
