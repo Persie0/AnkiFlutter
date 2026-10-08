@@ -45,6 +45,86 @@ void main() {
     expect(await File('${temporaryDirectory.path}/app/collections/French_123.media/card.mp3').readAsBytes(), [6, 7]);
   });
 
+  test('existing import destination is never overwritten', () async {
+    final sourceDir = Directory('${temporaryDirectory.path}/source');
+    await sourceDir.create();
+    final source = File('${sourceDir.path}/Existing.anki2');
+    await source.writeAsBytes([1, 2, 3]);
+
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    await destination.create();
+    final original = File('${destination.path}/Existing_123.anki2');
+    await original.writeAsBytes([9, 9, 9]);
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 123,
+    );
+    await expectLater(
+      storage.copySelectedCollection(source),
+      throwsStateError,
+    );
+    expect(await original.readAsBytes(), [9, 9, 9]);
+    expect(
+      destination.listSync().where(
+        (entity) => entity.path.contains('.anki-import-'),
+      ),
+      isEmpty,
+    );
+  });
+
+  test('existing companion media is preserved if collection is missing', () async {
+    final sourceDir = Directory('${temporaryDirectory.path}/source');
+    await sourceDir.create();
+    final source = File('${sourceDir.path}/French.anki2');
+    await source.writeAsBytes([1, 2, 3]);
+
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    await destination.create();
+    final existingMedia = File('${destination.path}/French_123.media.db2');
+    await existingMedia.writeAsBytes([4, 5, 6]);
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 123,
+    );
+    await expectLater(
+      storage.copySelectedCollection(source),
+      throwsStateError,
+    );
+    expect(await existingMedia.readAsBytes(), [4, 5, 6]);
+    expect(File('${destination.path}/French_123.anki2').existsSync(), isFalse);
+    expect(destination.listSync(), hasLength(1));
+  });
+
+  test('successful copy commits collection last with no temporary files', () async {
+    final sourceDir = Directory('${temporaryDirectory.path}/source');
+    await sourceDir.create();
+    final source = File('${sourceDir.path}/German.anki2');
+    await source.writeAsBytes([1]);
+    await File('${sourceDir.path}/German.media/pictures/one.png')
+        .create(recursive: true);
+    await File('${sourceDir.path}/German.media/pictures/one.png')
+        .writeAsBytes([4, 5]);
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 321,
+    );
+
+    final result = await storage.copySelectedCollection(source);
+    expect(await File(result).readAsBytes(), [1]);
+    expect(
+      await File('${destination.path}/German_321.media/pictures/one.png')
+          .readAsBytes(),
+      [4, 5],
+    );
+    expect(
+      destination.listSync().where(
+        (entity) => entity.path.contains('.anki-import-'),
+      ),
+      isEmpty,
+    );
+  });
+
   test('rejects files that are not Anki collection databases', () async {
     final source = File('${temporaryDirectory.path}/notes.txt');
     await source.writeAsString('not a collection');
