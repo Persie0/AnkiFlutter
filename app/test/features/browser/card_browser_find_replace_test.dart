@@ -95,6 +95,10 @@ void main() {
 
   testWidgets('all matching cards can be targeted without loading every row',
       (tester) async {
+    tester.view.physicalSize = const Size(1280, 960);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     final repo = _Repository();
     await tester.pumpWidget(_app(repo));
     await tester.pumpAndSettle();
@@ -103,8 +107,14 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('browser-find-replace')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('browser-find-text')), 'A');
-    await tester.tap(find.byKey(const ValueKey('browser-confirm-find-replace')));
     await tester.pumpAndSettle();
+    final confirm = find.byKey(const ValueKey('browser-confirm-find-replace'));
+    expect(tester.widget<FilledButton>(confirm).onPressed, isNotNull);
+    await tester.ensureVisible(confirm);
+    await tester.pumpAndSettle();
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(repo.replacements, hasLength(1));
     expect(repo.replacements.single.ids, [10, 20, 30]);
   });
 
