@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -308,6 +309,109 @@ void main() {
     expect(tempRoot.existsSync(), isTrue);
     expect(tempRoot.listSync(), isEmpty);
   });
+  test('concurrent TTS sessions never overwrite or delete each other',
+      () async {
+    final backend = _FakeBackend((operation, request) async {
+      if (operation == BackendOperation.allTtsVoices) {
+        return _bytes(card_rendering_pb.AllTtsVoicesResponse(
+          voices: [
+            card_rendering_pb.AllTtsVoicesResponse_TtsVoice(
+              id: 'voice-id',
+              name: 'English',
+              language: 'en-US',
+              available: true,
+            ),
+          ],
+        ));
+      }
+      if (operation == BackendOperation.writeTtsStream) {
+        final input = card_rendering_pb.WriteTtsStreamRequest.fromBuffer(request);
+        await File(input.path).writeAsString(input.text);
+        return Uint8List(0);
+      }
+      fail('Unexpected operation: $operation');
+    });
+    AnkiReviewTtsService createService() => AnkiReviewTtsService(
+      backend: backend,
+      tempDirectoryProvider: () async => tempRoot,
+    );
+    final first = createService();
+    final second = createService();
+    ReviewTtsTag tag(String text) => ReviewTtsTag(
+      text: text,
+      language: 'en_US',
+      voices: const ['English'],
+      speed: 1,
+      otherArgs: const [],
+    );
+
+    final one = await first.materialize(tag('first'));
+    final two = await second.materialize(tag('second'));
+    expect(one, isNotNull);
+    expect(two, isNotNull);
+    expect(one, isNot(two));
+    expect(await File.fromUri(one!).readAsString(), 'first');
+    expect(await File.fromUri(two!).readAsString(), 'second');
+
+    await first.dispose();
+    expect(File.fromUri(one).existsSync(), isFalse);
+    expect(await File.fromUri(two).readAsString(), 'second');
+    await second.dispose();
+    expect(tempRoot.listSync(), isEmpty);
+  });
+
+  test('dispose waits for an in-flight native TTS write and removes its files',
+      () async {
+    final started = Completer<void>();
+    final releaseWrite = Completer<void>();
+    final backend = _FakeBackend((operation, request) async {
+      if (operation == BackendOperation.allTtsVoices) {
+        return _bytes(card_rendering_pb.AllTtsVoicesResponse(
+          voices: [
+            card_rendering_pb.AllTtsVoicesResponse_TtsVoice(
+              id: 'voice-id',
+              name: 'English',
+              language: 'en-US',
+              available: true,
+            ),
+          ],
+        ));
+      }
+      if (operation == BackendOperation.writeTtsStream) {
+        final input = card_rendering_pb.WriteTtsStreamRequest.fromBuffer(request);
+        started.complete();
+        await releaseWrite.future;
+        await File(input.path).writeAsBytes([7]);
+        return Uint8List(0);
+      }
+      fail('Unexpected operation: $operation');
+    });
+    final service = AnkiReviewTtsService(
+      backend: backend,
+      tempDirectoryProvider: () async => tempRoot,
+    );
+    final pending = service.materialize(ReviewTtsTag(
+      text: 'race',
+      language: 'en_US',
+      voices: const ['English'],
+      speed: 1,
+      otherArgs: const [],
+    ));
+    await started.future;
+    final disposing = service.dispose();
+    releaseWrite.complete();
+    expect(await pending, isNull);
+    await disposing;
+    expect(tempRoot.listSync(), isEmpty);
+    expect(await service.materialize(ReviewTtsTag(
+      text: 'late',
+      language: 'en_US',
+      voices: const ['English'],
+      speed: 1,
+      otherArgs: const [],
+    )), isNull);
+  });
+
 }
 
 Uint8List _bytes(card_rendering_pb.AllTtsVoicesResponse response) {
