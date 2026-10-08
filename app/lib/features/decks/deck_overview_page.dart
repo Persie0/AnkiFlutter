@@ -6,6 +6,7 @@ import 'package:anki_flutter/features/card_info/data/anki_card_info_repository.d
 import 'package:anki_flutter/features/deck_options/data/anki_deck_options_repository.dart';
 import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
+import 'package:anki_flutter/features/decks/data/anki_filtered_deck_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
@@ -35,6 +36,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onChanged,
     this.onAddNote,
     this.onBrowse,
+    this.filteredDeckRepository,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -49,6 +51,9 @@ class DeckOverviewPage extends StatefulWidget {
 
   /// Opens the collection browser with native Anki search syntax.
   final void Function(String query)? onBrowse;
+
+  /// Overrides the native repository in tests or custom backend integrations.
+  final FilteredDeckRepository? filteredDeckRepository;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -58,6 +63,77 @@ class DeckOverviewPage extends StatefulWidget {
 class _DeckOverviewPageState extends State<DeckOverviewPage> {
   ReviewController? _reviewController;
   bool _mutating = false;
+
+  FilteredDeckRepository? get _filteredDeckRepository {
+    if (!widget.deck.filtered) return null;
+    final provided = widget.filteredDeckRepository;
+    if (provided != null) return provided;
+    final backend = widget.backend;
+    return backend == null ? null : AnkiFilteredDeckRepository(backend: backend);
+  }
+
+  Future<void> _performFilteredDeckOperation(
+    Future<String> Function(FilteredDeckRepository repository) operation,
+  ) async {
+    final repository = _filteredDeckRepository;
+    if (repository == null || _mutating) return;
+    setState(() => _mutating = true);
+    try {
+      final summary = await operation(repository);
+      if (!mounted) return;
+      await widget.onChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(summary)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not update filtered deck: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
+
+  Future<void> _rebuildFilteredDeck() async {
+    await _performFilteredDeckOperation((repository) async {
+      final count = await repository.rebuild(widget.deck.id);
+      return count == 1
+          ? 'Rebuilt filtered deck: 1 card.'
+          : 'Rebuilt filtered deck: $count cards.';
+    });
+  }
+
+  Future<void> _emptyFilteredDeck() async {
+    if (_filteredDeckRepository == null || _mutating) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Empty filtered deck?'),
+        content: const Text(
+          'Return its cards to their original decks? '
+          'Cards and review history will not be deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('filtered-deck-confirm-empty'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Empty deck'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    await _performFilteredDeckOperation((repository) async {
+      await repository.empty(widget.deck.id);
+      return 'Emptied filtered deck. Cards returned to original decks.';
+    });
+  }
 
   Future<void> _rename() async {
     final rename = widget.onRename;
@@ -426,6 +502,22 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               Text('Learn ${deck.learnCount}'),
               const SizedBox(height: 8),
               Text('Review ${deck.reviewCount}'),
+              if (_filteredDeckRepository != null) ...[
+                const SizedBox(height: 24),
+                OutlinedButton.icon(
+                  key: const ValueKey('filtered-deck-rebuild'),
+                  onPressed: _mutating ? null : _rebuildFilteredDeck,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Rebuild filtered deck'),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('filtered-deck-empty'),
+                  onPressed: _mutating ? null : _emptyFilteredDeck,
+                  icon: const Icon(Icons.clear_all),
+                  label: const Text('Empty filtered deck'),
+                ),
+              ],
               const SizedBox(height: 24),
               FilledButton(
                 onPressed:

@@ -93,6 +93,8 @@ void main() {
         'findAndReplace': 82,
         'sortCards': 83,
         'repositionDefaults': 84,
+        'emptyFilteredDeck': 85,
+        'rebuildFilteredDeck': 86,
       },
     );
 
