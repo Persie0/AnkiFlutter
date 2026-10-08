@@ -1,9 +1,13 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
+import 'package:anki_flutter/features/card_info/data/card_info_repository.dart';
+
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 /// Read-only card preview using Anki's browser rendering context.
 /// No reviewer queue is entered and no scheduling operation is performed.
@@ -12,6 +16,7 @@ class BrowserCardPreviewPage extends StatefulWidget {
     required this.cardId,
     required this.repository,
     this.orderedCardIds = const [],
+    this.cardInfoRepository,
     this.mediaBaseUri,
     this.surfaceBuilder,
     super.key,
@@ -23,6 +28,9 @@ class BrowserCardPreviewPage extends StatefulWidget {
   /// Optional complete browser-search order. Without it preview stays a
   /// single-card view, as before. The active card must be in this list.
   final List<int> orderedCardIds;
+
+  /// Optional card information for any matching card, including unloaded rows.
+  final CardInfoRepository? cardInfoRepository;
   final Uri? mediaBaseUri;
   final Widget Function(BuildContext context, String html)? surfaceBuilder;
 
@@ -50,6 +58,26 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
         : <int>[widget.cardId];
     _orderedCardIds = List<int>.unmodifiable(ordered);
     _position = _orderedCardIds.indexOf(widget.cardId);
+  }
+
+  void _flip() {
+    if (_loading || _content == null) return;
+    setState(() => _showAnswer = !_showAnswer);
+  }
+
+  Future<void> _openCardInfo() async {
+    final info = widget.cardInfoRepository;
+    if (info == null || _loading) return;
+    final cardId = _currentCardId;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CardInfoPage(
+          repository: info,
+          cardId: cardId,
+          kind: CardInfoKind.browser,
+        ),
+      ),
+    );
   }
 
   void _navigate(int delta) {
@@ -120,10 +148,31 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
   @override
   Widget build(BuildContext context) {
     final content = _content;
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.arrowLeft): () =>
+            _navigate(-1),
+        const SingleActivator(LogicalKeyboardKey.arrowRight): () =>
+            _navigate(1),
+        const SingleActivator(LogicalKeyboardKey.space): _flip,
+        const SingleActivator(LogicalKeyboardKey.enter): _flip,
+        if (widget.cardInfoRepository != null)
+          const SingleActivator(LogicalKeyboardKey.keyI): () =>
+              unawaited(_openCardInfo()),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: Text('Preview card $_currentCardId'),
         actions: [
+          if (widget.cardInfoRepository != null)
+            IconButton(
+              key: const ValueKey('browser-preview-card-info'),
+              tooltip: 'Card info',
+              onPressed: _loading ? null : () => unawaited(_openCardInfo()),
+              icon: const Icon(Icons.info_outline),
+            ),
           if (_orderedCardIds.length > 1) ...[
             Center(
               child: Text(
@@ -187,13 +236,13 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
                 padding: const EdgeInsets.all(16),
                 child: FilledButton(
                   key: const ValueKey('browser-preview-flip'),
-                  onPressed: _loading
-                      ? null
-                      : () => setState(() => _showAnswer = !_showAnswer),
+                  onPressed: _loading ? null : _flip,
                   child: Text(_showAnswer ? 'Show question' : 'Show answer'),
                 ),
               ),
           ],
+        ),
+      ),
         ),
       ),
     );
