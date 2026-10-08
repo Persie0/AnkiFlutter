@@ -18,8 +18,8 @@ use anki_proto::card_rendering::{
 };
 use anki_proto::cards::{CardIds, RemoveCardsRequest};
 use anki_proto::collection::{
-    CheckDatabaseResponse, CloseCollectionRequest, OpChangesAfterUndo, OpChangesWithCount,
-    OpChangesWithId, OpenCollectionRequest, UndoStatus,
+    CheckDatabaseResponse, CloseCollectionRequest, CreateBackupRequest, OpChangesAfterUndo,
+    OpChangesWithCount, OpChangesWithId, OpenCollectionRequest, UndoStatus,
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
@@ -176,6 +176,43 @@ fn real_collection_opens_exposes_default_deck_and_reopens_through_ffi() {
         String::from_utf8_lossy(&bytes)
     );
     assert_empty_default_deck(&fetch_tree(&backend));
+}
+
+#[test]
+fn native_backup_creates_database_only_archive_in_selected_directory() {
+    let temp = TempDir::new().unwrap();
+    let backend = TestBackend::new();
+    let open = collection_request(&temp);
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let folder = temp.path().join("manual-backups");
+    fs::create_dir_all(&folder).unwrap();
+    let (status, bytes) = backend.invoke(
+        81,
+        &CreateBackupRequest {
+            backup_folder: folder.to_string_lossy().into_owned(),
+            force: true,
+            wait_for_completion: true,
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "backup failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let created = anki_proto::generic::Bool::decode(bytes.as_slice()).unwrap();
+    assert!(created.val, "forced native backup must actually be created");
+    assert!(
+        fs::read_dir(&folder).unwrap().next().is_some(),
+        "native backup must write into the selected folder"
+    );
 }
 
 #[test]

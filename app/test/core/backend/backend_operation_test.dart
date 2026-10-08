@@ -89,6 +89,7 @@ void main() {
         'restoreBuriedAndSuspendedCards': 78,
         'redo': 79,
         'checkDatabase': 80,
+        'createBackup': 81,
       },
     );
 

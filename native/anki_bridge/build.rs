@@ -247,6 +247,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendCollectionService",
         "check_database",
     ),
+    ("CREATE_BACKUP", "BackendCollectionService", "create_backup"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

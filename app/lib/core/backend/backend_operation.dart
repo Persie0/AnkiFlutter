@@ -78,7 +78,8 @@ enum BackendOperation {
   restoreMediaTrash(77),
   restoreBuriedAndSuspendedCards(78),
   redo(79),
-  checkDatabase(80);
+  checkDatabase(80),
+  createBackup(81);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
