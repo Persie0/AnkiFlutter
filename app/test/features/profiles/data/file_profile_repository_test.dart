@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:anki_flutter/features/profiles/data/file_profile_repository.dart';
@@ -73,6 +74,42 @@ void main() {
 
     expect(await repository.list(), isEmpty);
     expect(await collection.readAsBytes(), [7, 8, 9]);
+  });
+
+  test('successive profile updates leave valid JSON and no staging files',
+      () async {
+    final personal = await repository.create('Personal');
+    for (var i = 0; i < 10; i++) {
+      await repository.create('Course $i');
+      final decoded = jsonDecode(await repository.registryFile.readAsString())
+          as Map<String, dynamic>;
+      expect(decoded['version'], 1);
+      expect((decoded['profiles'] as List).length, i + 2);
+      expect(
+        tempDirectory.listSync().where((item) =>
+            item.path.contains('.anki-profile-write-')),
+        isEmpty,
+      );
+    }
+
+    await repository.rename(personal.id, 'Primary');
+    final decoded = jsonDecode(await repository.registryFile.readAsString())
+        as Map<String, dynamic>;
+    expect((decoded['profiles'] as List).first['name'], 'Primary');
+  });
+
+  test('failed registry replacement cleans staged file', () async {
+    final directoryAtRegistryPath = Directory(repository.registryFile.path);
+    await directoryAtRegistryPath.create(recursive: true);
+
+    await expectLater(repository.create('Personal'), throwsFileSystemException);
+
+    expect(await directoryAtRegistryPath.exists(), isTrue);
+    expect(
+      tempDirectory.listSync().where((entry) =>
+          entry.path.contains('.anki-profile-write-')),
+      isEmpty,
+    );
   });
 
   test('recovers from malformed registry as an empty profile list', () async {
