@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/core/backend/generated/anki/media.pb.dart' as media;
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart' as search;
 import 'package:fixnum/fixnum.dart';
@@ -21,6 +22,7 @@ void main() {
         pickCollection: () async => '/tmp/a.anki2',
         openCollection: (_) async {},
         backend: backend,
+        browserStateStore: _StateStore(),
       ),
     ));
     await tester.pumpAndSettle();
@@ -99,4 +101,12 @@ class _Backend implements BackendInvoker {
     }
     return Uint8List(0);
   }
+}
+
+class _StateStore implements BrowserStateStore {
+  @override
+  Future<CardBrowserState?> load() async => null;
+
+  @override
+  Future<void> save(CardBrowserState state) async {}
 }
