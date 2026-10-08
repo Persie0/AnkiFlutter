@@ -11,7 +11,7 @@ void main() {
     final repo = _Repository();
     await tester.pumpWidget(_app(repo, () async => '/tmp/backups'));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(repo.folders, isEmpty);
     expect(find.textContaining('Media files are not included'), findsOneWidget);
@@ -27,7 +27,7 @@ void main() {
     final repo = _Repository();
     await tester.pumpWidget(_app(repo, () async => null));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
 
     expect(repo.folders, isEmpty);
     expect(find.byKey(const ValueKey('collection-backup-result')), findsNothing);
@@ -40,7 +40,7 @@ void main() {
     final repo = _Repository();
     await tester.pumpWidget(_app(repo, () async => '/tmp/backups'));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
@@ -52,7 +52,7 @@ void main() {
     final repo = _Repository()..created = false;
     await tester.pumpWidget(_app(repo, () async => '/tmp/backups'));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(find.byKey(const ValueKey('collection-backup-confirm')));
     await tester.pumpAndSettle();
 
@@ -64,7 +64,7 @@ void main() {
     final repo = _Repository()..fail = true;
     await tester.pumpWidget(_app(repo, () async => '/tmp/backups'));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(find.byKey(const ValueKey('collection-backup-confirm')));
     await tester.pumpAndSettle();
 
@@ -82,7 +82,7 @@ void main() {
     repo.pending = pending;
     await tester.pumpWidget(_app(repo, () async => '/tmp/backups'));
     await tester.tap(find.byKey(const ValueKey('collection-backup-run')));
-    await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 350));
     await tester.tap(find.byKey(const ValueKey('collection-backup-confirm')));
     await tester.pump();
 
