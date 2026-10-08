@@ -470,6 +470,99 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _setSelectedCardsDueDate() async {
+    final repository = widget.repository is CardBrowserSetDueDateRepository
+        ? widget.repository as CardBrowserSetDueDateRepository
+        : null;
+    if (repository == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    final selectedIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final defaultValue = await repository.setDueDateDefault();
+      if (!mounted) return;
+
+      var days = defaultValue;
+      final confirmedDays = await showDialog<String>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(
+              'Set due date for ${selectedIds.length} '
+              '${selectedIds.length == 1 ? 'card' : 'cards'}?',
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Reschedule the selected cards using Anki. '
+                    'Existing due dates will change.',
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    key: const ValueKey('browser-due-days'),
+                    initialValue: defaultValue,
+                    autofocus: true,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Days until due',
+                      border: OutlineInputBorder(),
+                    ),
+                    onChanged: (value) => setDialogState(() => days = value),
+                    onFieldSubmitted: (value) {
+                      if (value.trim().isNotEmpty) {
+                        Navigator.of(dialogContext).pop(value.trim());
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    '0 = today\n'
+                    '1! = tomorrow and change interval to 1\n'
+                    '3-7 = random day between 3 and 7',
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const ValueKey('browser-confirm-due'),
+                onPressed: days.trim().isEmpty
+                    ? null
+                    : () => Navigator.of(dialogContext).pop(days.trim()),
+                child: const Text('Set due date'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || confirmedDays == null) return;
+
+      await repository.setCardsDueDate(selectedIds, confirmedDays);
+      if (!mounted) return;
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not set due date: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _restoreSelectedCards() async {
     final repository = widget.repository is CardBrowserRestoreRepository
         ? widget.repository as CardBrowserRestoreRepository
@@ -904,6 +997,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                       ? null
                       : () => unawaited(_forgetSelectedCards()),
                   child: const Text('Forget selected'),
+                ),
+              if (widget.repository is CardBrowserSetDueDateRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-set-due'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_setSelectedCardsDueDate()),
+                  child: const Text('Set due date'),
                 ),
               if (widget.repository is CardBrowserFlagRepository)
                 OutlinedButton(
