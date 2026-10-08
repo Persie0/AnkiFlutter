@@ -11,6 +11,23 @@ import 'package:fixnum/fixnum.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('new filtered deck loads zero-ID defaults and saves with ID zero',
+      () async {
+    final backend = _Backend();
+    final repository = AnkiFilteredDeckOptionsRepository(backend: backend);
+    final draft = await repository.load(0);
+    expect(draft.id.toInt(), 0);
+    expect(decks.DeckId.fromBuffer(backend.requests.single).did.toInt(), 0);
+    draft.name = 'New filtered deck';
+    draft.config.searchTerms.single.search = 'is:due';
+    final newId = await repository.save(draft);
+    expect(newId, 98);
+    final saved = decks.FilteredDeckForUpdate.fromBuffer(backend.requests.last);
+    expect(saved.id.toInt(), 0);
+    expect(saved.name, 'New filtered deck');
+    expect(saved.config.searchTerms.single.search, 'is:due');
+  });
+
   test('load requests exact deck and parses scheduler default settings', () async {
     final backend = _Backend();
     final repository = AnkiFilteredDeckOptionsRepository(backend: backend);
@@ -94,7 +111,8 @@ class _Backend implements BackendInvoker {
     if (fail) throw StateError('Native call failed');
     if (operation == BackendOperation.getOrCreateFilteredDeck) {
       return Uint8List.fromList(decks.FilteredDeckForUpdate(
-        id: Int64(mismatched ? 99 : 98),
+        id: Int64(mismatched ? 99 :
+            decks.DeckId.fromBuffer(request).did.toInt()),
         name: 'French',
         allowEmpty: true,
         config: decks.Deck_Filtered(
