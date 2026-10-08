@@ -519,6 +519,9 @@ class _DeckListPageState extends State<DeckListPage> {
                     DeckMutationRepository(backend: widget.backend!)
                         .removeDecks([deck.id]),
           onChanged: widget.controller.load,
+          onBrowse: widget.backend == null
+              ? null
+              : (query) => _openBrowser(initialQuery: query),
           onAddNote: widget.backend == null
               ? null
               : () async {
