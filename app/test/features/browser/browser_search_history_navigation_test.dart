@@ -100,6 +100,42 @@ void main() {
     expect(repository.queries, ['is:due', 'is:learn', 'is:due', 'is:learn']);
   });
 
+  testWidgets('narrow browser exposes searchable history in compact menu', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final repository = _Repository();
+    await tester.pumpWidget(_app(repository, _Store()));
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byKey(const ValueKey('browser-compact-actions')), findsOneWidget);
+    expect(find.byKey(const ValueKey('browser-search-history-back')), findsNothing);
+
+    await _search(tester, 'is:due');
+    await _search(tester, 'is:new');
+
+    await tester.tap(find.byKey(const ValueKey('browser-compact-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Previous search'));
+    await tester.pumpAndSettle();
+    expect(_query(tester), 'is:due');
+
+    await tester.tap(find.byKey(const ValueKey('browser-compact-actions')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Next search'));
+    await tester.pumpAndSettle();
+    expect(_query(tester), 'is:new');
+
+    await tester.tap(find.byKey(const ValueKey('browser-compact-actions')));
+    await tester.pumpAndSettle();
+    expect(find.text('Save current search'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('sort changes and refresh do not append search history', (
     tester,
   ) async {
