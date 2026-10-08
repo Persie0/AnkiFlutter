@@ -22,6 +22,7 @@ use anki_proto::collection::{
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
+use anki_proto::media::{CheckMediaResponse, TrashMediaFilesRequest};
 use anki_proto::search::BrowserColumns;
 use prost::Message;
 use tempfile::TempDir;
@@ -339,6 +340,65 @@ fn browser_sort_metadata_is_available_through_ffi() {
     let columns = BrowserColumns::decode(bytes.as_slice()).unwrap();
     assert!(columns.columns.iter().any(|column| column.key == "noteFld"));
     assert!(columns.columns.iter().any(|column| column.key == "cardDue"));
+}
+
+#[test]
+fn media_audit_trash_and_restore_use_upstream_anki_storage() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let media_path = temp
+        .path()
+        .join("collection.media")
+        .join("unused-by-note.png");
+    fs::write(&media_path, b"unreferenced-media").unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(57, &Empty::default());
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "check media failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let audit = CheckMediaResponse::decode(bytes.as_slice()).unwrap();
+    assert!(audit.unused.contains(&"unused-by-note.png".to_string()));
+
+    let (status, bytes) = backend.invoke(
+        76,
+        &TrashMediaFilesRequest {
+            fnames: vec!["unused-by-note.png".to_string()],
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "trash media failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(
+        !media_path.exists(),
+        "trash must remove original media path"
+    );
+
+    let (status, bytes) = backend.invoke(77, &Empty::default());
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "restore media failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    assert!(
+        media_path.exists(),
+        "restoring trash must recover original media"
+    );
 }
 
 #[test]
