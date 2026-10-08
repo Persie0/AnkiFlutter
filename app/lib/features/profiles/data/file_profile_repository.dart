@@ -91,21 +91,33 @@ class FileProfileRepository implements ProfileRepository {
     final profiles = await list();
     _ensureUniqueName(profiles, normalizedName);
 
-    final id = '${_slug(normalizedName)}-${_timestampMicros()}';
+    final id = await _availableManagedId(
+      '${_slug(normalizedName)}-${_timestampMicros()}',
+      profiles,
+    );
     final profileDirectory = Directory(
       '${profilesDirectory.path}$pathSeparator$id',
     );
     await profileDirectory.create(recursive: true);
-    final profile = AnkiProfile(
-      id: id,
-      name: normalizedName,
-      collectionPath:
-          '${profileDirectory.path}${pathSeparator}collection.anki2',
-      profileDirectory: profileDirectory.path,
-      isManaged: true,
-    );
-    await _write([...profiles, profile]);
-    return profile;
+    try {
+      final profile = AnkiProfile(
+        id: id,
+        name: normalizedName,
+        collectionPath:
+            '${profileDirectory.path}${pathSeparator}collection.anki2',
+        profileDirectory: profileDirectory.path,
+        isManaged: true,
+      );
+      await _write([...profiles, profile]);
+      return profile;
+    } catch (_) {
+      // The newly created managed folder must not become an orphan if the
+      // registry cannot be committed. Never delete any pre-existing folder.
+      if (await profileDirectory.exists()) {
+        await profileDirectory.delete(recursive: true);
+      }
+      rethrow;
+    }
   }
 
   @override
@@ -134,7 +146,7 @@ class FileProfileRepository implements ProfileRepository {
     }
     final separatorIndex = path.lastIndexOf(pathSeparator);
     final profile = AnkiProfile(
-      id: 'external-${_timestampMicros()}',
+      id: _availableExternalId('external-${_timestampMicros()}', profiles),
       name: normalizedName,
       collectionPath: path,
       profileDirectory:
@@ -248,6 +260,29 @@ class FileProfileRepository implements ProfileRepository {
     )) {
       throw ArgumentError.value(name, 'name', 'Profile name already exists.');
     }
+  }
+
+  Future<String> _availableManagedId(
+    String base,
+    List<AnkiProfile> registered,
+  ) async {
+    for (var suffix = 0; suffix < 1000; suffix++) {
+      final id = suffix == 0 ? base : '$base-$suffix';
+      if (registered.any((profile) => profile.id == id)) continue;
+      final path = '${profilesDirectory.path}$pathSeparator$id';
+      if (!await Directory(path).exists() && !await File(path).exists()) {
+        return id;
+      }
+    }
+    throw StateError('Could not allocate an unused profile directory.');
+  }
+
+  String _availableExternalId(String base, List<AnkiProfile> registered) {
+    for (var suffix = 0; suffix < 1000; suffix++) {
+      final id = suffix == 0 ? base : '$base-$suffix';
+      if (registered.every((profile) => profile.id != id)) return id;
+    }
+    throw StateError('Could not allocate an unused external profile ID.');
   }
 
   String _slug(String value) {
