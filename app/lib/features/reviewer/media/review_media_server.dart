@@ -140,7 +140,31 @@ class ReviewMediaServer {
 
   _ByteRange? _parseRange(String header, int size) {
     if (size == 0) return null;
-    final match = RegExp(r'^bytes=(\\d*)-(\\d*)
+    final match = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(header.trim());
+    if (match == null) return null;
+    final first = match.group(1)!;
+    final last = match.group(2)!;
+    if (first.isEmpty && last.isEmpty) return null;
+
+    try {
+      if (first.isEmpty) {
+        final suffix = int.parse(last);
+        if (suffix <= 0) return null;
+        return _ByteRange(
+          suffix >= size ? 0 : size - suffix,
+          size - 1,
+        );
+      }
+      final start = int.parse(first);
+      final end = last.isEmpty ? size - 1 : int.parse(last);
+      if (start < 0 || start >= size || end < start) return null;
+      return _ByteRange(start, end >= size ? size - 1 : end);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  bool _isUnsafePathSegment(String segment) {
     return segment.isEmpty ||
         segment == '.' ||
         segment == '..' ||
