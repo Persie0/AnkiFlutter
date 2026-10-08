@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:anki_flutter/features/card_info/card_info_page.dart';
 import 'package:anki_flutter/features/card_info/data/card_info_repository.dart';
-
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:anki_flutter/features/reviewer/surface/card_surface.dart';
@@ -163,86 +162,86 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
       child: Focus(
         autofocus: true,
         child: Scaffold(
-      appBar: AppBar(
-        title: Text('Preview card $_currentCardId'),
-        actions: [
-          if (widget.cardInfoRepository != null)
-            IconButton(
-              key: const ValueKey('browser-preview-card-info'),
-              tooltip: 'Card info',
-              onPressed: _loading ? null : () => unawaited(_openCardInfo()),
-              icon: const Icon(Icons.info_outline),
-            ),
-          if (_orderedCardIds.length > 1) ...[
-            Center(
-              child: Text(
-                '${_position + 1} / ${_orderedCardIds.length}',
-                key: const ValueKey('browser-preview-position'),
-              ),
-            ),
-            IconButton(
-              key: const ValueKey('browser-preview-previous'),
-              tooltip: 'Previous card',
-              onPressed: _position > 0 ? () => _navigate(-1) : null,
-              icon: const Icon(Icons.chevron_left),
-            ),
-            IconButton(
-              key: const ValueKey('browser-preview-next'),
-              tooltip: 'Next card',
-              onPressed: _position + 1 < _orderedCardIds.length
-                  ? () => _navigate(1)
-                  : null,
-              icon: const Icon(Icons.chevron_right),
-            ),
-          ],
-        ],
-      ),
-      body: SafeArea(
-        child: Column(
-          children: [
-            if (_loading && content != null) const LinearProgressIndicator(),
-            Expanded(
-              child: content != null
-                  ? CardSurface(
-                      content: content,
-                      showAnswer: _showAnswer,
-                      mediaBaseUri: widget.mediaBaseUri,
-                      builder: widget.surfaceBuilder,
-                    )
-                  : _loading
-                  ? const Center(child: CircularProgressIndicator())
-                  : Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Could not preview this card'),
-                            const SizedBox(height: 8),
-                            Text('${_error ?? 'No card returned'}'),
-                            const SizedBox(height: 16),
-                            OutlinedButton(
-                              key: const ValueKey('browser-preview-retry'),
-                              onPressed: _load,
-                              child: const Text('Retry'),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-            ),
-            if (content != null)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: FilledButton(
-                  key: const ValueKey('browser-preview-flip'),
-                  onPressed: _loading ? null : _flip,
-                  child: Text(_showAnswer ? 'Show question' : 'Show answer'),
+          appBar: AppBar(
+            title: Text('Preview card $_currentCardId'),
+            actions: [
+              if (widget.cardInfoRepository != null)
+                IconButton(
+                  key: const ValueKey('browser-preview-card-info'),
+                  tooltip: 'Card info',
+                  onPressed: _loading ? null : () => unawaited(_openCardInfo()),
+                  icon: const Icon(Icons.info_outline),
                 ),
-              ),
-          ],
-        ),
-      ),
+              if (_orderedCardIds.length > 1) ...[
+                Center(
+                  child: Text(
+                    '${_position + 1} / ${_orderedCardIds.length}',
+                    key: const ValueKey('browser-preview-position'),
+                  ),
+                ),
+                IconButton(
+                  key: const ValueKey('browser-preview-previous'),
+                  tooltip: 'Previous card',
+                  onPressed: _position > 0 ? () => _navigate(-1) : null,
+                  icon: const Icon(Icons.chevron_left),
+                ),
+                IconButton(
+                  key: const ValueKey('browser-preview-next'),
+                  tooltip: 'Next card',
+                  onPressed: _position + 1 < _orderedCardIds.length
+                      ? () => _navigate(1)
+                      : null,
+                  icon: const Icon(Icons.chevron_right),
+                ),
+              ],
+            ],
+          ),
+          body: SafeArea(
+            child: Column(
+              children: [
+                if (_loading && content != null) const LinearProgressIndicator(),
+                Expanded(
+                  child: content != null
+                      ? CardSurface(
+                          content: content,
+                          showAnswer: _showAnswer,
+                          mediaBaseUri: widget.mediaBaseUri,
+                          builder: widget.surfaceBuilder,
+                        )
+                      : _loading
+                      ? const Center(child: CircularProgressIndicator())
+                      : Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(24),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Text('Could not preview this card'),
+                                const SizedBox(height: 8),
+                                Text('${_error ?? 'No card returned'}'),
+                                const SizedBox(height: 16),
+                                OutlinedButton(
+                                  key: const ValueKey('browser-preview-retry'),
+                                  onPressed: _load,
+                                  child: const Text('Retry'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                ),
+                if (content != null)
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: FilledButton(
+                      key: const ValueKey('browser-preview-flip'),
+                      onPressed: _loading ? null : _flip,
+                      child: Text(_showAnswer ? 'Show question' : 'Show answer'),
+                    ),
+                  ),
+              ],
+            ),
+          ),
         ),
       ),
     );
