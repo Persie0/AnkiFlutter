@@ -102,7 +102,10 @@ void main() {
     final directoryAtRegistryPath = Directory(repository.registryFile.path);
     await directoryAtRegistryPath.create(recursive: true);
 
-    await expectLater(repository.create('Personal'), throwsFileSystemException);
+    await expectLater(
+      repository.create('Personal'),
+      throwsA(isA<FileSystemException>()),
+    );
 
     expect(await directoryAtRegistryPath.exists(), isTrue);
     expect(
