@@ -90,6 +90,7 @@ void main() {
         'redo': 79,
         'checkDatabase': 80,
         'createBackup': 81,
+        'findAndReplace': 82,
       },
     );
 

@@ -24,8 +24,9 @@ use anki_proto::collection::{
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
 use anki_proto::media::{CheckMediaResponse, TrashMediaFilesRequest};
+use anki_proto::notes::{Note, NoteId};
 use anki_proto::scheduler::BuryOrSuspendCardsRequest;
-use anki_proto::search::BrowserColumns;
+use anki_proto::search::{BrowserColumns, FindAndReplaceRequest};
 use prost::Message;
 use tempfile::TempDir;
 
@@ -462,6 +463,60 @@ fn selected_card_removal_uses_anki_cards_service_through_ffi() {
     );
     let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
     assert_eq!(changes.count, 1);
+}
+
+#[test]
+fn find_and_replace_updates_selected_real_anki_note_only_once() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype must exist");
+    let mut note = notetype.new_note();
+    note.set_field(0, "colour word").unwrap();
+    note.set_field(1, "the back").unwrap();
+    collection.add_note(&mut note, DeckId(1)).unwrap();
+    let note_id = note.id.0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(
+        82,
+        &FindAndReplaceRequest {
+            nids: vec![note_id],
+            search: "colour".to_string(),
+            replacement: "color".to_string(),
+            regex: false,
+            match_case: false,
+            field_name: "Front".to_string(),
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "replace failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
+    assert_eq!(changes.count, 1);
+
+    let (status, bytes) = backend.invoke(29, &NoteId { nid: note_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let updated = Note::decode(bytes.as_slice()).unwrap();
+    assert_eq!(updated.fields[0], "color word");
+    assert_eq!(updated.fields[1], "the back");
 }
 
 #[test]

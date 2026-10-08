@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
+import 'package:anki_flutter/features/browser/browser_find_replace_dialog.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
@@ -430,6 +431,51 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _findReplaceSelected() async {
+    final repository = widget.repository is CardBrowserFindReplaceRepository
+        ? widget.repository as CardBrowserFindReplaceRepository
+        : null;
+    if (repository == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+    final cardIds = List<int>.unmodifiable(_selectedCardIds);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final options = await showDialog<CardBrowserFindReplaceOptions>(
+        context: context,
+        builder: (_) => BrowserFindReplaceDialog(cardCount: cardIds.length),
+      );
+      if (!mounted || options == null) return;
+
+      final changed = await repository.findAndReplaceSelected(cardIds, options);
+      if (!mounted) return;
+      // The replaced text may no longer match the previous search. Do not
+      // retain selections of invisible cards after editing their notes.
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            changed == 0
+                ? 'No matching text found in selected notes.'
+                : 'Updated $changed ${changed == 1 ? 'note' : 'notes'}.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not find and replace: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _setSelectedFlags() async {
     final flagRepository = widget.repository is CardBrowserFlagRepository
         ? widget.repository as CardBrowserFlagRepository
@@ -778,6 +824,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                       ? null
                       : () => unawaited(_moveSelectedCards()),
                   child: const Text('Change deck'),
+                ),
+              if (widget.repository is CardBrowserFindReplaceRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-find-replace'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_findReplaceSelected()),
+                  child: const Text('Find & replace'),
                 ),
               if (widget.repository is CardBrowserTagRepository) ...[
                 OutlinedButton(
