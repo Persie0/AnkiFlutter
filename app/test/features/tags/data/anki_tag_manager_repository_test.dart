@@ -54,7 +54,7 @@ void main() {
       'a::::b']) {
       await expectLater(manager.remove(invalid), throwsArgumentError);
     }
-    await expectLater(manager.rename('French', 'french'), throwsArgumentError);
+    await expectLater(manager.rename('French', 'French'), throwsArgumentError);
     await expectLater(manager.rename('', 'OK'), throwsArgumentError);
     expect(backend.operations, isEmpty);
   });
