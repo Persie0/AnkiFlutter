@@ -267,9 +267,11 @@ class _FilteredDeckOptionsPageState extends State<FilteredDeckOptionsPage> {
                 )
               : Form(
                   key: _formKey,
-                  child: ListView(
+                  child: SingleChildScrollView(
                     padding: const EdgeInsets.all(16),
-                    children: [
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
                       TextFormField(
                         key: const ValueKey('filtered-options-name'),
                         controller: _name,
@@ -319,7 +321,8 @@ class _FilteredDeckOptionsPageState extends State<FilteredDeckOptionsPage> {
                             : const Icon(Icons.save),
                         label: const Text('Save filtered deck'),
                       ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
     );
