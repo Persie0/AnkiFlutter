@@ -229,16 +229,16 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   }
 
   Future<void> _saveNamedSearch() async {
-    print('DEBUG_SAVE_START query=${_queryController.text} bulk=$_bulkActionInProgress');
+    debugPrint('DEBUG_SAVE_START query=${_queryController.text} bulk=$_bulkActionInProgress');
     if (_bulkActionInProgress || _queryController.text.trim().isEmpty) {
-      print('DEBUG_SAVE_RETURN_EARLY');
+      debugPrint('DEBUG_SAVE_RETURN_EARLY');
       return;
     }
     final name = await showDialog<String>(
       context: context,
       builder: (_) => const _SaveBrowserSearchDialog(),
     );
-    print('DEBUG_SAVE_DIALOG_RETURN name=$name mounted=$mounted');
+    debugPrint('DEBUG_SAVE_DIALOG_RETURN name=$name mounted=$mounted');
     if (!mounted || name == null || name.trim().isEmpty) return;
     final trimmed = name.trim();
     final index = _savedSearches.indexWhere(
@@ -281,9 +281,9 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _savedSearches = List.unmodifiable(updated);
       _activeSavedSearchName = saved.name;
     });
-    print('DEBUG_SAVE_SET_STATE names=${_savedSearches.map((s) => s.name).toList()}');
+    debugPrint('DEBUG_SAVE_SET_STATE names=${_savedSearches.map((s) => s.name).toList()}');
     await _persistState();
-    print('DEBUG_SAVE_PERSISTED');
+    debugPrint('DEBUG_SAVE_PERSISTED');
   }
 
   Future<void> _deleteSavedSearch() async {
