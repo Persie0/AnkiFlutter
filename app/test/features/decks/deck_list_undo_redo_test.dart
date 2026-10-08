@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:typed_data';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
@@ -10,6 +9,7 @@ import 'package:anki_flutter/features/decks/deck_list_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/deck_repository.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -44,6 +44,50 @@ void main() {
     expect(decks.loads, initialDeckLoads + 2);
     expect(tester.widget<IconButton>(undo).onPressed, isNotNull);
     expect(tester.widget<IconButton>(redo).onPressed, isNull);
+  });
+
+  testWidgets('Ctrl+Z and Ctrl+Shift+Z use the native collection history',
+      (tester) async {
+    final backend = _HistoryBackend()
+      ..state = collection.UndoStatus(undo: 'Add note');
+    await tester.pumpWidget(_app(backend, _DeckRepository()));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(backend.undos, 1);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyZ);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(backend.redos, 1);
+  });
+
+  testWidgets('Ctrl+Y also redoes and no-history shortcuts do nothing',
+      (tester) async {
+    final backend = _HistoryBackend()
+      ..state = collection.UndoStatus(redo: 'Add note');
+    await tester.pumpWidget(_app(backend, _DeckRepository()));
+    await tester.tap(find.text('Open Anki Collection'));
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(backend.redos, 1);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyY);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(backend.redos, 1);
   });
 
   testWidgets('no native undo history keeps controls disabled', (tester) async {

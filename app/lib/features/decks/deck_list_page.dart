@@ -30,6 +30,7 @@ import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
 import 'package:anki_flutter/features/sync/sync_page.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 typedef CollectionPicker = Future<String?> Function();
 typedef CollectionOpener = Future<void> Function(String path);
@@ -496,8 +497,29 @@ class _DeckListPageState extends State<DeckListPage> {
   @override
   Widget build(BuildContext context) {
     final compactToolbar = MediaQuery.sizeOf(context).width < 700;
-    return Scaffold(
-      appBar: AppBar(
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyZ, control: true):
+            () => unawaited(_changeHistory(redo: false)),
+        const SingleActivator(LogicalKeyboardKey.keyZ, meta: true):
+            () => unawaited(_changeHistory(redo: false)),
+        const SingleActivator(
+          LogicalKeyboardKey.keyZ,
+          control: true,
+          shift: true,
+        ): () => unawaited(_changeHistory(redo: true)),
+        const SingleActivator(
+          LogicalKeyboardKey.keyZ,
+          meta: true,
+          shift: true,
+        ): () => unawaited(_changeHistory(redo: true)),
+        const SingleActivator(LogicalKeyboardKey.keyY, control: true):
+            () => unawaited(_changeHistory(redo: true)),
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          appBar: AppBar(
         title: const Text('AnkiFlutter'),
         actions: [
           if (_collectionOpened && widget.backend != null) ...[
@@ -647,7 +669,9 @@ class _DeckListPageState extends State<DeckListPage> {
           ],
         ],
       ),
-      body: SafeArea(child: _buildBody()),
+          body: SafeArea(child: _buildBody()),
+        ),
+      ),
     );
   }
 
