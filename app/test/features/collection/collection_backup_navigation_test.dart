@@ -30,16 +30,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Back up collection'), findsOneWidget);
-    expect(find.textContaining('not media files'), findsNothing);
-    expect(find.textContaining('does not'), findsNothing);
+    expect(find.textContaining('but not media files'), findsOneWidget);
     expect(find.byKey(const ValueKey('collection-backup-run')), findsOneWidget);
     expect(backend.calls, isNot(contains(BackendOperation.createBackup)));
   });
 
   testWidgets('narrow collection toolbar exposes backup in overflow', (tester) async {
     final backend = _Backend();
-    await tester.binding.setSurfaceSize(const Size(420, 800));
-    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(MaterialApp(
       home: DeckListPage(
         controller: DeckListController(repository: _Decks()),
