@@ -230,7 +230,7 @@ class _FilteredDeckOptionsPageState extends State<FilteredDeckOptionsPage> {
         const SizedBox(height: 12),
         DropdownButtonFormField<decks.Deck_Filtered_SearchTerm_Order>(
           key: ValueKey('filtered-options-order-$index'),
-          value: term.order,
+          initialValue: term.order,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Sort matching cards',
