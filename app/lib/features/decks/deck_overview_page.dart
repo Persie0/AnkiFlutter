@@ -23,6 +23,8 @@ import 'package:flutter/material.dart';
 
 typedef ReviewControllerBuilder = ReviewController Function();
 
+enum _DeckBrowseFilter { all, due, newCards, suspended }
+
 class DeckOverviewPage extends StatefulWidget {
   const DeckOverviewPage({
     required this.deck,
@@ -32,6 +34,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onRemove,
     this.onChanged,
     this.onAddNote,
+    this.onBrowse,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -43,6 +46,9 @@ class DeckOverviewPage extends StatefulWidget {
   final Future<void> Function()? onRemove;
   final Future<void> Function()? onChanged;
   final Future<void> Function()? onAddNote;
+
+  /// Opens the collection browser with native Anki search syntax.
+  final void Function(String query)? onBrowse;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -262,6 +268,19 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     );
   }
 
+  void _browseDeck(_DeckBrowseFilter filter) {
+    final onBrowse = widget.onBrowse;
+    if (onBrowse == null || _mutating) return;
+    final deckFilter = _deckStatsSearch(widget.deck.name);
+    final query = switch (filter) {
+      _DeckBrowseFilter.all => deckFilter,
+      _DeckBrowseFilter.due => '$deckFilter is:due',
+      _DeckBrowseFilter.newCards => '$deckFilter is:new',
+      _DeckBrowseFilter.suspended => '$deckFilter is:suspended',
+    };
+    onBrowse(query);
+  }
+
   Future<void> _statistics() async {
     final backend = widget.backend;
     if (backend == null) return;
@@ -325,6 +344,32 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
       appBar: AppBar(
         title: Text(deck.name),
         actions: [
+          if (widget.onBrowse != null)
+            PopupMenuButton<_DeckBrowseFilter>(
+              key: const ValueKey('deck-browse-menu'),
+              tooltip: 'Browse deck cards',
+              enabled: !_mutating,
+              icon: const Icon(Icons.manage_search),
+              onSelected: _browseDeck,
+              itemBuilder: (_) => const [
+                PopupMenuItem(
+                  value: _DeckBrowseFilter.all,
+                  child: Text('All cards in deck'),
+                ),
+                PopupMenuItem(
+                  value: _DeckBrowseFilter.due,
+                  child: Text('Due cards in deck'),
+                ),
+                PopupMenuItem(
+                  value: _DeckBrowseFilter.newCards,
+                  child: Text('New cards in deck'),
+                ),
+                PopupMenuItem(
+                  value: _DeckBrowseFilter.suspended,
+                  child: Text('Suspended cards in deck'),
+                ),
+              ],
+            ),
           if (widget.backend != null)
             IconButton(
               tooltip: 'Deck options',
