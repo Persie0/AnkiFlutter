@@ -88,6 +88,7 @@ void main() {
         'restoreMediaTrash': 77,
         'restoreBuriedAndSuspendedCards': 78,
         'redo': 79,
+        'checkDatabase': 80,
       },
     );
 
