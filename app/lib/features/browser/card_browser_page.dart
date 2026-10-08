@@ -1137,60 +1137,60 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
               },
             )
           else ...[
-          IconButton(
-            key: const ValueKey('browser-search-history-back'),
-            tooltip: 'Previous search',
-            onPressed: _loading ||
-                    _bulkActionInProgress ||
-                    !_history.canGoBack
-                ? null
-                : () => _navigateSearchHistory(forward: false),
-            icon: const Icon(Icons.arrow_back_ios_new),
-          ),
-          IconButton(
-            key: const ValueKey('browser-search-history-forward'),
-            tooltip: 'Next search',
-            onPressed: _loading ||
-                    _bulkActionInProgress ||
-                    !_history.canGoForward
-                ? null
-                : () => _navigateSearchHistory(forward: true),
-            icon: const Icon(Icons.arrow_forward_ios),
-          ),
-          PopupMenuButton<String>(
-            key: const ValueKey('browser-saved-search-picker'),
-            tooltip: 'Load saved search',
-            icon: const Icon(Icons.bookmarks_outlined),
-            enabled: !_loading &&
-                !_bulkActionInProgress &&
-                _savedSearches.isNotEmpty,
-            itemBuilder: (_) => [
-              for (final entry in _savedSearches)
-                PopupMenuItem<String>(
-                  value: entry.name,
-                  child: Text(entry.name),
-                ),
-            ],
-            onSelected: (name) => unawaited(_applySavedSearch(name)),
-          ),
-          IconButton(
-            key: const ValueKey('browser-save-search'),
-            tooltip: 'Save current search',
-            onPressed: _bulkActionInProgress ||
-                    _queryController.text.trim().isEmpty
-                ? null
-                : () => unawaited(_saveNamedSearch()),
-            icon: const Icon(Icons.bookmark_add_outlined),
-          ),
-          IconButton(
-            key: const ValueKey('browser-delete-saved-search'),
-            tooltip: 'Delete selected saved search',
-            onPressed: _activeSavedSearchName == null ||
-                    _bulkActionInProgress
-                ? null
-                : () => unawaited(_deleteSavedSearch()),
-            icon: const Icon(Icons.delete_outline),
-          ),
+            IconButton(
+              key: const ValueKey('browser-search-history-back'),
+              tooltip: 'Previous search',
+              onPressed: _loading ||
+                      _bulkActionInProgress ||
+                      !_history.canGoBack
+                  ? null
+                  : () => _navigateSearchHistory(forward: false),
+              icon: const Icon(Icons.arrow_back_ios_new),
+            ),
+            IconButton(
+              key: const ValueKey('browser-search-history-forward'),
+              tooltip: 'Next search',
+              onPressed: _loading ||
+                      _bulkActionInProgress ||
+                      !_history.canGoForward
+                  ? null
+                  : () => _navigateSearchHistory(forward: true),
+              icon: const Icon(Icons.arrow_forward_ios),
+            ),
+            PopupMenuButton<String>(
+              key: const ValueKey('browser-saved-search-picker'),
+              tooltip: 'Load saved search',
+              icon: const Icon(Icons.bookmarks_outlined),
+              enabled: !_loading &&
+                  !_bulkActionInProgress &&
+                  _savedSearches.isNotEmpty,
+              itemBuilder: (_) => [
+                for (final entry in _savedSearches)
+                  PopupMenuItem<String>(
+                    value: entry.name,
+                    child: Text(entry.name),
+                  ),
+              ],
+              onSelected: (name) => unawaited(_applySavedSearch(name)),
+            ),
+            IconButton(
+              key: const ValueKey('browser-save-search'),
+              tooltip: 'Save current search',
+              onPressed: _bulkActionInProgress ||
+                      _queryController.text.trim().isEmpty
+                  ? null
+                  : () => unawaited(_saveNamedSearch()),
+              icon: const Icon(Icons.bookmark_add_outlined),
+            ),
+            IconButton(
+              key: const ValueKey('browser-delete-saved-search'),
+              tooltip: 'Delete selected saved search',
+              onPressed: _activeSavedSearchName == null ||
+                      _bulkActionInProgress
+                  ? null
+                  : () => unawaited(_deleteSavedSearch()),
+              icon: const Icon(Icons.delete_outline),
+            ),
           ],
         ],
       ),
