@@ -9,6 +9,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  testWidgets('new filtered deck editor validates name and saves zero-ID config',
+      (tester) async {
+    final repository = _Repository();
+    await tester.pumpWidget(MaterialApp(
+      home: FilteredDeckOptionsPage(deckId: 0, repository: repository),
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Create filtered deck'), findsWidgets);
+    await tester.enterText(
+      find.byKey(const ValueKey('filtered-options-name')),
+      'Revision session',
+    );
+    await tester.enterText(
+      find.byKey(const ValueKey('filtered-options-query-0')),
+      'is:due',
+    );
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('filtered-options-save')),
+    );
+    await tester.tap(find.byKey(const ValueKey('filtered-options-save')));
+    await tester.pumpAndSettle();
+
+    expect(repository.loads, [0]);
+    expect(repository.saved.single.id.toInt(), 0);
+    expect(repository.saved.single.name, 'Revision session');
+    expect(repository.saved.single.config.searchTerms.single.search, 'is:due');
+  });
+
   testWidgets('overview opens editor and saves native config preserving extras',
       (tester) async {
     final repository = _Repository();

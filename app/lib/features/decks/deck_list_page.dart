@@ -14,6 +14,8 @@ import 'package:anki_flutter/features/collection/check_database_page.dart';
 import 'package:anki_flutter/features/collection/collection_backup_page.dart';
 import 'package:anki_flutter/features/collection/data/anki_collection_backup_repository.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
+import 'package:anki_flutter/features/decks/data/anki_filtered_deck_options_repository.dart';
+import 'package:anki_flutter/features/deck_options/filtered_deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_state.dart';
@@ -319,6 +321,23 @@ class _DeckListPageState extends State<DeckListPage> {
       builder: (_) => _CreateDeckDialog(
         onCreate: (name) =>
             DeckMutationRepository(backend: backend).addDeck(name),
+      ),
+    );
+    if (created == true && mounted) {
+      await widget.controller.load();
+      await _refreshHistory();
+    }
+  }
+
+  Future<void> _createFilteredDeck() async {
+    final backend = widget.backend;
+    if (backend == null || _opening) return;
+    final created = await Navigator.of(context).push<bool>(
+      MaterialPageRoute<bool>(
+        builder: (_) => FilteredDeckOptionsPage(
+          deckId: 0,
+          repository: AnkiFilteredDeckOptionsRepository(backend: backend),
+        ),
       ),
     );
     if (created == true && mounted) {
@@ -823,6 +842,8 @@ class _DeckListPageState extends State<DeckListPage> {
             decks: decks,
             onDeckTap: _openDeck,
             onCreateDeck: widget.backend == null ? null : _createDeck,
+            onCreateFilteredDeck:
+                widget.backend == null ? null : _createFilteredDeck,
           ),
         };
       },
@@ -954,11 +975,13 @@ class _DeckTree extends StatelessWidget {
     required this.decks,
     required this.onDeckTap,
     this.onCreateDeck,
+    this.onCreateFilteredDeck,
   });
 
   final List<DeckNode> decks;
   final ValueChanged<DeckNode> onDeckTap;
   final VoidCallback? onCreateDeck;
+  final VoidCallback? onCreateFilteredDeck;
 
   @override
   Widget build(BuildContext context) {
@@ -991,6 +1014,19 @@ class _DeckTree extends StatelessWidget {
           ),
         ),
         const Divider(height: 1),
+        if (onCreateFilteredDeck != null)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: TextButton.icon(
+                key: const ValueKey('create-filtered-deck'),
+                onPressed: onCreateFilteredDeck,
+                icon: const Icon(Icons.filter_alt_outlined),
+                label: const Text('Create filtered deck'),
+              ),
+            ),
+          ),
         Expanded(
           child: decks.isEmpty
               ? _CenteredMessage(
