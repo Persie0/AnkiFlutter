@@ -434,9 +434,10 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
   @override
   Widget build(BuildContext context) {
     final deck = widget.deck;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 720;
     return Scaffold(
       appBar: AppBar(
-        title: Text(deck.name),
+        title: Text(deck.name, overflow: TextOverflow.ellipsis),
         actions: [
           if (widget.onBrowse != null)
             PopupMenuButton<_DeckBrowseFilter>(
@@ -510,10 +511,15 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
             ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (_, bounds) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: bounds.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -548,6 +554,10 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 child: const Text('Study'),
               ),
             ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
