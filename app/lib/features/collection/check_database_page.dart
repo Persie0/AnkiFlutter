@@ -65,7 +65,18 @@ class _CheckDatabasePageState extends State<CheckDatabasePage> {
         _messages = List.unmodifiable(messages);
         _visible = _pageSize;
       });
-      await widget.onCollectionChanged?.call();
+      try {
+        await widget.onCollectionChanged?.call();
+      } catch (error) {
+        if (!mounted) return;
+        // The database check already succeeded. Do not erase its report
+        // when a dependent deck-list refresh fails.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(
+            'Database check finished, but the collection could not refresh: $error',
+          )),
+        );
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -97,8 +108,10 @@ class _CheckDatabasePageState extends State<CheckDatabasePage> {
   @override
   Widget build(BuildContext context) {
     final messages = _messages;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Check database')),
+    return PopScope(
+      canPop: !_checking,
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Check database')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -171,6 +184,7 @@ class _CheckDatabasePageState extends State<CheckDatabasePage> {
             ],
           ],
         ),
+      ),
       ),
     );
   }
