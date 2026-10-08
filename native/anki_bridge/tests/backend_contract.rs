@@ -280,7 +280,10 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
     );
     let redone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
     assert!(!redone.new_status.unwrap().undo.is_empty());
-    assert!(fetch_tree(&backend).children.iter().any(|node| node.deck_id == id));
+    assert!(fetch_tree(&backend)
+        .children
+        .iter()
+        .any(|node| node.deck_id == id));
 }
 
 #[test]
