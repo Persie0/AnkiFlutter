@@ -228,6 +228,7 @@ class FileProfileRepository implements ProfileRepository {
     }
     for (final record in data['profiles'] as List) {
       if (record is! Map ||
+          !record.keys.every((key) => key is String) ||
           _decodeProfile(Map<String, dynamic>.from(record)) == null) {
         throw const FormatException(
           'Profile registry has invalid entries; existing data was preserved.',
