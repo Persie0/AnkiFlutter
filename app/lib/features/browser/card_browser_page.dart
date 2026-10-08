@@ -229,9 +229,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   }
 
   Future<void> _saveNamedSearch() async {
-    if (_loading ||
-        _bulkActionInProgress ||
-        _queryController.text.trim().isEmpty) {
+    if (_bulkActionInProgress || _queryController.text.trim().isEmpty) {
       return;
     }
     final name = await showDialog<String>(
@@ -285,7 +283,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
 
   Future<void> _deleteSavedSearch() async {
     final name = _activeSavedSearchName;
-    if (name == null || _loading || _bulkActionInProgress) return;
+    if (name == null || _bulkActionInProgress) return;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -312,63 +310,6 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _activeSavedSearchName = null;
     });
     await _persistState();
-  }
-
-  Widget _buildSavedSearchControls() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: InputDecorator(
-              decoration: const InputDecoration(
-                labelText: 'Saved searches',
-                border: OutlineInputBorder(),
-                contentPadding: EdgeInsets.symmetric(horizontal: 12),
-              ),
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  key: const ValueKey('browser-saved-search-picker'),
-                  isExpanded: true,
-                  value: _activeSavedSearchName,
-                  hint: const Text('Choose a saved search'),
-                  items: [
-                    for (final entry in _savedSearches)
-                      DropdownMenuItem(
-                        value: entry.name,
-                        child: Text(entry.name),
-                      ),
-                  ],
-                  onChanged: _loading || _bulkActionInProgress
-                      ? null
-                      : (name) => unawaited(_applySavedSearch(name)),
-                ),
-              ),
-            ),
-          ),
-          IconButton(
-            key: const ValueKey('browser-save-search'),
-            tooltip: 'Save current search',
-            onPressed: _loading ||
-                    _bulkActionInProgress ||
-                    _queryController.text.trim().isEmpty
-                ? null
-                : () => unawaited(_saveNamedSearch()),
-            icon: const Icon(Icons.bookmark_add_outlined),
-          ),
-          IconButton(
-            key: const ValueKey('browser-delete-saved-search'),
-            tooltip: 'Delete selected saved search',
-            onPressed: _activeSavedSearchName == null ||
-                    _loading ||
-                    _bulkActionInProgress
-                ? null
-                : () => unawaited(_deleteSavedSearch()),
-            icon: const Icon(Icons.delete_outline),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _loadMore() async {
@@ -1110,7 +1051,49 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Browse cards')),
+      appBar: AppBar(
+        title: Text(
+          _activeSavedSearchName == null
+              ? 'Browse cards'
+              : 'Browse · $_activeSavedSearchName',
+        ),
+        actions: [
+          PopupMenuButton<String>(
+            key: const ValueKey('browser-saved-search-picker'),
+            tooltip: 'Load saved search',
+            icon: const Icon(Icons.bookmarks_outlined),
+            enabled: !_loading &&
+                !_bulkActionInProgress &&
+                _savedSearches.isNotEmpty,
+            itemBuilder: (_) => [
+              for (final entry in _savedSearches)
+                PopupMenuItem<String>(
+                  value: entry.name,
+                  child: Text(entry.name),
+                ),
+            ],
+            onSelected: (name) => unawaited(_applySavedSearch(name)),
+          ),
+          IconButton(
+            key: const ValueKey('browser-save-search'),
+            tooltip: 'Save current search',
+            onPressed: _bulkActionInProgress ||
+                    _queryController.text.trim().isEmpty
+                ? null
+                : () => unawaited(_saveNamedSearch()),
+            icon: const Icon(Icons.bookmark_add_outlined),
+          ),
+          IconButton(
+            key: const ValueKey('browser-delete-saved-search'),
+            tooltip: 'Delete selected saved search',
+            onPressed: _activeSavedSearchName == null ||
+                    _bulkActionInProgress
+                ? null
+                : () => unawaited(_deleteSavedSearch()),
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -1141,7 +1124,6 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                 onChanged: (_) => setState(() => _activeSavedSearchName = null),
               ),
             ),
-            _buildSavedSearchControls(),
             if (_sortOptions.isNotEmpty) _buildSortControls(),
             if (!_loading && _error == null && _result?.cards.isNotEmpty == true)
               _buildSelectionToolbar(),
