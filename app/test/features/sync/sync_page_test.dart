@@ -81,7 +81,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-download')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     expect(find.text('Protect the local collection'), findsOneWidget);
     expect(find.textContaining('Media files are not included'), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
@@ -111,7 +112,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.text('Download'));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
     await tester.pumpAndSettle();
 
@@ -139,7 +141,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-download')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
     await tester.pumpAndSettle();
 
@@ -166,7 +169,8 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-download')));
-    await tester.pumpAndSettle();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
     await tester.tap(find.byKey(const ValueKey('full-sync-skip-backup')));
     await tester.pumpAndSettle();
 
