@@ -10,6 +10,8 @@ import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
 import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
     as anki_collection;
+import 'package:anki_flutter/core/backend/generated/anki/config.pb.dart'
+    as anki_config;
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
     as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart'
@@ -101,6 +103,13 @@ abstract interface class CardBrowserForgetRepository {
   );
 }
 
+/// Bulk scheduling via the official Anki browser Set Due Date operation.
+abstract interface class CardBrowserSetDueDateRepository {
+  Future<String> setDueDateDefault();
+
+  Future<void> setCardsDueDate(List<int> cardIds, String days);
+}
+
 class CardBrowserForgetOptions {
   const CardBrowserForgetOptions({
     required this.restoreOriginalPosition,
@@ -175,6 +184,7 @@ class AnkiCardBrowserRepository
         CardBrowserPagingRepository,
         CardBrowserRestoreRepository,
         CardBrowserForgetRepository,
+        CardBrowserSetDueDateRepository,
         CardBrowserFindReplaceRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
@@ -293,6 +303,34 @@ class AnkiCardBrowserRepository
       Uint8List.fromList(request.writeToBuffer()),
     );
     return anki_cards.Card.fromBuffer(response).noteId.toInt();
+  }
+
+  @override
+  Future<String> setDueDateDefault() async {
+    final request = anki_config.GetConfigStringRequest(
+      key: anki_config.ConfigKey_String.SET_DUE_BROWSER,
+    );
+    final bytes = await backend.invoke(
+      BackendOperation.getConfigString,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return generic.String.fromBuffer(bytes).val;
+  }
+
+  @override
+  Future<void> setCardsDueDate(List<int> cardIds, String days) async {
+    if (cardIds.isEmpty) return;
+    final request = anki_scheduler.SetDueDateRequest(
+      cardIds: cardIds.map((id) => Int64(id)),
+      days: days,
+      configKey: anki_config.OptionalStringConfigKey(
+        key: anki_config.ConfigKey_String.SET_DUE_BROWSER,
+      ),
+    );
+    await backend.invoke(
+      BackendOperation.setDueDate,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
   }
 
   @override
