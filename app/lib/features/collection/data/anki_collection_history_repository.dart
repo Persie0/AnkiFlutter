@@ -58,10 +58,10 @@ class AnkiCollectionHistoryRepository implements CollectionHistoryRepository {
       operation,
       Uint8List.fromList(generic.Empty().writeToBuffer()),
     );
-    final result = anki_collection.OpChangesAfterUndo.fromBuffer(response);
-    if (result.hasNewStatus()) {
-      return _decode(result.newStatus);
-    }
+    // Anki's UndoOutput.new_undo_status is captured *inside* the transaction,
+    // before end_step() records the opposite redo/undo step. Refresh after
+    // completion so that redo is immediately available in the UI.
+    anki_collection.OpChangesAfterUndo.fromBuffer(response);
     return status();
   }
 
