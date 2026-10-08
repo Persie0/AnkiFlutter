@@ -260,6 +260,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           cardId: cardId,
           repository: repository,
           orderedCardIds: orderedIds,
+          cardInfoRepository: widget.cardInfoRepository,
           mediaBaseUri: widget.previewMediaBaseUri,
           surfaceBuilder: widget.previewSurfaceBuilder,
         ),
