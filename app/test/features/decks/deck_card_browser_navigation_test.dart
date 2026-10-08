@@ -4,6 +4,7 @@ import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/core/backend/backend_operation.dart';
 import 'package:anki_flutter/core/backend/generated/anki/search.pb.dart'
     as search;
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
 import 'package:anki_flutter/features/decks/deck_list_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
@@ -60,6 +61,7 @@ void main() {
           home: DeckListPage(
             controller: controller,
             backend: backend,
+            browserStateStore: _MemoryBrowserStateStore(),
             pickCollection: () async => '/collection.anki2',
             openCollection: (_) async {},
           ),
@@ -123,4 +125,16 @@ class _DeckRepository implements DeckRepository {
 
   @override
   Future<List<DeckNode>> loadDeckTree() async => decks;
+}
+
+class _MemoryBrowserStateStore implements BrowserStateStore {
+  CardBrowserState? current;
+
+  @override
+  Future<CardBrowserState?> load() async => current;
+
+  @override
+  Future<void> save(CardBrowserState state) async {
+    current = state;
+  }
 }
