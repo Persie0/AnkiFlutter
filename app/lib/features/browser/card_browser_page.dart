@@ -1823,6 +1823,7 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
   @override
   Widget build(BuildContext context) {
     final name = _nameController.text.trim();
+    debugPrint('DEBUG_NAME_BUILD name=$name');
     return AlertDialog(
       title: const Text('Save current search'),
       content: TextField(
@@ -1835,8 +1836,12 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
           labelText: 'Search name',
           border: OutlineInputBorder(),
         ),
-        onChanged: (_) => setState(() {}),
+        onChanged: (value) {
+          debugPrint('DEBUG_NAME_CHANGED value=$value');
+          setState(() {});
+        },
         onSubmitted: (_) {
+          debugPrint('DEBUG_NAME_SUBMITTED name=$name');
           if (name.isNotEmpty) Navigator.of(context).pop(name);
         },
       ),
@@ -1847,7 +1852,10 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
         ),
         FilledButton(
           key: const ValueKey('browser-confirm-save-search'),
-          onPressed: name.isEmpty ? null : () => Navigator.of(context).pop(name),
+          onPressed: name.isEmpty ? null : () {
+            debugPrint('DEBUG_NAME_BUTTON name=$name');
+            Navigator.of(context).pop(name);
+          },
           child: const Text('Save'),
         ),
       ],
