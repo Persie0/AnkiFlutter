@@ -104,7 +104,7 @@ void main() {
       expect(response.statusCode, HttpStatus.requestedRangeNotSatisfiable,
           reason: 'invalid range: $range');
       expect(response.headers.value('content-range'), 'bytes */3');
-      expect(await response.drain<void>(), isNull);
+      await response.drain<void>();
     }
   });
 
