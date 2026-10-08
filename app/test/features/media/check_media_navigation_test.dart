@@ -63,11 +63,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Collection media audit'), findsOneWidget);
-    expect(backend.operations, isEmpty);
+    expect(backend.operations, [BackendOperation.getUndoStatus]);
     await tester.tap(find.byKey(const ValueKey('media-check-run')));
     await tester.pumpAndSettle();
 
-    expect(backend.operations, [BackendOperation.checkMedia]);
+    expect(backend.operations, [BackendOperation.getUndoStatus, BackendOperation.checkMedia]);
     expect(find.text('Missing files: 1'), findsOneWidget);
     expect(find.text('lost.mp3'), findsOneWidget);
   });
