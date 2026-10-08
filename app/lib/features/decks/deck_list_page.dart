@@ -37,6 +37,8 @@ import 'package:anki_flutter/features/statistics/statistics_page.dart';
 import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
 import 'package:anki_flutter/features/sync/sync_page.dart';
+import 'package:anki_flutter/features/tags/data/anki_tag_manager_repository.dart';
+import 'package:anki_flutter/features/tags/tag_manager_page.dart';
 import 'package:flutter/material.dart';
 
 typedef CollectionPicker = Future<String?> Function();
@@ -465,6 +467,23 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
+  void _openTagManager() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    unawaited(Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => TagManagerPage(
+          repository: AnkiTagManagerRepository(backend: backend),
+          onBrowse: (query) => _openBrowser(initialQuery: query),
+          onChanged: () async {
+            await widget.controller.load();
+            await _refreshHistory();
+          },
+        ),
+      ),
+    ).then((_) => _onReturnedFromCollectionScreen()));
+  }
+
   void _openBrowser({String? initialQuery}) {
     final backend = widget.backend;
     if (backend == null) return;
@@ -844,6 +863,7 @@ class _DeckListPageState extends State<DeckListPage> {
             onCreateDeck: widget.backend == null ? null : _createDeck,
             onCreateFilteredDeck:
                 widget.backend == null ? null : _createFilteredDeck,
+            onManageTags: widget.backend == null ? null : _openTagManager,
           ),
         };
       },
@@ -976,12 +996,14 @@ class _DeckTree extends StatelessWidget {
     required this.onDeckTap,
     this.onCreateDeck,
     this.onCreateFilteredDeck,
+    this.onManageTags,
   });
 
   final List<DeckNode> decks;
   final ValueChanged<DeckNode> onDeckTap;
   final VoidCallback? onCreateDeck;
   final VoidCallback? onCreateFilteredDeck;
+  final VoidCallback? onManageTags;
 
   @override
   Widget build(BuildContext context) {
@@ -1014,17 +1036,28 @@ class _DeckTree extends StatelessWidget {
           ),
         ),
         const Divider(height: 1),
-        if (onCreateFilteredDeck != null)
-          Align(
-            alignment: Alignment.centerLeft,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: TextButton.icon(
-                key: const ValueKey('create-filtered-deck'),
-                onPressed: onCreateFilteredDeck,
-                icon: const Icon(Icons.filter_alt_outlined),
-                label: const Text('Create filtered deck'),
-              ),
+        if (onCreateFilteredDeck != null || onManageTags != null)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                if (onCreateFilteredDeck != null)
+                  TextButton.icon(
+                    key: const ValueKey('create-filtered-deck'),
+                    onPressed: onCreateFilteredDeck,
+                    icon: const Icon(Icons.filter_alt_outlined),
+                    label: const Text('Create filtered deck'),
+                  ),
+                if (onManageTags != null)
+                  TextButton.icon(
+                    key: const ValueKey('manage-tags'),
+                    onPressed: onManageTags,
+                    icon: const Icon(Icons.label_outline),
+                    label: const Text('Manage tags'),
+                  ),
+              ],
             ),
           ),
         Expanded(
