@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anki_flutter/features/collection/mobile_collection_storage.dart';
+import 'package:anki_flutter/core/storage/atomic_state_file.dart';
 
 abstract interface class RecentCollectionStore {
   Future<List<String>> load();
@@ -67,7 +68,7 @@ class FileRecentCollectionStore implements RecentCollectionStore {
 
   Future<void> _write(Iterable<String> paths) async {
     await _file.parent.create(recursive: true);
-    await _file.writeAsString(jsonEncode(paths.toList()), flush: true);
+    await writeAtomicState(_file, jsonEncode(paths.toList()));
   }
 
   static File _defaultFile() {
