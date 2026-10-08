@@ -161,6 +161,14 @@ Future<void> _save(
     find.byKey(const ValueKey('browser-saved-search-name')),
     name,
   );
+  await tester.pump();
+  expect(
+    tester.widget<FilledButton>(
+      find.byKey(const ValueKey('browser-confirm-save-search')),
+    ).onPressed,
+    isNotNull,
+    reason: 'Name should enable Save',
+  );
   await tester.tap(find.byKey(const ValueKey('browser-confirm-save-search')));
   await tester.pumpAndSettle();
 
