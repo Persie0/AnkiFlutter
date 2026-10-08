@@ -5,7 +5,7 @@ import 'package:anki_flutter/features/card_info/data/card_info_repository.dart';
 import 'package:anki_flutter/features/card_info/models/card_info_data.dart';
 import 'package:flutter/material.dart';
 
-enum CardInfoKind { current, previous }
+enum CardInfoKind { current, previous, browser }
 
 class CardInfoPage extends StatefulWidget {
   const CardInfoPage({
@@ -96,6 +96,7 @@ class _CardInfoPageState extends State<CardInfoPage> {
   String get _title => switch (widget.kind) {
     CardInfoKind.current => 'Current Card Info',
     CardInfoKind.previous => 'Previous Card Info',
+    CardInfoKind.browser => 'Card Info',
   };
 
   Widget _buildBody() {
