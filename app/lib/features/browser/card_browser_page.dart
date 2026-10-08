@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:anki_flutter/features/browser/browser_state_store.dart';
+import 'package:anki_flutter/features/browser/browser_card_preview_page.dart';
+import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/browser_find_replace_dialog.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
@@ -15,6 +17,9 @@ class CardBrowserPage extends StatefulWidget {
     required this.repository,
     required this.noteRepository,
     this.cardInfoRepository,
+    this.previewRepository,
+    this.previewMediaBaseUri,
+    this.previewSurfaceBuilder,
     this.stateStore,
     this.cardExporter,
     this.initialQuery,
@@ -26,6 +31,12 @@ class CardBrowserPage extends StatefulWidget {
 
   /// Optional native card statistics and review history access.
   final CardInfoRepository? cardInfoRepository;
+
+  /// Read-only browser rendering is opt-in for legacy/mock repositories.
+  final CardRenderRepository? previewRepository;
+  final Uri? previewMediaBaseUri;
+  final Widget Function(BuildContext context, String html)?
+      previewSurfaceBuilder;
   final BrowserStateStore? stateStore;
   final BrowserCardExporter? cardExporter;
 
@@ -222,6 +233,21 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         setState(() => _loadingMore = false);
       }
     }
+  }
+
+  Future<void> _previewCard(int cardId) async {
+    final repository = widget.previewRepository;
+    if (repository == null || _loading || _bulkActionInProgress) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => BrowserCardPreviewPage(
+          cardId: cardId,
+          repository: repository,
+          mediaBaseUri: widget.previewMediaBaseUri,
+          surfaceBuilder: widget.previewSurfaceBuilder,
+        ),
+      ),
+    );
   }
 
   Future<void> _openCardInfo(int cardId) async {
@@ -1235,6 +1261,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           ),
           title: Text(title),
           subtitle: subtitle == null ? null : Text(subtitle),
+          onTap: widget.previewRepository == null ||
+                  _loading ||
+                  _bulkActionInProgress
+              ? null
+              : () => unawaited(_previewCard(card.cardId)),
           trailing: Row(
             mainAxisSize: MainAxisSize.min,
             children: [

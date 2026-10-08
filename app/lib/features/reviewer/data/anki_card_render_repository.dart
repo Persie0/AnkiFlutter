@@ -11,15 +11,18 @@ import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:fixnum/fixnum.dart';
 
 class AnkiCardRenderRepository implements CardRenderRepository {
-  AnkiCardRenderRepository({required this.backend});
+  AnkiCardRenderRepository({required this.backend, this.browser = false});
 
   final BackendInvoker backend;
+
+  /// Native Anki rendering context: reviewer by default, browser for previews.
+  final bool browser;
 
   @override
   Future<ReviewCardContent> render(int cardId) async {
     final renderRequest = card_rendering_pb.RenderExistingCardRequest(
       cardId: Int64(cardId),
-      browser: false,
+      browser: browser,
       partialRender: false,
     );
     final renderBytes = await backend.invoke(
