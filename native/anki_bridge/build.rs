@@ -279,11 +279,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendDecksService",
         "add_or_update_filtered_deck",
     ),
-    (
-        "SORT_DECK",
-        "BackendSchedulerService",
-        "sort_deck",
-    ),
+    ("SORT_DECK", "BackendSchedulerService", "sort_deck"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
