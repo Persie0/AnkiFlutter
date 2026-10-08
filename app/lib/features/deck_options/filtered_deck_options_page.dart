@@ -252,7 +252,11 @@ class _FilteredDeckOptionsPageState extends State<FilteredDeckOptionsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Filtered deck options')),
+      appBar: AppBar(
+        title: Text(widget.deckId == 0
+            ? 'Create filtered deck'
+            : 'Filtered deck options'),
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _snapshot == null
@@ -319,7 +323,9 @@ class _FilteredDeckOptionsPageState extends State<FilteredDeckOptionsPage> {
                             ? const SizedBox(width: 16, height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.save),
-                        label: const Text('Save filtered deck'),
+                        label: Text(widget.deckId == 0
+                            ? 'Create filtered deck'
+                            : 'Save filtered deck'),
                       ),
                       ],
                     ),
