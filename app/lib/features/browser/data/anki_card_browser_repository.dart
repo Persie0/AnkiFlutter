@@ -90,6 +90,27 @@ abstract interface class CardBrowserRestoreRepository {
   Future<void> restoreCards(List<int> cardIds);
 }
 
+/// Anki's native "Forget" action, which makes cards new again. Defaults are
+/// context-sensitive and must come from the backend rather than Flutter.
+abstract interface class CardBrowserForgetRepository {
+  Future<CardBrowserForgetOptions> forgetCardsDefaults();
+
+  Future<void> forgetCards(
+    List<int> cardIds,
+    CardBrowserForgetOptions options,
+  );
+}
+
+class CardBrowserForgetOptions {
+  const CardBrowserForgetOptions({
+    required this.restoreOriginalPosition,
+    required this.resetRepetitionAndLapseCounts,
+  });
+
+  final bool restoreOriginalPosition;
+  final bool resetRepetitionAndLapseCounts;
+}
+
 /// Optional browser capability for moving cards into a regular deck.
 abstract interface class CardBrowserDeckMoveRepository {
   Future<List<CardBrowserDeckTarget>> moveTargets();
@@ -153,6 +174,7 @@ class AnkiCardBrowserRepository
         CardBrowserFlagRepository,
         CardBrowserPagingRepository,
         CardBrowserRestoreRepository,
+        CardBrowserForgetRepository,
         CardBrowserFindReplaceRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
@@ -271,6 +293,42 @@ class AnkiCardBrowserRepository
       Uint8List.fromList(request.writeToBuffer()),
     );
     return anki_cards.Card.fromBuffer(response).noteId.toInt();
+  }
+
+  @override
+  Future<CardBrowserForgetOptions> forgetCardsDefaults() async {
+    final request = anki_scheduler.ScheduleCardsAsNewDefaultsRequest(
+      context: anki_scheduler.ScheduleCardsAsNewRequest_Context.BROWSER,
+    );
+    final bytes = await backend.invoke(
+      BackendOperation.scheduleCardsAsNewDefaults,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    final defaults =
+        anki_scheduler.ScheduleCardsAsNewDefaultsResponse.fromBuffer(bytes);
+    return CardBrowserForgetOptions(
+      restoreOriginalPosition: defaults.restorePosition,
+      resetRepetitionAndLapseCounts: defaults.resetCounts,
+    );
+  }
+
+  @override
+  Future<void> forgetCards(
+    List<int> cardIds,
+    CardBrowserForgetOptions options,
+  ) async {
+    if (cardIds.isEmpty) return;
+    final request = anki_scheduler.ScheduleCardsAsNewRequest(
+      cardIds: cardIds.map((id) => Int64(id)),
+      log: true,
+      restorePosition: options.restoreOriginalPosition,
+      resetCounts: options.resetRepetitionAndLapseCounts,
+      context: anki_scheduler.ScheduleCardsAsNewRequest_Context.BROWSER,
+    );
+    await backend.invoke(
+      BackendOperation.scheduleCardsAsNew,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
   }
 
   @override
