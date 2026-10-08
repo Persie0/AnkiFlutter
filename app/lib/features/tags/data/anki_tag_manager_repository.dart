@@ -39,7 +39,7 @@ class AnkiTagManagerRepository implements TagManagerRepository {
   Future<int> rename(String oldName, String newName) async {
     final oldTag = _validateTag(oldName);
     final newTag = _validateTag(newName);
-    if (oldTag.toLowerCase() == newTag.toLowerCase()) {
+    if (oldTag == newTag) {
       throw ArgumentError('Choose a different tag name');
     }
     final bytes = await backend.invoke(
