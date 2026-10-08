@@ -229,16 +229,13 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   }
 
   Future<void> _saveNamedSearch() async {
-    debugPrint('DEBUG_SAVE_START query=${_queryController.text} bulk=$_bulkActionInProgress');
     if (_bulkActionInProgress || _queryController.text.trim().isEmpty) {
-      debugPrint('DEBUG_SAVE_RETURN_EARLY');
       return;
     }
     final name = await showDialog<String>(
       context: context,
       builder: (_) => const _SaveBrowserSearchDialog(),
     );
-    debugPrint('DEBUG_SAVE_DIALOG_RETURN name=$name mounted=$mounted');
     if (!mounted || name == null || name.trim().isEmpty) return;
     final trimmed = name.trim();
     final index = _savedSearches.indexWhere(
@@ -281,9 +278,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _savedSearches = List.unmodifiable(updated);
       _activeSavedSearchName = saved.name;
     });
-    debugPrint('DEBUG_SAVE_SET_STATE names=${_savedSearches.map((s) => s.name).toList()}');
     await _persistState();
-    debugPrint('DEBUG_SAVE_PERSISTED');
   }
 
   Future<void> _deleteSavedSearch() async {
@@ -1823,7 +1818,6 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
   @override
   Widget build(BuildContext context) {
     final name = _nameController.text.trim();
-    debugPrint('DEBUG_NAME_BUILD name=$name');
     return AlertDialog(
       title: const Text('Save current search'),
       content: TextField(
@@ -1836,12 +1830,8 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
           labelText: 'Search name',
           border: OutlineInputBorder(),
         ),
-        onChanged: (value) {
-          debugPrint('DEBUG_NAME_CHANGED value=$value');
-          setState(() {});
-        },
+        onChanged: (_) => setState(() {}),
         onSubmitted: (_) {
-          debugPrint('DEBUG_NAME_SUBMITTED name=$name');
           if (name.isNotEmpty) Navigator.of(context).pop(name);
         },
       ),
@@ -1852,10 +1842,7 @@ class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
         ),
         FilledButton(
           key: const ValueKey('browser-confirm-save-search'),
-          onPressed: name.isEmpty ? null : () {
-            debugPrint('DEBUG_NAME_BUTTON name=$name');
-            Navigator.of(context).pop(name);
-          },
+          onPressed: name.isEmpty ? null : () => Navigator.of(context).pop(name),
           child: const Text('Save'),
         ),
       ],
