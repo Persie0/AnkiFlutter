@@ -185,6 +185,54 @@ void main() {
     );
   });
 
+  test('corrupted registry is not replaced when adding a profile', () async {
+    await repository.registryFile.writeAsString('{broken json');
+    final before = await repository.registryFile.readAsBytes();
+
+    await expectLater(
+      repository.create('New profile'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsBytes(), before);
+    expect(Directory(
+      '${repository.profilesDirectory.path}${Platform.pathSeparator}'
+      'new-profile',
+    ).existsSync(), isFalse);
+    final folders = repository.profilesDirectory;
+    expect(!await folders.exists() || folders.listSync().isEmpty, isTrue);
+  });
+
+  test('future profile registry versions are preserved on attempted writes',
+      () async {
+    const futureJson = '{"version":2,"profiles":[]}';
+    await repository.registryFile.writeAsString(futureJson);
+    await expectLater(
+      repository.create('New profile'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsString(), futureJson);
+  });
+
+  test('partially malformed entries are not discarded by a rename',
+      () async {
+    final original = await repository.create('Valid');
+    final json = jsonDecode(await repository.registryFile.readAsString())
+        as Map<String, dynamic>;
+    (json['profiles'] as List).add(<String, Object>{
+      'id': 'damaged',
+      'name': 'Incomplete',
+    });
+    final originalJson = jsonEncode(json);
+    await repository.registryFile.writeAsString(originalJson);
+
+    await expectLater(
+      repository.rename(original.id, 'Renamed'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsString(), originalJson);
+    expect(Directory(original.profileDirectory).existsSync(), isTrue);
+  });
+
   test('recovers from malformed registry as an empty profile list', () async {
     await repository.registryFile.parent.create(recursive: true);
     await repository.registryFile.writeAsString('{broken json');
