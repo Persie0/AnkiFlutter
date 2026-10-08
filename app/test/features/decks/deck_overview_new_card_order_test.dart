@@ -132,6 +132,6 @@ class _OrderRepository implements DeckNewCardOrderRepository {
   Future<int> reorder(int deckId, {required bool randomize}) async {
     calls.add((deckId, randomize));
     if (fail) throw StateError('native error');
-    return pending ?? 3;
+    return pending == null ? 3 : await pending!;
   }
 }
