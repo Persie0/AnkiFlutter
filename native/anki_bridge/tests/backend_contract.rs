@@ -16,7 +16,8 @@ use anki_proto::card_rendering::{
     rendered_template_node::Value, RenderCardResponse, RenderExistingCardRequest,
     RenderedTemplateNode,
 };
-use anki_proto::cards::RemoveCardsRequest;
+use anki_proto::cards::{CardIds, RemoveCardsRequest};
+use anki_proto::scheduler::BuryOrSuspendCardsRequest;
 use anki_proto::collection::{
     CloseCollectionRequest, OpChangesWithCount, OpChangesWithId, OpenCollectionRequest,
 };
@@ -314,6 +315,64 @@ fn selected_card_removal_uses_anki_cards_service_through_ffi() {
     );
     let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
     assert_eq!(changes.count, 1);
+}
+
+#[test]
+fn suspended_card_can_be_restored_through_native_anki_scheduler() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype should exist");
+    let mut note = notetype.new_note();
+    note.set_field(0, "restore-suspended").unwrap();
+    note.set_field(1, "back").unwrap();
+    collection.add_note(&mut note, DeckId(1)).unwrap();
+    let card_ids = collection.search_cards(note.id, SortMode::NoOrder).unwrap();
+    assert_eq!(card_ids.len(), 1);
+    let card_id = card_ids[0].0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(
+        9,
+        &BuryOrSuspendCardsRequest {
+            card_ids: vec![card_id],
+            note_ids: vec![],
+            mode: 0, // Anki's SUSPEND enum
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "suspend card failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(
+        78,
+        &CardIds {
+            cids: vec![card_id],
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "restore card failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
 }
 
 #[test]

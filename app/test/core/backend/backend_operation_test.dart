@@ -86,6 +86,7 @@ void main() {
         'cardStats': 75,
         'trashMediaFiles': 76,
         'restoreMediaTrash': 77,
+        'restoreBuriedAndSuspendedCards': 78,
       },
     );
 

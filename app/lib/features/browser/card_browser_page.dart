@@ -381,6 +381,55 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _restoreSelectedCards() async {
+    final repository = widget.repository is CardBrowserRestoreRepository
+        ? widget.repository as CardBrowserRestoreRepository
+        : null;
+    if (repository == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+    final selectedIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: Text('Restore ${selectedIds.length} selected cards?'),
+          content: const Text(
+            'Unsuspend or unbury these cards, using Anki scheduling. '
+            'Cards that are not buried or suspended will remain unchanged.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('browser-confirm-restore'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Restore cards'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || confirmed != true) return;
+      await repository.restoreCards(selectedIds);
+      if (!mounted) return;
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not restore selected cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _setSelectedFlags() async {
     final flagRepository = widget.repository is CardBrowserFlagRepository
         ? widget.repository as CardBrowserFlagRepository
@@ -705,6 +754,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                       ? null
                       : () => unawaited(_exportSelectedCards()),
                   child: const Text('Export selected'),
+                ),
+              if (widget.repository is CardBrowserRestoreRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-restore-selected'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_restoreSelectedCards()),
+                  child: const Text('Restore selected'),
                 ),
               if (widget.repository is CardBrowserFlagRepository)
                 OutlinedButton(
