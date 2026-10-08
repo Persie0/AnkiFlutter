@@ -18,8 +18,8 @@ use anki_proto::card_rendering::{
 };
 use anki_proto::cards::{CardIds, RemoveCardsRequest};
 use anki_proto::collection::{
-    CloseCollectionRequest, OpChangesAfterUndo, OpChangesWithCount, OpChangesWithId,
-    OpenCollectionRequest, UndoStatus,
+    CheckDatabaseResponse, CloseCollectionRequest, OpChangesAfterUndo, OpChangesWithCount,
+    OpChangesWithId, OpenCollectionRequest, UndoStatus,
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
@@ -217,6 +217,31 @@ fn real_backend_creates_a_deck_from_anki_defaults_through_ffi() {
         .children
         .iter()
         .any(|node| { node.deck_id == result.id && node.name == "Created by AnkiFlutter" }));
+}
+
+#[test]
+fn native_database_check_uses_upstream_anki_on_real_collection() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(80, &Empty::default());
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "check database: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let _report = CheckDatabaseResponse::decode(bytes.as_slice()).unwrap();
+    // A completed database check must leave the collection readable.
+    assert!(fetch_tree(&backend).children.iter().any(|node| node.deck_id == 1));
 }
 
 #[test]
