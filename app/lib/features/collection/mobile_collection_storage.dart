@@ -64,7 +64,7 @@ class MobileCollectionStorage {
   final int Function() _timestampMicros;
 
   Future<String> copySelectedCollection(File source) async {
-    if (!RegExp(r'\\.anki2$', caseSensitive: false).hasMatch(source.path)) {
+    if (!RegExp(r'\.anki2$', caseSensitive: false).hasMatch(source.path)) {
       throw FormatException('Select an Anki .anki2 collection file.');
     }
     if (!await source.exists()) {
@@ -74,9 +74,9 @@ class MobileCollectionStorage {
       );
     }
 
-    final basename = source.path.split(RegExp(r'[/\\\\]')).last;
+    final basename = source.path.split(RegExp(r'[/\\]')).last;
     final name = basename.replaceFirst(
-      RegExp(r'\\.anki2$', caseSensitive: false),
+      RegExp(r'\.anki2$', caseSensitive: false),
       '',
     );
     final stem = '${name}_${_timestampMicros()}';
