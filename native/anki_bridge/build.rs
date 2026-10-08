@@ -259,6 +259,16 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendSchedulerService",
         "reposition_defaults",
     ),
+    (
+        "EMPTY_FILTERED_DECK",
+        "BackendSchedulerService",
+        "empty_filtered_deck",
+    ),
+    (
+        "REBUILD_FILTERED_DECK",
+        "BackendSchedulerService",
+        "rebuild_filtered_deck",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
