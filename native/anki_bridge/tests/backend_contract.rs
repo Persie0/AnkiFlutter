@@ -19,8 +19,7 @@ use anki_proto::card_rendering::{
 use anki_proto::cards::{CardIds, RemoveCardsRequest};
 use anki_proto::collection::{
     CheckDatabaseResponse, CloseCollectionRequest, CreateBackupRequest, OpChangesAfterUndo,
-    OpChangesWithCount,
-    OpChangesWithId, OpenCollectionRequest, UndoStatus,
+    OpChangesWithCount, OpChangesWithId, OpenCollectionRequest, UndoStatus,
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
@@ -185,7 +184,12 @@ fn native_backup_creates_database_only_archive_in_selected_directory() {
     let backend = TestBackend::new();
     let open = collection_request(&temp);
     let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
-    assert_eq!(status, STATUS_SUCCESS, "open: {}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
 
     let folder = temp.path().join("manual-backups");
     fs::create_dir_all(&folder).unwrap();
