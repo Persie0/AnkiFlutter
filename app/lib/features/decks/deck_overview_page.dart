@@ -8,6 +8,7 @@ import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/deck_options/filtered_deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/data/anki_filtered_deck_repository.dart';
+import 'package:anki_flutter/features/decks/data/anki_deck_new_card_order_repository.dart';
 import 'package:anki_flutter/features/decks/data/anki_filtered_deck_options_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
@@ -40,6 +41,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onBrowse,
     this.filteredDeckRepository,
     this.filteredDeckOptionsRepository,
+    this.newCardOrderRepository,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -58,6 +60,7 @@ class DeckOverviewPage extends StatefulWidget {
   /// Overrides the native repository in tests or custom backend integrations.
   final FilteredDeckRepository? filteredDeckRepository;
   final FilteredDeckOptionsRepository? filteredDeckOptionsRepository;
+  final DeckNewCardOrderRepository? newCardOrderRepository;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -67,6 +70,68 @@ class DeckOverviewPage extends StatefulWidget {
 class _DeckOverviewPageState extends State<DeckOverviewPage> {
   ReviewController? _reviewController;
   bool _mutating = false;
+
+  DeckNewCardOrderRepository? get _newCardOrderRepository {
+    if (widget.deck.filtered) return null;
+    final provided = widget.newCardOrderRepository;
+    if (provided != null) return provided;
+    final backend = widget.backend;
+    return backend == null ? null : AnkiDeckNewCardOrderRepository(backend: backend);
+  }
+
+  Future<void> _reorderNewCards({required bool randomize}) async {
+    final repository = _newCardOrderRepository;
+    if (repository == null || _mutating) return;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(randomize ? 'Shuffle new cards?' : 'Restore new-card order?'),
+        content: Text(
+          randomize
+              ? 'Change the position of new cards in this deck to a random order? '
+                  'Review history and existing review intervals will be preserved.'
+              : 'Order new cards in this deck by their original insertion order? '
+                  'Review history and existing review intervals will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-new-card-order'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(randomize ? 'Shuffle' : 'Restore order'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted || _mutating) return;
+    setState(() => _mutating = true);
+    try {
+      final count = await repository.reorder(
+        widget.deck.id,
+        randomize: randomize,
+      );
+      if (!mounted) return;
+      await widget.onChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(
+          randomize
+              ? 'Shuffled $count new cards.'
+              : 'Restored order of $count new cards.',
+        )),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reorder new cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
 
   FilteredDeckRepository? get _filteredDeckRepository {
     if (!widget.deck.filtered) return null;
@@ -522,6 +587,26 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               Text('Learn ${deck.learnCount}'),
               const SizedBox(height: 8),
               Text('Review ${deck.reviewCount}'),
+              if (_newCardOrderRepository != null) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  key: const ValueKey('deck-shuffle-new-cards'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _reorderNewCards(randomize: true),
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text('Shuffle new cards'),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('deck-restore-new-card-order'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _reorderNewCards(randomize: false),
+                  icon: const Icon(Icons.sort),
+                  label: const Text('Restore new-card order'),
+                ),
+              ],
               if (_filteredDeckRepository != null) ...[
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
