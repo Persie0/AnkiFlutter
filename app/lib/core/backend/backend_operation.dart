@@ -80,7 +80,9 @@ enum BackendOperation {
   redo(79),
   checkDatabase(80),
   createBackup(81),
-  findAndReplace(82);
+  findAndReplace(82),
+  sortCards(83),
+  repositionDefaults(84);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
