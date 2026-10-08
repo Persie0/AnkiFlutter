@@ -237,12 +237,29 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
 
   Future<void> _previewCard(int cardId) async {
     final repository = widget.previewRepository;
-    if (repository == null || _loading || _bulkActionInProgress) return;
+    final result = _result;
+    if (repository == null ||
+        result == null ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    // Native search returns every ordered matching ID even if the browser
+    // has only rendered the first page. Fall back to visible rows when the
+    // result is partial; never navigate outside the current search.
+    final matchingIds = result.matchingCardIds;
+    final orderedIds = matchingIds.length == result.totalCount &&
+            matchingIds.contains(cardId)
+        ? matchingIds
+        : result.cards.map((card) => card.cardId).toList(growable: false);
+
     await Navigator.of(context).push<void>(
       MaterialPageRoute<void>(
         builder: (_) => BrowserCardPreviewPage(
           cardId: cardId,
           repository: repository,
+          orderedCardIds: orderedIds,
           mediaBaseUri: widget.previewMediaBaseUri,
           surfaceBuilder: widget.previewSurfaceBuilder,
         ),
