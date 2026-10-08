@@ -61,6 +61,8 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   List<CardBrowserSortOption> _sortOptions = const [];
   CardBrowserSortOption? _selectedSortOption;
   CardBrowserSort? _sort;
+  List<BrowserSavedSearch> _savedSearches = const [];
+  String? _activeSavedSearchName;
 
   @override
   void initState() {
@@ -113,6 +115,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _sortOptions = options;
       _selectedSortOption = selectedSortOption;
       _sort = restoredSort;
+      _savedSearches = savedState?.savedSearches ?? const [];
     });
     await _search(persistState: false);
   }
@@ -124,6 +127,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           query: _queryController.text,
           sortColumn: _sort?.column,
           reverse: _sort?.reverse ?? false,
+          savedSearches: _savedSearches,
         ),
       );
     } catch (_) {
@@ -133,6 +137,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
 
   void _selectSortOption(CardBrowserSortOption? option) {
     setState(() {
+      _activeSavedSearchName = null;
       _selectedSortOption = option;
       _sort = option == null
           ? null
@@ -148,6 +153,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     final sort = _sort;
     if (sort == null) return;
     setState(() {
+      _activeSavedSearchName = null;
       _sort = CardBrowserSort(
         column: sort.column,
         reverse: !sort.reverse,
@@ -159,8 +165,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
   Future<void> _search({
     bool clearSelection = false,
     bool persistState = true,
+    bool keepActiveSavedSearch = false,
   }) async {
     if (_bulkActionInProgress) return;
+    // Changing a query manually does not modify the saved preset.
+    if (!keepActiveSavedSearch) _activeSavedSearchName = null;
     if (persistState) await _persistState();
     final generation = ++_generation;
     setState(() {
@@ -186,6 +195,180 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _applySavedSearch(String? name) async {
+    if (name == null || _loading || _bulkActionInProgress) return;
+    BrowserSavedSearch? selected;
+    for (final entry in _savedSearches) {
+      if (entry.name == name) {
+        selected = entry;
+        break;
+      }
+    }
+    if (selected == null) return;
+    CardBrowserSortOption? sortOption;
+    for (final option in _sortOptions) {
+      if (option.column == selected.sortColumn) {
+        sortOption = option;
+        break;
+      }
+    }
+    setState(() {
+      _activeSavedSearchName = selected!.name;
+      _queryController.text = selected.query;
+      _selectedSortOption = sortOption;
+      _sort = sortOption == null
+          ? null
+          : CardBrowserSort(
+              column: sortOption.column,
+              reverse: selected.reverse,
+            );
+    });
+    await _search(clearSelection: true, keepActiveSavedSearch: true);
+  }
+
+  Future<void> _saveNamedSearch() async {
+    if (_loading ||
+        _bulkActionInProgress ||
+        _queryController.text.trim().isEmpty) {
+      return;
+    }
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => const _SaveBrowserSearchDialog(),
+    );
+    if (!mounted || name == null || name.trim().isEmpty) return;
+    final trimmed = name.trim();
+    final index = _savedSearches.indexWhere(
+      (entry) => entry.name.toLowerCase() == trimmed.toLowerCase(),
+    );
+    if (index >= 0) {
+      final overwrite = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Overwrite saved search?'),
+          content: Text('Replace "${_savedSearches[index].name}" with the current query and sort order?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              key: const ValueKey('browser-confirm-overwrite-saved-search'),
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('Overwrite'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || overwrite != true) return;
+    }
+    final saved = BrowserSavedSearch(
+      name: trimmed,
+      query: _queryController.text,
+      sortColumn: _sort?.column,
+      reverse: _sort?.reverse ?? false,
+    );
+    final updated = [..._savedSearches];
+    if (index >= 0) {
+      updated[index] = saved;
+    } else {
+      updated.add(saved);
+    }
+    setState(() {
+      _savedSearches = List.unmodifiable(updated);
+      _activeSavedSearchName = saved.name;
+    });
+    await _persistState();
+  }
+
+  Future<void> _deleteSavedSearch() async {
+    final name = _activeSavedSearchName;
+    if (name == null || _loading || _bulkActionInProgress) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete saved search?'),
+        content: Text('Delete "$name"? Your current browser query will remain unchanged.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('browser-confirm-delete-saved-search'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || confirmed != true) return;
+    setState(() {
+      _savedSearches = List.unmodifiable(
+        _savedSearches.where((entry) => entry.name != name),
+      );
+      _activeSavedSearchName = null;
+    });
+    await _persistState();
+  }
+
+  Widget _buildSavedSearchControls() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: InputDecorator(
+              decoration: const InputDecoration(
+                labelText: 'Saved searches',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  key: const ValueKey('browser-saved-search-picker'),
+                  isExpanded: true,
+                  value: _activeSavedSearchName,
+                  hint: const Text('Choose a saved search'),
+                  items: [
+                    for (final entry in _savedSearches)
+                      DropdownMenuItem(
+                        value: entry.name,
+                        child: Text(entry.name),
+                      ),
+                  ],
+                  onChanged: _loading || _bulkActionInProgress
+                      ? null
+                      : (name) => unawaited(_applySavedSearch(name)),
+                ),
+              ),
+            ),
+          ),
+          IconButton(
+            key: const ValueKey('browser-save-search'),
+            tooltip: 'Save current search',
+            onPressed: _loading ||
+                    _bulkActionInProgress ||
+                    _queryController.text.trim().isEmpty
+                ? null
+                : () => unawaited(_saveNamedSearch()),
+            icon: const Icon(Icons.bookmark_add_outlined),
+          ),
+          IconButton(
+            key: const ValueKey('browser-delete-saved-search'),
+            tooltip: 'Delete selected saved search',
+            onPressed: _activeSavedSearchName == null ||
+                    _loading ||
+                    _bulkActionInProgress
+                ? null
+                : () => unawaited(_deleteSavedSearch()),
+            icon: const Icon(Icons.delete_outline),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _loadMore() async {
@@ -955,8 +1138,10 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     unawaited(_search(clearSelection: true));
                   }
                 },
+                onChanged: (_) => setState(() => _activeSavedSearchName = null),
               ),
             ),
+            _buildSavedSearchControls(),
             if (_sortOptions.isNotEmpty) _buildSortControls(),
             if (!_loading && _error == null && _result?.cards.isNotEmpty == true)
               _buildSelectionToolbar(),
@@ -1626,6 +1811,57 @@ class _BrowserRepositionDialogState extends State<_BrowserRepositionDialog> {
           key: const ValueKey('browser-confirm-reposition'),
           onPressed: startValid && stepValid ? _confirm : null,
           child: const Text('Reposition'),
+        ),
+      ],
+    );
+  }
+}
+
+class _SaveBrowserSearchDialog extends StatefulWidget {
+  const _SaveBrowserSearchDialog();
+
+  @override
+  State<_SaveBrowserSearchDialog> createState() => _SaveBrowserSearchDialogState();
+}
+
+class _SaveBrowserSearchDialogState extends State<_SaveBrowserSearchDialog> {
+  final TextEditingController _nameController = TextEditingController();
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final name = _nameController.text.trim();
+    return AlertDialog(
+      title: const Text('Save current search'),
+      content: TextField(
+        key: const ValueKey('browser-saved-search-name'),
+        controller: _nameController,
+        autofocus: true,
+        maxLength: 80,
+        textInputAction: TextInputAction.done,
+        decoration: const InputDecoration(
+          labelText: 'Search name',
+          border: OutlineInputBorder(),
+        ),
+        onChanged: (_) => setState(() {}),
+        onSubmitted: (_) {
+          if (name.isNotEmpty) Navigator.of(context).pop(name);
+        },
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('browser-confirm-save-search'),
+          onPressed: name.isEmpty ? null : () => Navigator.of(context).pop(name),
+          child: const Text('Save'),
         ),
       ],
     );
