@@ -2,20 +2,29 @@ import 'dart:async';
 
 import 'package:anki_flutter/core/backend/generated/anki/sync.pb.dart' as sync;
 import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
+import 'package:anki_flutter/features/collection/data/anki_collection_backup_repository.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
 import 'package:flutter/material.dart';
+
+enum _BackupChoice { cancel, skip, backup }
 
 class SyncPage extends StatefulWidget {
   const SyncPage({
     required this.repository,
     required this.authStore,
     this.onCollectionChanged,
+    this.backupRepository,
+    this.chooseBackupDirectory,
     super.key,
   });
 
   final SyncRepository repository;
   final SyncAuthStore authStore;
   final Future<void> Function()? onCollectionChanged;
+  /// Optional native database backup before a destructive full download.
+  final CollectionBackupRepository? backupRepository;
+  final Future<String?> Function()? chooseBackupDirectory;
 
   @override
   State<SyncPage> createState() => _SyncPageState();
@@ -246,6 +255,9 @@ class _SyncPageState extends State<SyncPage> {
           false;
       if (!confirmed) return false;
     }
+    if (!upload && widget.backupRepository != null) {
+      if (!await _confirmDownloadProtection() || !mounted) return false;
+    }
     setState(() {
       _status = upload ? 'Uploading full collection…' : 'Downloading full collection…';
     });
@@ -255,6 +267,57 @@ class _SyncPageState extends State<SyncPage> {
       serverUsn: _syncMedia ? response.serverMediaUsn : null,
     );
     return true;
+  }
+
+  Future<bool> _confirmDownloadProtection() async {
+    final choice = await showDialog<_BackupChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Protect the local collection'),
+        content: const Text(
+          'Downloading from AnkiWeb will replace the local collection. '
+          'You can create a database-only backup first. '
+          'Media files are not included in this backup.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, _BackupChoice.cancel),
+            child: const Text('Cancel download'),
+          ),
+          TextButton(
+            key: const ValueKey('full-sync-skip-backup'),
+            onPressed: () => Navigator.pop(dialogContext, _BackupChoice.skip),
+            child: const Text('Download without backup'),
+          ),
+          FilledButton(
+            key: const ValueKey('full-sync-create-backup'),
+            onPressed: () => Navigator.pop(dialogContext, _BackupChoice.backup),
+            child: const Text('Back up first'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || choice == null || choice == _BackupChoice.cancel) {
+      return false;
+    }
+    if (choice == _BackupChoice.skip) return true;
+
+    final directory = await (widget.chooseBackupDirectory ??
+        () => FilePicker.getDirectoryPath(
+              dialogTitle: 'Choose pre-sync backup folder',
+            ))();
+    if (!mounted || directory == null) return false;
+    final trimmed = directory.trim();
+    if (trimmed.isEmpty) return false;
+    setState(() => _status = 'Backing up local collection…');
+    final created = await widget.backupRepository!.createBackup(trimmed);
+    if (!created) {
+      throw StateError(
+        'Anki did not create the backup. Download was not started.',
+      );
+    }
+    return mounted;
   }
 
   Future<void> _refreshStatus() async {
