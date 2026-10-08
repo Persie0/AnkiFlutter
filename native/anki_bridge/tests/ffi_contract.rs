@@ -122,6 +122,25 @@ fn media_trash_operation_ids_are_registered() {
 }
 
 #[test]
+fn restore_buried_and_suspended_cards_operation_id_is_mapped() {
+    let init = backend_init_bytes();
+    let created = unsafe { anki_bridge_create(init.as_ptr(), init.len()) };
+    assert_eq!(created.status, STATUS_SUCCESS);
+
+    let result = unsafe { anki_bridge_invoke(created.handle, 78, ptr::null(), 0) };
+    let status = result.status;
+    let bytes = unsafe { copy_and_free(result.data) };
+    if status == STATUS_BRIDGE_ERROR {
+        let message = String::from_utf8(bytes).unwrap();
+        assert!(
+            !message.contains("Unknown Anki bridge operation"),
+            "restore operation 78 must be mapped to the pinned Anki service"
+        );
+    }
+    unsafe { anki_bridge_destroy(created.handle) };
+}
+
+#[test]
 fn backend_error_bytes_are_preserved() {
     let init = backend_init_bytes();
     let request = DeckTreeRequest { now: 1_800_000_000 }.encode_to_vec();
