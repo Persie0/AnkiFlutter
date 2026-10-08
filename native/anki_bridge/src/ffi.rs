@@ -358,6 +358,8 @@ mod tests {
         assert_eq!(operation_from_id(80).unwrap(), CHECK_DATABASE);
         assert_eq!(operation_from_id(81).unwrap(), CREATE_BACKUP);
         assert_eq!(operation_from_id(82).unwrap(), FIND_AND_REPLACE);
-        assert!(operation_from_id(83).is_err());
+        assert_eq!(operation_from_id(83).unwrap(), SORT_CARDS);
+        assert_eq!(operation_from_id(84).unwrap(), REPOSITION_DEFAULTS);
+        assert!(operation_from_id(85).is_err());
     }
 }
