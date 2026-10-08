@@ -18,7 +18,7 @@ use anki_proto::card_rendering::{
 };
 use anki_proto::cards::{CardIds, RemoveCardsRequest};
 use anki_proto::collection::{
-    CloseCollectionRequest, OpChangesAfterUndo, OpChangesWithCount, OpChangesWithId,
+    CheckDatabaseResponse, CloseCollectionRequest, OpChangesAfterUndo, OpChangesWithCount, OpChangesWithId,
     OpenCollectionRequest, UndoStatus,
 };
 use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
@@ -217,6 +217,35 @@ fn real_backend_creates_a_deck_from_anki_defaults_through_ffi() {
         .children
         .iter()
         .any(|node| { node.deck_id == result.id && node.name == "Created by AnkiFlutter" }));
+}
+
+#[test]
+fn anki_database_integrity_check_runs_against_a_real_collection() {
+    let temp = TempDir::new().unwrap();
+    let backend = TestBackend::new();
+    let open = collection_request(&temp);
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(80, &Empty::default());
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "check_database failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let result = CheckDatabaseResponse::decode(bytes.as_slice()).unwrap();
+    assert!(
+        result.problems.is_empty(),
+        "new Anki collection reported problems: {:?}",
+        result.problems
+    );
+    assert_empty_default_deck(&fetch_tree(&backend));
 }
 
 #[test]
