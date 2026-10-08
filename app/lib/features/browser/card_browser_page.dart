@@ -496,8 +496,8 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     try {
       final defaults = await repository.repositionDefaults();
       if (!mounted) return;
-      var startText = '1';
-      var stepText = '1';
+      final startController = TextEditingController(text: '1');
+      final stepController = TextEditingController(text: '1');
       var randomize = defaults.randomize;
       var shiftExisting = defaults.shiftExisting;
       int? validUInt32(String value) {
@@ -509,8 +509,8 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         context: context,
         builder: (dialogContext) => StatefulBuilder(
           builder: (context, setDialogState) {
-            final start = validUInt32(startText);
-            final step = validUInt32(stepText);
+            final start = validUInt32(startController.text);
+            final step = validUInt32(stepController.text);
             return AlertDialog(
               title: Text(
                 'Reposition ${cardIds.length} selected '
@@ -528,26 +528,24 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     const SizedBox(height: 12),
                     TextFormField(
                       key: const ValueKey('browser-reposition-start'),
-                      initialValue: startText,
+                      controller: startController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Starting position',
                         border: OutlineInputBorder(),
                       ),
-                      onChanged: (value) =>
-                          setDialogState(() => startText = value),
+                      onChanged: (_) => setDialogState(() {}),
                     ),
                     const SizedBox(height: 12),
                     TextFormField(
                       key: const ValueKey('browser-reposition-step'),
-                      initialValue: stepText,
+                      controller: stepController,
                       keyboardType: TextInputType.number,
                       decoration: const InputDecoration(
                         labelText: 'Step size',
                         border: OutlineInputBorder(),
                       ),
-                      onChanged: (value) =>
-                          setDialogState(() => stepText = value),
+                      onChanged: (_) => setDialogState(() {}),
                     ),
                     CheckboxListTile(
                       contentPadding: EdgeInsets.zero,
@@ -590,6 +588,8 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           },
         ),
       );
+      startController.dispose();
+      stepController.dispose();
       if (!mounted || options == null) return;
 
       final changed = await repository.repositionNewCards(cardIds, options);
