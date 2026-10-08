@@ -496,14 +496,78 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     super.dispose();
   }
 
+  void _compactAction(String action) {
+    switch (action) {
+      case 'all':
+        _browseDeck(_DeckBrowseFilter.all);
+      case 'due':
+        _browseDeck(_DeckBrowseFilter.due);
+      case 'new':
+        _browseDeck(_DeckBrowseFilter.newCards);
+      case 'suspended':
+        _browseDeck(_DeckBrowseFilter.suspended);
+      case 'options':
+        unawaited(_deckOptions());
+      case 'preferences':
+        unawaited(_preferences());
+      case 'custom-study':
+        unawaited(_customStudy());
+      case 'statistics':
+        unawaited(_statistics());
+      case 'add-note':
+        unawaited(_addNote());
+      case 'rename':
+        unawaited(_rename());
+      case 'remove':
+        unawaited(_remove());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final deck = widget.deck;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 720;
     return Scaffold(
       appBar: AppBar(
-        title: Text(deck.name),
+        title: Text(deck.name, overflow: TextOverflow.ellipsis),
         actions: [
-          if (widget.onBrowse != null)
+          if (compactToolbar &&
+              (widget.onBrowse != null ||
+                  widget.backend != null ||
+                  widget.onAddNote != null ||
+                  widget.onRename != null ||
+                  widget.onRemove != null ||
+                  widget.filteredDeckOptionsRepository != null))
+            PopupMenuButton<String>(
+              key: const ValueKey('deck-overview-actions'),
+              tooltip: 'More deck actions',
+              enabled: !_mutating,
+              icon: const Icon(Icons.more_vert),
+              onSelected: _compactAction,
+              itemBuilder: (_) => [
+                if (widget.onBrowse != null) ...[
+                  const PopupMenuItem(value: 'all', child: Text('Browse all cards')),
+                  const PopupMenuItem(value: 'due', child: Text('Browse due cards')),
+                  const PopupMenuItem(value: 'new', child: Text('Browse new cards')),
+                  const PopupMenuItem(value: 'suspended', child: Text('Browse suspended cards')),
+                ],
+                if (widget.backend != null ||
+                    (widget.deck.filtered && widget.filteredDeckOptionsRepository != null))
+                  const PopupMenuItem(value: 'options', child: Text('Deck options')),
+                if (widget.backend != null) ...[
+                  const PopupMenuItem(value: 'preferences', child: Text('Preferences')),
+                  const PopupMenuItem(value: 'custom-study', child: Text('Custom study')),
+                  const PopupMenuItem(value: 'statistics', child: Text('Deck statistics')),
+                ],
+                if (widget.onAddNote != null)
+                  const PopupMenuItem(value: 'add-note', child: Text('Add note')),
+                if (widget.onRename != null)
+                  const PopupMenuItem(value: 'rename', child: Text('Rename deck')),
+                if (widget.onRemove != null)
+                  const PopupMenuItem(value: 'remove', child: Text('Delete deck')),
+              ],
+            ),
+          if (!compactToolbar && widget.onBrowse != null)
             PopupMenuButton<_DeckBrowseFilter>(
               key: const ValueKey('deck-browse-menu'),
               tooltip: 'Browse deck cards',
@@ -529,45 +593,45 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 ),
               ],
             ),
-          if (widget.backend != null ||
+          if (!compactToolbar && (widget.backend != null ||
               (widget.deck.filtered &&
-                  widget.filteredDeckOptionsRepository != null))
+                  widget.filteredDeckOptionsRepository != null)))
             IconButton(
               tooltip: widget.deck.filtered ? 'Filtered deck options' : 'Deck options',
               onPressed: _mutating ? null : _deckOptions,
               icon: const Icon(Icons.settings_outlined),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Preferences',
               onPressed: _mutating ? null : _preferences,
               icon: const Icon(Icons.settings_suggest_outlined),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Custom study',
               onPressed: _mutating ? null : _customStudy,
               icon: const Icon(Icons.tune),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Deck statistics',
               onPressed: _mutating ? null : _statistics,
               icon: const Icon(Icons.bar_chart_outlined),
             ),
-          if (widget.onAddNote != null)
+          if (!compactToolbar && widget.onAddNote != null)
             IconButton(
               tooltip: 'Add note',
               onPressed: () => unawaited(_addNote()),
               icon: const Icon(Icons.note_add_outlined),
             ),
-          if (widget.onRename != null)
+          if (!compactToolbar && widget.onRename != null)
             IconButton(
               tooltip: 'Rename deck',
               onPressed: _mutating ? null : _rename,
               icon: const Icon(Icons.edit_outlined),
             ),
-          if (widget.onRemove != null)
+          if (!compactToolbar && widget.onRemove != null)
             IconButton(
               tooltip: 'Delete deck',
               onPressed: _mutating ? null : _remove,
@@ -575,10 +639,15 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
             ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (_, bounds) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: bounds.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -633,6 +702,10 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 child: const Text('Study'),
               ),
             ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
