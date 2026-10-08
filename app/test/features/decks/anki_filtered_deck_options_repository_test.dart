@@ -65,10 +65,10 @@ void main() {
   test('rejects invalid deck IDs, names, searches and card limits', () async {
     final backend = _Backend();
     final repository = AnkiFilteredDeckOptionsRepository(backend: backend);
-    await expectLater(repository.load(0), throwsArgumentError);
+    await expectLater(repository.load(-1), throwsArgumentError);
 
     final good = await repository.load(98);
-    final invalidId = good.deepCopy()..id = Int64.ZERO;
+    final invalidId = good.deepCopy()..id = Int64(-1);
     final invalidName = good.deepCopy()..name = ' ';
     final noQueries = good.deepCopy()..config.searchTerms.clear();
     final missingQuery = good.deepCopy()
