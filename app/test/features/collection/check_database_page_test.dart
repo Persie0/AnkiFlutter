@@ -83,15 +83,25 @@ void main() {
     await _confirm(tester);
 
     expect(find.text('Database message 0'), findsOneWidget);
+    final pageScroll = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(
+      find.text('Database message 49'),
+      260,
+      scrollable: pageScroll,
+    );
     expect(find.text('Database message 49'), findsOneWidget);
     expect(find.text('Database message 54'), findsNothing);
 
     final more = find.byKey(const ValueKey('database-check-more'));
-    await tester.ensureVisible(more);
-    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(more, 260, scrollable: pageScroll);
     await tester.tap(more);
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.text('Database message 54'),
+      260,
+      scrollable: pageScroll,
+    );
     expect(find.text('Database message 54'), findsOneWidget);
   });
 
