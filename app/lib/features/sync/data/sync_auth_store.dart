@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:anki_flutter/core/backend/generated/anki/sync.pb.dart' as sync;
+import 'package:anki_flutter/core/storage/atomic_state_file.dart';
 import 'package:anki_flutter/features/collection/mobile_collection_storage.dart';
 
 abstract interface class SyncAuthStore {
@@ -52,7 +53,7 @@ class FileSyncAuthStore implements SyncAuthStore {
     if (auth.hasIoTimeoutSecs() && auth.ioTimeoutSecs > 0) {
       data['ioTimeoutSecs'] = auth.ioTimeoutSecs;
     }
-    await file.writeAsString(jsonEncode(data), flush: true);
+    await writeAtomicState(file, jsonEncode(data));
   }
 
   @override
