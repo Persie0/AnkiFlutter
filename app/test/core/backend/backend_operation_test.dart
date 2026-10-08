@@ -97,6 +97,9 @@ void main() {
         'rebuildFilteredDeck': 86,
         'getOrCreateFilteredDeck': 87,
         'addOrUpdateFilteredDeck': 88,
+        'tagManagerRenameTags': 89,
+        'tagManagerRemoveTags': 90,
+        'tagManagerClearUnusedTags': 91,
       },
     );
 
