@@ -6,6 +6,7 @@ import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/collection/recent_collection_store.dart';
+import 'package:anki_flutter/features/collection/data/anki_collection_history_repository.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
@@ -81,6 +82,66 @@ class _DeckListPageState extends State<DeckListPage> {
   bool _collectionOpened = false;
   String? _collectionErrorMessage;
   List<String> _recentCollections = const [];
+  CollectionHistoryStatus _historyStatus = const CollectionHistoryStatus(
+    undoLabel: '',
+    redoLabel: '',
+  );
+  bool _historyBusy = false;
+  int _historyGeneration = 0;
+
+  Future<void> _refreshHistory() async {
+    final backend = widget.backend;
+    if (!_collectionOpened || backend == null) return;
+    final generation = ++_historyGeneration;
+    try {
+      final status = await AnkiCollectionHistoryRepository(
+        backend: backend,
+      ).status();
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() => _historyStatus = status);
+    } catch (_) {
+      // Undo history must not block normal collection workflows.
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() => _historyStatus = const CollectionHistoryStatus(
+        undoLabel: '',
+        redoLabel: '',
+      ));
+    }
+  }
+
+  Future<void> _changeHistory({required bool redo}) async {
+    final backend = widget.backend;
+    if (backend == null || !_collectionOpened || _historyBusy || _opening) {
+      return;
+    }
+    if (redo ? !_historyStatus.canRedo : !_historyStatus.canUndo) return;
+    setState(() => _historyBusy = true);
+    final generation = ++_historyGeneration;
+    try {
+      final repository = AnkiCollectionHistoryRepository(backend: backend);
+      final status = redo ? await repository.redo() : await repository.undo();
+      if (!mounted || generation != _historyGeneration) return;
+      setState(() => _historyStatus = status);
+      await widget.controller.load();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not ${redo ? 'redo' : 'undo'}: $error')),
+      );
+      await _refreshHistory();
+    } finally {
+      if (mounted) {
+        setState(() => _historyBusy = false);
+      }
+    }
+  }
+
+  Future<void> _onReturnedFromCollectionScreen() async {
+    if (!mounted || !_collectionOpened) return;
+    await _refreshHistory();
+    if (mounted) await widget.controller.load();
+  }
+
 
   @override
   void initState() {
@@ -152,6 +213,7 @@ class _DeckListPageState extends State<DeckListPage> {
       _collectionOpened = true;
     });
     await widget.controller.load();
+    await _refreshHistory();
     final store = widget.recentCollectionsStore;
     if (store != null) {
       try {
@@ -221,6 +283,8 @@ class _DeckListPageState extends State<DeckListPage> {
       setState(() {
         _opening = false;
         _collectionOpened = false;
+        _historyStatus = const CollectionHistoryStatus(undoLabel: '', redoLabel: '');
+        _historyGeneration++;
       });
     } catch (error) {
       if (!mounted) {
@@ -251,6 +315,7 @@ class _DeckListPageState extends State<DeckListPage> {
     );
     if (created == true && mounted) {
       await widget.controller.load();
+      await _refreshHistory();
     }
   }
 
@@ -348,7 +413,7 @@ class _DeckListPageState extends State<DeckListPage> {
   void _openBrowser({String? initialQuery}) {
     final backend = widget.backend;
     if (backend == null) return;
-    Navigator.of(context).push(
+    unawaited(Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CardBrowserPage(
           initialQuery: initialQuery,
@@ -361,7 +426,7 @@ class _DeckListPageState extends State<DeckListPage> {
           ),
         ),
       ),
-    );
+    ).then((_) => _onReturnedFromCollectionScreen()));
   }
 
   void _runCollectionAction(_CollectionAction action) {
@@ -391,7 +456,7 @@ class _DeckListPageState extends State<DeckListPage> {
   }
 
   void _openDeck(DeckNode deck) {
-    Navigator.of(context).push(
+    unawaited(Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => DeckOverviewPage(
           deck: deck,
@@ -425,7 +490,7 @@ class _DeckListPageState extends State<DeckListPage> {
                 },
         ),
       ),
-    );
+    ).then((_) => _onReturnedFromCollectionScreen()));
   }
 
   @override
@@ -435,6 +500,28 @@ class _DeckListPageState extends State<DeckListPage> {
       appBar: AppBar(
         title: const Text('AnkiFlutter'),
         actions: [
+          if (_collectionOpened && widget.backend != null) ...[
+            IconButton(
+              key: const ValueKey('collection-undo'),
+              tooltip: _historyStatus.canUndo
+                  ? 'Undo ${_historyStatus.undoLabel}'
+                  : 'Undo',
+              icon: const Icon(Icons.undo),
+              onPressed: _opening || _historyBusy || !_historyStatus.canUndo
+                  ? null
+                  : () => unawaited(_changeHistory(redo: false)),
+            ),
+            IconButton(
+              key: const ValueKey('collection-redo'),
+              tooltip: _historyStatus.canRedo
+                  ? 'Redo ${_historyStatus.redoLabel}'
+                  : 'Redo',
+              icon: const Icon(Icons.redo),
+              onPressed: _opening || _historyBusy || !_historyStatus.canRedo
+                  ? null
+                  : () => unawaited(_changeHistory(redo: true)),
+            ),
+          ],
           if (_collectionOpened) ...[
             IconButton(
               tooltip: 'Switch collection',

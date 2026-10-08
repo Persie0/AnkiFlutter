@@ -241,6 +241,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendSchedulerService",
         "restore_buried_and_suspended_cards",
     ),
+    ("REDO", "BackendCollectionService", "redo"),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

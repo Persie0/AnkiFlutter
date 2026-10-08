@@ -259,11 +259,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(backend.calls.map((call) => call.operation), [
+      BackendOperation.getUndoStatus,
       BackendOperation.newDeck,
       BackendOperation.addDeck,
+      BackendOperation.getUndoStatus,
     ]);
     expect(
-      Deck.fromBuffer(backend.calls.last.request).name,
+      Deck.fromBuffer(backend.calls.firstWhere((call) => call.operation == BackendOperation.addDeck).request).name,
       'Language::Norwegian',
     );
     expect(repository.calls, 2);
@@ -288,7 +290,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Enter a deck name'), findsOneWidget);
-    expect(backend.calls, isEmpty);
+    expect(backend.calls.map((call) => call.operation), [BackendOperation.getUndoStatus]);
   });
 
   testWidgets('deck load failure is readable and Retry can recover', (tester) async {

@@ -67,7 +67,7 @@ void main() {
 
     expect(
       backend.calls.map((call) => call.operation),
-      [BackendOperation.newDeck, BackendOperation.addDeck],
+      [BackendOperation.getUndoStatus, BackendOperation.newDeck, BackendOperation.addDeck, BackendOperation.getUndoStatus],
     );
   });
 }
