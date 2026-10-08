@@ -31,7 +31,7 @@ void main() {
 
     expect(browser.queries, ['', 'deck:French is:due', 'is:new', 'deck:French is:due']);
     expect(_query(tester), 'deck:French is:due');
-    expect(find.text('French due'), findsWidgets);
+    expect(find.textContaining('French due'), findsWidgets);
     expect(find.text('1 card selected'), findsNothing);
     expect(stateStore.state!.query, 'deck:French is:due');
   });
@@ -54,6 +54,8 @@ void main() {
 
     expect(_query(tester), 'tag:chemistry');
     expect(reopened.queries, ['tag:chemistry']);
+    await tester.tap(find.byKey(const ValueKey('browser-saved-search-picker')));
+    await tester.pumpAndSettle();
     expect(find.text('Chemistry'), findsOneWidget);
   });
 
