@@ -110,6 +110,10 @@ void main() {
 
     // Resubmitting the same query should not create a duplicate step.
     await _search(tester, 'tag:math');
+    await tester.tap(find.byKey(const ValueKey('card-browser-sort-column')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Sort field').last);
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('card-browser-sort-direction')));
     await tester.pumpAndSettle();
 
@@ -117,7 +121,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(_query(tester), '');
     expect(_navButton(tester, 'browser-search-history-back').onPressed, isNull);
-    expect(repository.queries, ['', 'tag:math', 'tag:math', 'tag:math', '']);
+    expect(repository.queries, ['', 'tag:math', 'tag:math', 'tag:math', 'tag:math', '']);
   });
 }
 
