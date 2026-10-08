@@ -4,10 +4,13 @@ import 'package:anki_flutter/features/browser/browser_card_preview_page.dart';
 import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
+import 'package:anki_flutter/features/card_info/data/card_info_repository.dart';
+import 'package:anki_flutter/features/card_info/models/card_info_data.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/reviewer/models/review_card_content.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -139,6 +142,112 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('browser-preview-next')), findsNothing);
     expect(renderer.ids, [20]);
+  });
+
+  testWidgets('Space and Enter flip, arrows navigate, modifiers do not', (
+    tester,
+  ) async {
+    final renderer = _Renderer();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BrowserCardPreviewPage(
+          cardId: 20,
+          orderedCardIds: const [10, 20, 30],
+          repository: renderer,
+          surfaceBuilder: (_, html) => Text(html),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('back-20'), findsOneWidget);
+    expect(renderer.ids, [20]);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    expect(find.text('Preview card 30'), findsOneWidget);
+    expect(find.textContaining('front-30'), findsOneWidget);
+    expect(find.textContaining('back-30'), findsNothing);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.enter);
+    await tester.pumpAndSettle();
+    expect(find.textContaining('back-30'), findsOneWidget);
+    expect(renderer.ids, [20, 30]);
+
+    await tester.sendKeyDownEvent(LogicalKeyboardKey.controlLeft);
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.sendKeyUpEvent(LogicalKeyboardKey.controlLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Preview card 30'), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowLeft);
+    await tester.pumpAndSettle();
+    expect(find.text('Preview card 20'), findsOneWidget);
+    expect(find.textContaining('front-20'), findsOneWidget);
+    expect(renderer.ids, [20, 30, 20]);
+  });
+
+  testWidgets('Card Info opens exact navigated card using button and I', (
+    tester,
+  ) async {
+    final renderer = _Renderer();
+    final info = _InfoRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BrowserCardPreviewPage(
+          cardId: 20,
+          orderedCardIds: const [20, 30],
+          repository: renderer,
+          cardInfoRepository: info,
+          surfaceBuilder: (_, html) => Text(html),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.arrowRight);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('browser-preview-card-info')));
+    await tester.pumpAndSettle();
+    expect(find.text('Card Info'), findsOneWidget);
+    expect(find.text('Math::Logic'), findsOneWidget);
+    expect(info.loadedCardIds, [30]);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Preview card 30'), findsOneWidget);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.pumpAndSettle();
+    expect(find.text('Card Info'), findsOneWidget);
+    expect(info.loadedCardIds, [30, 30]);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.textContaining('front-30'), findsOneWidget);
+    expect(renderer.ids, [20, 30]);
+  });
+
+  testWidgets('Card Info shortcut and button require capability', (
+    tester,
+  ) async {
+    final renderer = _Renderer();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: BrowserCardPreviewPage(
+          cardId: 11,
+          repository: renderer,
+          surfaceBuilder: (_, html) => Text(html),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('browser-preview-card-info')), findsNothing);
+    await tester.sendKeyEvent(LogicalKeyboardKey.keyI);
+    await tester.pumpAndSettle();
+    expect(find.text('Preview card 11'), findsOneWidget);
+    expect(renderer.ids, [11]);
   });
 
   testWidgets('missing card is retryable without entering reviewer', (
@@ -380,6 +489,34 @@ class _PagedBrowser extends _Browser {
         CardBrowserResult(cardId: 88, cells: ['Card 88']),
       ],
       matchingCardIds: [77, 88, 99],
+    );
+  }
+}
+
+class _InfoRepository implements CardInfoRepository {
+  final loadedCardIds = <int>[];
+
+  @override
+  Future<CardInfoData> load(int cardId) async {
+    loadedCardIds.add(cardId);
+    return CardInfoData(
+      cardId: cardId,
+      noteId: cardId + 100,
+      deck: 'Math::Logic',
+      cardType: 'Card 1',
+      noteType: 'Basic',
+      preset: 'Default',
+      addedUnixSeconds: 1700000000,
+      duePosition: 3,
+      intervalDays: 0,
+      easePermille: 0,
+      reviews: 0,
+      lapses: 0,
+      averageSeconds: 0,
+      totalSeconds: 0,
+      customData: '',
+      fsrsParameters: const [],
+      reviewHistory: const [],
     );
   }
 }
