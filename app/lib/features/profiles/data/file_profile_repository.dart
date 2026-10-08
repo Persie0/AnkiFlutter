@@ -188,7 +188,22 @@ class FileProfileRepository implements ProfileRepository {
           )
           .toList(growable: false),
     };
-    await registryFile.writeAsString(jsonEncode(payload), flush: true);
+    // Keep the previous registry readable until the replacement has been
+    // completely written and flushed. Stage on the same filesystem to allow
+    // the final rename to replace the file rather than writing in place.
+    final stagingDirectory =
+        await registryFile.parent.createTemp('.anki-profile-write-');
+    try {
+      final staged = File(
+        '${stagingDirectory.path}${Platform.pathSeparator}registry.json',
+      );
+      await staged.writeAsString(jsonEncode(payload), flush: true);
+      await staged.rename(registryFile.path);
+    } finally {
+      if (await stagingDirectory.exists()) {
+        await stagingDirectory.delete(recursive: true);
+      }
+    }
   }
 
   AnkiProfile? _decodeProfile(Map<String, dynamic> json) {
