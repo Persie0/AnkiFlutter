@@ -37,7 +37,7 @@ class _CollectionBackupPageState extends State<CollectionBackupPage> {
     });
     try {
       final destination = await (widget.pickDirectory ??
-          () => FilePicker.platform.getDirectoryPath(
+          () => FilePicker.getDirectoryPath(
                 dialogTitle: 'Choose Anki backup folder',
               ))();
       if (!mounted || destination == null) return;
