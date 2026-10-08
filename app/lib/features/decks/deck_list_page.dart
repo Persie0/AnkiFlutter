@@ -9,6 +9,8 @@ import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/collection/data/anki_collection_history_repository.dart';
 import 'package:anki_flutter/features/collection/data/anki_database_check_repository.dart';
 import 'package:anki_flutter/features/collection/check_database_page.dart';
+import 'package:anki_flutter/features/collection/collection_backup_page.dart';
+import 'package:anki_flutter/features/collection/data/anki_collection_backup_repository.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
@@ -44,6 +46,7 @@ enum _CollectionAction {
   importExport,
   mediaCheck,
   databaseCheck,
+  backup,
   sync,
   browse,
 }
@@ -399,6 +402,18 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
+  void _openCollectionBackup() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CollectionBackupPage(
+          repository: AnkiCollectionBackupRepository(backend: backend),
+        ),
+      ),
+    );
+  }
+
   void _openDatabaseCheck() {
     final backend = widget.backend;
     if (backend == null) return;
@@ -467,6 +482,9 @@ class _DeckListPageState extends State<DeckListPage> {
         break;
       case _CollectionAction.databaseCheck:
         _openDatabaseCheck();
+        break;
+      case _CollectionAction.backup:
+        _openCollectionBackup();
         break;
       case _CollectionAction.sync:
         _openSync();
@@ -619,6 +637,14 @@ class _DeckListPageState extends State<DeckListPage> {
                   ),
                 ),
                 PopupMenuItem(
+                  value: _CollectionAction.backup,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.backup_outlined),
+                    title: Text('Create backup'),
+                  ),
+                ),
+                PopupMenuItem(
                   value: _CollectionAction.sync,
                   child: ListTile(
                     dense: true,
@@ -668,6 +694,11 @@ class _DeckListPageState extends State<DeckListPage> {
               tooltip: 'Check database',
               icon: const Icon(Icons.build_circle_outlined),
               onPressed: _opening ? null : _openDatabaseCheck,
+            ),
+            IconButton(
+              tooltip: 'Create backup',
+              icon: const Icon(Icons.backup_outlined),
+              onPressed: _opening ? null : _openCollectionBackup,
             ),
             IconButton(
               tooltip: 'Sync',
