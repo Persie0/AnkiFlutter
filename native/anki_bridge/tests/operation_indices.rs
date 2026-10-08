@@ -9,7 +9,7 @@ use anki_flutter_bridge::operations::{
     RENDER_EXISTING_CARD, RESTORE_TRASH, SCHEDULE_CARDS_AS_NEW, SCHEDULE_CARDS_AS_NEW_DEFAULTS,
     SET_CURRENT_DECK, SET_CUSTOM_CERTIFICATE, SET_DUE_DATE, STATE_IS_LEECH, SYNC_COLLECTION,
     SYNC_LOGIN, SYNC_MEDIA, SYNC_STATUS, TRASH_MEDIA_FILES, UNBURY_DECK, UNDO, UPDATE_DECK_CONFIGS,
-    UPDATE_NOTETYPE, WRITE_TTS_STREAM,
+    UPDATE_NOTETYPE, WRITE_TTS_STREAM, SORT_CARDS, REPOSITION_DEFAULTS,
 };
 
 #[test]
@@ -66,9 +66,11 @@ fn required_operations_are_distinct_and_available() {
         SCHEDULE_CARDS_AS_NEW_DEFAULTS,
         GET_CONFIG_STRING,
         SET_DUE_DATE,
+        SORT_CARDS,
+        REPOSITION_DEFAULTS,
     ];
 
-    assert_eq!(values.len(), 51);
+    assert_eq!(values.len(), 53);
     for (index, left) in values.iter().enumerate() {
         for right in values.iter().skip(index + 1) {
             assert_ne!(left, right);
