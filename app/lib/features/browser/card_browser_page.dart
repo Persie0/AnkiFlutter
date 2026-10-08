@@ -4,6 +4,8 @@ import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/browser_find_replace_dialog.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
+import 'package:anki_flutter/features/card_info/card_info_page.dart';
+import 'package:anki_flutter/features/card_info/data/card_info_repository.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +14,7 @@ class CardBrowserPage extends StatefulWidget {
   const CardBrowserPage({
     required this.repository,
     required this.noteRepository,
+    this.cardInfoRepository,
     this.stateStore,
     this.cardExporter,
     this.initialQuery,
@@ -20,6 +23,9 @@ class CardBrowserPage extends StatefulWidget {
 
   final CardBrowserRepository repository;
   final NoteEntryRepository noteRepository;
+
+  /// Optional native card statistics and review history access.
+  final CardInfoRepository? cardInfoRepository;
   final BrowserStateStore? stateStore;
   final BrowserCardExporter? cardExporter;
 
@@ -216,6 +222,20 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         setState(() => _loadingMore = false);
       }
     }
+  }
+
+  Future<void> _openCardInfo(int cardId) async {
+    final repository = widget.cardInfoRepository;
+    if (repository == null || _bulkActionInProgress || _loading) return;
+    await Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) => CardInfoPage(
+          repository: repository,
+          cardId: cardId,
+          kind: CardInfoKind.browser,
+        ),
+      ),
+    );
   }
 
   Future<void> _editNote(int cardId) async {
@@ -1215,12 +1235,26 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           ),
           title: Text(title),
           subtitle: subtitle == null ? null : Text(subtitle),
-          trailing: IconButton(
-            tooltip: 'Edit note',
-            onPressed: _bulkActionInProgress
-                ? null
-                : () => unawaited(_editNote(card.cardId)),
-            icon: const Icon(Icons.edit_outlined),
+          trailing: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (widget.cardInfoRepository != null)
+                IconButton(
+                  key: ValueKey('browser-card-info-${card.cardId}'),
+                  tooltip: 'Card info',
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_openCardInfo(card.cardId)),
+                  icon: const Icon(Icons.info_outline),
+                ),
+              IconButton(
+                tooltip: 'Edit note',
+                onPressed: _bulkActionInProgress
+                    ? null
+                    : () => unawaited(_editNote(card.cardId)),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
           ),
         );
       },
