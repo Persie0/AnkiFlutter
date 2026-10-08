@@ -28,6 +28,8 @@ class _SyncPageState extends State<SyncPage> {
   sync.SyncAuth? _auth;
   sync.MediaSyncStatusResponse? _mediaStatus;
   Timer? _mediaTimer;
+  Object? _mediaStatusRequest;
+  int _mediaStatusGeneration = 0;
   bool _loading = true;
   bool _busy = false;
   bool _syncMedia = true;
@@ -87,6 +89,7 @@ class _SyncPageState extends State<SyncPage> {
       await widget.authStore.save(auth);
       _passwordController.clear();
       if (!mounted) return;
+      _stopMediaPolling(); // Discard status responses belonging to an older account.
       setState(() {
         _auth = auth;
         _busy = false;
@@ -323,19 +326,39 @@ class _SyncPageState extends State<SyncPage> {
   void _stopMediaPolling() {
     _mediaTimer?.cancel();
     _mediaTimer = null;
+    // Invalidate already dispatched callbacks (logout, cancellation, or
+    // switching accounts). Their completion must not update the new session.
+    _mediaStatusGeneration++;
+    _mediaStatusRequest = null;
   }
 
   Future<void> _refreshMediaStatus() async {
-    if (_auth == null) return;
+    final auth = _auth;
+    if (auth == null || _mediaStatusRequest != null) return;
+    final request = Object();
+    final generation = _mediaStatusGeneration;
+    _mediaStatusRequest = request;
     try {
       final status = await widget.repository.mediaStatus();
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _mediaStatusGeneration ||
+          !identical(auth, _auth)) {
+        return;
+      }
       setState(() => _mediaStatus = status);
       if (!status.active) _stopMediaPolling();
     } catch (error) {
-      if (!mounted) return;
+      if (!mounted ||
+          generation != _mediaStatusGeneration ||
+          !identical(auth, _auth)) {
+        return;
+      }
       _stopMediaPolling();
       setState(() => _error = 'Media sync failed: $error');
+    } finally {
+      if (identical(_mediaStatusRequest, request)) {
+        _mediaStatusRequest = null;
+      }
     }
   }
 

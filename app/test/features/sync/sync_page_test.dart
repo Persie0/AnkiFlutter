@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:anki_flutter/core/backend/generated/anki/sync.pb.dart' as sync;
 import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
@@ -56,6 +58,69 @@ void main() {
     expect(repository.fullUpload, isFalse);
     expect(repository.fullServerUsn, 17);
   });
+
+  testWidgets('sign out ignores a pending response from the previous account',
+      (tester) async {
+    final repository = _Repository()..manualMediaStatus = true;
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(
+      MaterialApp(home: SyncPage(repository: repository, authStore: store)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(repository.mediaStatusCalls, 1);
+
+    await tester.tap(find.byTooltip('Sign out'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(store.value, isNull);
+    expect(find.byKey(const ValueKey('sync-login')), findsOneWidget);
+
+    repository.pendingMediaStatuses.single.complete(
+      sync.MediaSyncStatusResponse(active: true),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.text('Media sync active'), findsNothing);
+    expect(find.text('Media sync failed'), findsNothing);
+  });
+
+  testWidgets('media status timer does not overlap an unresolved request',
+      (tester) async {
+    final repository = _Repository()..manualMediaStatus = true;
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(
+      MaterialApp(home: SyncPage(repository: repository, authStore: store)),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(repository.mediaStatusCalls, 1);
+
+    await tester.tap(find.text('Sync media only'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(repository.mediaStatusCalls, 2);
+
+    await tester.pump(const Duration(seconds: 4));
+    expect(repository.mediaStatusCalls, 2,
+        reason: 'Only one request may be in flight per active polling session');
+
+    // A completion from before the polling restart must not override
+    // the status returned by the new request.
+    repository.pendingMediaStatuses.first.complete(
+      sync.MediaSyncStatusResponse(active: true),
+    );
+    repository.pendingMediaStatuses.last.complete(
+      sync.MediaSyncStatusResponse(active: false),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 10));
+    expect(find.text('Media sync idle'), findsOneWidget);
+
+    await tester.pump(const Duration(seconds: 2));
+    expect(repository.mediaStatusCalls, 2);
+  });
+
 }
 
 class _Store implements SyncAuthStore {
@@ -82,6 +147,9 @@ class _Repository implements SyncRepository {
   String? loginPassword;
   bool? fullUpload;
   int? fullServerUsn;
+  bool manualMediaStatus = false;
+  int mediaStatusCalls = 0;
+  final pendingMediaStatuses = <Completer<sync.MediaSyncStatusResponse>>[];
 
   @override
   Future<sync.SyncAuth> login({
@@ -117,8 +185,15 @@ class _Repository implements SyncRepository {
   Future<void> syncMedia(sync.SyncAuth auth) async {}
 
   @override
-  Future<sync.MediaSyncStatusResponse> mediaStatus() async =>
-      sync.MediaSyncStatusResponse(active: false);
+  Future<sync.MediaSyncStatusResponse> mediaStatus() async {
+    mediaStatusCalls++;
+    if (manualMediaStatus) {
+      final pending = Completer<sync.MediaSyncStatusResponse>();
+      pendingMediaStatuses.add(pending);
+      return pending.future;
+    }
+    return sync.MediaSyncStatusResponse(active: false);
+  }
 
   @override
   Future<void> abortCollectionSync() async {}
