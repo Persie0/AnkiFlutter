@@ -264,8 +264,13 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
         "undo: {}",
         String::from_utf8_lossy(&bytes)
     );
-    let undone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
-    assert!(!undone.new_status.unwrap().redo.is_empty());
+    let _undone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
+    // UndoOutput captures the interim status inside the transaction. Read
+    // the committed status after the opposite redo step is recorded.
+    let (status, bytes) = backend.invoke(10, &Empty::default());
+    assert_eq!(status, STATUS_SUCCESS);
+    let after_undo = UndoStatus::decode(bytes.as_slice()).unwrap();
+    assert!(!after_undo.redo.is_empty(), "redo must be available after undo");
     assert!(!fetch_tree(&backend)
         .children
         .iter()
@@ -278,8 +283,11 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
         "redo: {}",
         String::from_utf8_lossy(&bytes)
     );
-    let redone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
-    assert!(!redone.new_status.unwrap().undo.is_empty());
+    let _redone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
+    let (status, bytes) = backend.invoke(10, &Empty::default());
+    assert_eq!(status, STATUS_SUCCESS);
+    let after_redo = UndoStatus::decode(bytes.as_slice()).unwrap();
+    assert!(!after_redo.undo.is_empty(), "undo must be available after redo");
     assert!(fetch_tree(&backend)
         .children
         .iter()
