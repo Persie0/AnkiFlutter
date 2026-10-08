@@ -382,6 +382,94 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _forgetSelectedCards() async {
+    final repository = widget.repository is CardBrowserForgetRepository
+        ? widget.repository as CardBrowserForgetRepository
+        : null;
+    if (repository == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    final selectedIds = _selectedCardIds.toList(growable: false);
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final defaults = await repository.forgetCardsDefaults();
+      if (!mounted) return;
+      var restorePosition = defaults.restoreOriginalPosition;
+      var resetCounts = defaults.resetRepetitionAndLapseCounts;
+      final options = await showDialog<CardBrowserForgetOptions>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (context, setDialogState) => AlertDialog(
+            title: Text(
+              'Forget ${selectedIds.length} selected '
+              '${selectedIds.length == 1 ? 'card' : 'cards'}?',
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Return these cards to the new queue using Anki scheduling. '
+                    'Existing review progress will be reset.',
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Restore original position'),
+                    value: restorePosition,
+                    onChanged: (value) => setDialogState(
+                      () => restorePosition = value ?? false,
+                    ),
+                  ),
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Reset review and lapse counts'),
+                    value: resetCounts,
+                    onChanged: (value) => setDialogState(
+                      () => resetCounts = value ?? false,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                key: const ValueKey('browser-confirm-forget'),
+                onPressed: () => Navigator.of(dialogContext).pop(
+                  CardBrowserForgetOptions(
+                    restoreOriginalPosition: restorePosition,
+                    resetRepetitionAndLapseCounts: resetCounts,
+                  ),
+                ),
+                child: const Text('Forget cards'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (!mounted || options == null) return;
+
+      await repository.forgetCards(selectedIds, options);
+      if (!mounted) return;
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not forget selected cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _restoreSelectedCards() async {
     final repository = widget.repository is CardBrowserRestoreRepository
         ? widget.repository as CardBrowserRestoreRepository
@@ -808,6 +896,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                       ? null
                       : () => unawaited(_restoreSelectedCards()),
                   child: const Text('Restore selected'),
+                ),
+              if (widget.repository is CardBrowserForgetRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-forget-selected'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_forgetSelectedCards()),
+                  child: const Text('Forget selected'),
                 ),
               if (widget.repository is CardBrowserFlagRepository)
                 OutlinedButton(
