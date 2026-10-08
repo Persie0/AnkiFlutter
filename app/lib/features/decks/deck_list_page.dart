@@ -7,6 +7,8 @@ import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/collection/recent_collection_store.dart';
 import 'package:anki_flutter/features/collection/data/anki_collection_history_repository.dart';
+import 'package:anki_flutter/features/collection/data/anki_collection_integrity_repository.dart';
+import 'package:anki_flutter/features/collection/check_database_page.dart';
 import 'package:anki_flutter/features/decks/data/deck_mutation_repository.dart';
 import 'package:anki_flutter/features/decks/deck_overview_page.dart';
 import 'package:anki_flutter/features/decks/deck_list_controller.dart';
@@ -41,6 +43,7 @@ enum _CollectionAction {
   noteTypes,
   importExport,
   mediaCheck,
+  databaseCheck,
   sync,
   browse,
 }
@@ -396,6 +399,23 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
+  void _openDatabaseCheck() {
+    final backend = widget.backend;
+    if (backend == null) return;
+    unawaited(
+      Navigator.of(context)
+          .push<void>(
+            MaterialPageRoute<void>(
+              builder: (_) => CheckDatabasePage(
+                repository: AnkiCollectionIntegrityRepository(backend: backend),
+                onCollectionChanged: widget.controller.load,
+              ),
+            ),
+          )
+          .then((_) => _onReturnedFromCollectionScreen()),
+    );
+  }
+
   void _openSync() {
     final backend = widget.backend;
     if (backend == null) return;
@@ -446,6 +466,9 @@ class _DeckListPageState extends State<DeckListPage> {
       case _CollectionAction.mediaCheck:
         _openMediaCheck();
         break;
+      case _CollectionAction.databaseCheck:
+        _openDatabaseCheck();
+        break;
       case _CollectionAction.sync:
         _openSync();
         break;
@@ -495,7 +518,7 @@ class _DeckListPageState extends State<DeckListPage> {
 
   @override
   Widget build(BuildContext context) {
-    final compactToolbar = MediaQuery.sizeOf(context).width < 700;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 840;
     return Scaffold(
       appBar: AppBar(
         title: const Text('AnkiFlutter'),
@@ -589,6 +612,14 @@ class _DeckListPageState extends State<DeckListPage> {
                   ),
                 ),
                 PopupMenuItem(
+                  value: _CollectionAction.databaseCheck,
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(Icons.health_and_safety_outlined),
+                    title: Text('Check database'),
+                  ),
+                ),
+                PopupMenuItem(
                   value: _CollectionAction.sync,
                   child: ListTile(
                     dense: true,
@@ -633,6 +664,11 @@ class _DeckListPageState extends State<DeckListPage> {
               tooltip: 'Check media',
               icon: const Icon(Icons.fact_check_outlined),
               onPressed: _opening ? null : _openMediaCheck,
+            ),
+            IconButton(
+              tooltip: 'Check database',
+              icon: const Icon(Icons.health_and_safety_outlined),
+              onPressed: _opening ? null : _openDatabaseCheck,
             ),
             IconButton(
               tooltip: 'Sync',
