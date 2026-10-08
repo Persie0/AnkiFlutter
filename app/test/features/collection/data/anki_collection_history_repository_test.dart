@@ -27,7 +27,11 @@ void main() {
     final status = await AnkiCollectionHistoryRepository(backend: backend).undo();
     expect(status.canUndo, isFalse);
     expect(status.redoLabel, 'Delete note');
-    expect(backend.calls, [BackendOperation.getUndoStatus, BackendOperation.undo]);
+    expect(backend.calls, [
+      BackendOperation.getUndoStatus,
+      BackendOperation.undo,
+      BackendOperation.getUndoStatus,
+    ]);
   });
 
   test('redo uses upstream Anki redo operation and status', () async {
@@ -36,7 +40,11 @@ void main() {
     )..afterRedo = anki_collection.UndoStatus(undo: 'Change deck');
     final status = await AnkiCollectionHistoryRepository(backend: backend).redo();
     expect(status.undoLabel, 'Change deck');
-    expect(backend.calls, [BackendOperation.getUndoStatus, BackendOperation.redo]);
+    expect(backend.calls, [
+      BackendOperation.getUndoStatus,
+      BackendOperation.redo,
+      BackendOperation.getUndoStatus,
+    ]);
   });
 
   test('unavailable undo or redo never invokes mutating operation', () async {
@@ -48,7 +56,7 @@ void main() {
         [BackendOperation.getUndoStatus, BackendOperation.getUndoStatus]);
   });
 
-  test('missing embedded undo status triggers authoritative refresh', () async {
+  test('authoritative refresh runs even when response omits updated status', () async {
     final backend = _Backend(
       state: anki_collection.UndoStatus(undo: 'Add cards'),
     )..omitReturnStatus = true;
