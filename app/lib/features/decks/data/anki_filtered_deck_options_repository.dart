@@ -24,7 +24,7 @@ class AnkiFilteredDeckOptionsRepository
 
   @override
   Future<decks.FilteredDeckForUpdate> load(int deckId) async {
-    if (deckId <= 0) {
+    if (deckId < 0) {
       throw ArgumentError.value(deckId, 'deckId', 'Must be positive');
     }
     final response = await backend.invoke(
@@ -42,7 +42,7 @@ class AnkiFilteredDeckOptionsRepository
 
   @override
   Future<int> save(decks.FilteredDeckForUpdate draft) async {
-    if (draft.id <= Int64.ZERO) {
+    if (draft.id < Int64.ZERO) {
       throw ArgumentError.value(draft.id, 'deckId', 'Must be positive');
     }
     if (draft.name.trim().isEmpty) {
