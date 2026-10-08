@@ -139,6 +139,50 @@ void main() {
     expect(tts.otherArgs, orderedEquals(['cloze_blank=...']));
   });
 
+  test('browser preview renders with the native Anki browser context', () async {
+    final rendered = card_rendering_pb.RenderCardResponse(
+      questionNodes: [
+        card_rendering_pb.RenderedTemplateNode(text: '<p>front</p>'),
+      ],
+      answerNodes: [
+        card_rendering_pb.RenderedTemplateNode(text: '<p>back</p>'),
+      ],
+      css: '.card {}',
+    );
+    final backend = _FakeBackend((operation, request) {
+      switch (operation) {
+        case BackendOperation.renderExistingCard:
+          return Uint8List.fromList(rendered.writeToBuffer());
+        case BackendOperation.extractAvTags:
+          final input = card_rendering_pb.ExtractAvTagsRequest.fromBuffer(request);
+          return Uint8List.fromList(
+            card_rendering_pb.ExtractAvTagsResponse(text: input.text)
+                .writeToBuffer(),
+          );
+        case BackendOperation.encodeIriPaths:
+          return request;
+        default:
+          fail('Unexpected backend operation $operation');
+      }
+    });
+    final repository = AnkiCardRenderRepository(
+      backend: backend,
+      browser: true,
+    );
+
+    final content = await repository.render(123);
+    final request = card_rendering_pb.RenderExistingCardRequest.fromBuffer(
+      backend.calls.first.request,
+    );
+
+    expect(request.cardId, Int64(123));
+    expect(request.browser, isTrue);
+    expect(request.partialRender, isFalse);
+    expect(content.questionHtml, '<p>front</p>');
+    expect(content.answerHtml, '<p>back</p>');
+    expect(backend.calls.length, 5);
+  });
+
   test('render stays neutral when referenced media does not exist', () async {
     const questionHtml = '<img src="definitely-missing-reviewer-image.png">';
     const answerHtml = '<div>answer with missing media</div>';
