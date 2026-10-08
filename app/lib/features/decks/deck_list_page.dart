@@ -459,6 +459,7 @@ class _DeckListPageState extends State<DeckListPage> {
         builder: (_) => SyncPage(
           repository: AnkiSyncRepository(backend: backend),
           authStore: FileSyncAuthStore(),
+          backupRepository: AnkiCollectionBackupRepository(backend: backend),
           onCollectionChanged: widget.controller.load,
         ),
       ),
