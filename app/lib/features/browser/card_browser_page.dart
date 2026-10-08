@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:anki_flutter/features/browser/browser_state_store.dart';
+import 'package:anki_flutter/features/browser/browser_search_history.dart';
 import 'package:anki_flutter/features/browser/browser_card_preview_page.dart';
 import 'package:anki_flutter/features/reviewer/data/card_render_repository.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
@@ -50,6 +51,7 @@ class CardBrowserPage extends StatefulWidget {
 
 class _CardBrowserPageState extends State<CardBrowserPage> {
   final TextEditingController _queryController = TextEditingController();
+  final BrowserSearchHistory _history = BrowserSearchHistory();
   late final BrowserStateStore _stateStore;
   CardBrowserSearchResult? _result;
   Object? _error;
@@ -117,7 +119,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
       _sort = restoredSort;
       _savedSearches = savedState?.savedSearches ?? const [];
     });
-    await _search(persistState: false);
+    await _search(persistState: false, recordHistory: true);
   }
 
   Future<void> _persistState() async {
@@ -166,8 +168,12 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     bool clearSelection = false,
     bool persistState = true,
     bool keepActiveSavedSearch = false,
+    bool recordHistory = false,
   }) async {
     if (_bulkActionInProgress) return;
+    if (recordHistory) {
+      _history.record(_queryController.text);
+    }
     // Changing a query manually does not modify the saved preset.
     if (!keepActiveSavedSearch) _activeSavedSearchName = null;
     if (persistState) await _persistState();
@@ -195,6 +201,18 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
         _loading = false;
       });
     }
+  }
+
+  void _navigateSearchHistory({required bool forward}) {
+    if (_loading || _bulkActionInProgress) return;
+    final query = forward ? _history.forward() : _history.back();
+    if (query == null) return;
+    setState(() {
+      _queryController.text = query;
+      _activeSavedSearchName = null;
+    });
+    // Browsing history is a replay, not a new search that forks history.
+    unawaited(_search(clearSelection: true));
   }
 
   Future<void> _applySavedSearch(String? name) async {
@@ -225,7 +243,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
               reverse: selected.reverse,
             );
     });
-    await _search(clearSelection: true, keepActiveSavedSearch: true);
+    await _search(
+      clearSelection: true,
+      keepActiveSavedSearch: true,
+      recordHistory: true,
+    );
   }
 
   Future<void> _saveNamedSearch() async {
@@ -1058,6 +1080,26 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
               : 'Browse · $_activeSavedSearchName',
         ),
         actions: [
+          IconButton(
+            key: const ValueKey('browser-search-history-back'),
+            tooltip: 'Previous search',
+            onPressed: _loading ||
+                    _bulkActionInProgress ||
+                    !_history.canGoBack
+                ? null
+                : () => _navigateSearchHistory(forward: false),
+            icon: const Icon(Icons.arrow_back_ios_new),
+          ),
+          IconButton(
+            key: const ValueKey('browser-search-history-forward'),
+            tooltip: 'Next search',
+            onPressed: _loading ||
+                    _bulkActionInProgress ||
+                    !_history.canGoForward
+                ? null
+                : () => _navigateSearchHistory(forward: true),
+            icon: const Icon(Icons.arrow_forward_ios),
+          ),
           PopupMenuButton<String>(
             key: const ValueKey('browser-saved-search-picker'),
             tooltip: 'Load saved search',
@@ -1112,13 +1154,17 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     tooltip: 'Search',
                     onPressed: _loading || _bulkActionInProgress
                         ? null
-                        : () => unawaited(_search(clearSelection: true)),
+                        : () => unawaited(
+                        _search(clearSelection: true, recordHistory: true),
+                      ),
                     icon: const Icon(Icons.search),
                   ),
                 ),
                 onSubmitted: (_) {
                   if (!_bulkActionInProgress) {
-                    unawaited(_search(clearSelection: true));
+                    unawaited(
+                      _search(clearSelection: true, recordHistory: true),
+                    );
                   }
                 },
                 onChanged: (_) => setState(() => _activeSavedSearchName = null),
