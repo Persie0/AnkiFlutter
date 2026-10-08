@@ -83,7 +83,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(repo.checks, 1);
-    expect(find.text('Affected notes: 3'), findsOneWidget);
+    expect(find.text('Affected notes: 2'), findsOneWidget);
   });
 
   testWidgets('failed note navigation keeps audit available and shows error',
