@@ -8,6 +8,8 @@ import 'package:anki_flutter/core/backend/generated/anki/backend.pbenum.dart'
     as backend_proto;
 import 'package:anki_flutter/core/backend/generated/anki/generic.pb.dart'
     as generic;
+import 'package:anki_flutter/core/backend/generated/anki/collection.pb.dart'
+    as anki_collection;
 import 'package:anki_flutter/core/backend/generated/anki/cards.pb.dart'
     as anki_cards;
 import 'package:anki_flutter/core/backend/generated/anki/decks.pb.dart'
@@ -49,6 +51,32 @@ abstract interface class CardBrowserTagRepository {
     String tags, {
     required bool remove,
   });
+}
+
+/// Native Find and Replace changes note fields rather than individual cards.
+/// Restricting operations to a selected card list avoids whole-collection
+/// replacements without an explicit selection.
+abstract interface class CardBrowserFindReplaceRepository {
+  Future<int> findAndReplaceSelected(
+    List<int> cardIds,
+    CardBrowserFindReplaceOptions options,
+  );
+}
+
+class CardBrowserFindReplaceOptions {
+  const CardBrowserFindReplaceOptions({
+    required this.search,
+    required this.replacement,
+    required this.regex,
+    required this.matchCase,
+    required this.fieldName,
+  });
+
+  final String search;
+  final String replacement;
+  final bool regex;
+  final bool matchCase;
+  final String fieldName;
 }
 
 /// Optional browser capability for Anki's per-card flags (0 clears, 1-7 set).
@@ -124,7 +152,8 @@ class AnkiCardBrowserRepository
         CardBrowserDeckMoveRepository,
         CardBrowserFlagRepository,
         CardBrowserPagingRepository,
-        CardBrowserRestoreRepository {
+        CardBrowserRestoreRepository,
+        CardBrowserFindReplaceRepository {
   static const _defaultColumns = ['noteFld', 'template', 'cardDue', 'deck'];
 
   const AnkiCardBrowserRepository({required this.backend, this.maxRows = 50});
@@ -301,6 +330,44 @@ class AnkiCardBrowserRepository
       remove ? BackendOperation.removeNoteTags : BackendOperation.addNoteTags,
       Uint8List.fromList(request.writeToBuffer()),
     );
+  }
+
+  @override
+  Future<int> findAndReplaceSelected(
+    List<int> cardIds,
+    CardBrowserFindReplaceOptions options,
+  ) async {
+    if (cardIds.isEmpty || cardIds.any((id) => id <= 0)) {
+      throw ArgumentError.value(cardIds, 'cardIds', 'Choose valid cards.');
+    }
+    if (options.search.trim().isEmpty) {
+      throw ArgumentError.value(options.search, 'search', 'Find text is empty.');
+    }
+
+    // A note may have multiple cards. Resolve the full selection before
+    // writing, so a failed card lookup cannot partially change notes.
+    final noteIds = <int>{};
+    for (final cardId in cardIds.toSet()) {
+      final noteId = await noteIdForCard(cardId);
+      if (noteId <= 0) {
+        throw StateError('Card $cardId has no valid Anki note ID.');
+      }
+      noteIds.add(noteId);
+    }
+
+    final request = anki_search.FindAndReplaceRequest(
+      nids: noteIds.map(Int64.new),
+      search: options.search,
+      replacement: options.replacement,
+      regex: options.regex,
+      matchCase: options.matchCase,
+      fieldName: options.fieldName.trim(),
+    );
+    final bytes = await backend.invoke(
+      BackendOperation.findAndReplace,
+      Uint8List.fromList(request.writeToBuffer()),
+    );
+    return anki_collection.OpChangesWithCount.fromBuffer(bytes).count;
   }
 
   @override
