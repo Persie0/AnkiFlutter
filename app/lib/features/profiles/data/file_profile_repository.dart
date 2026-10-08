@@ -188,6 +188,7 @@ class FileProfileRepository implements ProfileRepository {
 
   Future<void> _write(Iterable<AnkiProfile> profiles) async {
     await registryFile.parent.create(recursive: true);
+    await _ensureRegistryCanBeReplaced();
     final payload = <String, Object>{
       'version': 1,
       'profiles': profiles
@@ -203,6 +204,36 @@ class FileProfileRepository implements ProfileRepository {
           .toList(growable: false),
     };
     await writeAtomicState(registryFile, jsonEncode(payload));
+  }
+
+  /// Reading can recover with an empty list for display, but writes must
+  /// never silently overwrite an unreadable or future-version registry.
+  /// Otherwise one failed JSON read could hide all existing profiles.
+  Future<void> _ensureRegistryCanBeReplaced() async {
+    if (!await registryFile.exists()) return;
+    final Object? data;
+    try {
+      data = jsonDecode(await registryFile.readAsString());
+    } on FormatException {
+      throw const FormatException(
+        'The profile registry is damaged. Back it up before repairing.',
+      );
+    }
+    if (data is! Map<String, dynamic> ||
+        data['version'] != 1 ||
+        data['profiles'] is! List) {
+      throw const FormatException(
+        'Unsupported profile registry format; existing profiles were preserved.',
+      );
+    }
+    for (final record in data['profiles'] as List) {
+      if (record is! Map ||
+          _decodeProfile(Map<String, dynamic>.from(record)) == null) {
+        throw const FormatException(
+          'Profile registry has invalid entries; existing data was preserved.',
+        );
+      }
+    }
   }
 
   AnkiProfile? _decodeProfile(Map<String, dynamic> json) {
