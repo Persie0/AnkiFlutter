@@ -77,7 +77,8 @@ enum BackendOperation {
   trashMediaFiles(76),
   restoreMediaTrash(77),
   restoreBuriedAndSuspendedCards(78),
-  redo(79);
+  redo(79),
+  checkDatabase(80);
 
   const BackendOperation(this.nativeId);
   final int nativeId;
