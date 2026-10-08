@@ -69,6 +69,13 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('browser-find-replace')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('browser-find-text')), '*');
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<FilledButton>(
+        find.byKey(const ValueKey('browser-confirm-find-replace')),
+      ).onPressed,
+      isNotNull,
+    );
     await tester.tap(find.byKey(const ValueKey('browser-confirm-find-replace')));
     await tester.pumpAndSettle();
 
@@ -79,6 +86,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('browser-find-replace')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byKey(const ValueKey('browser-find-text')), 'A');
+    await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('browser-confirm-find-replace')));
     await tester.pumpAndSettle();
     expect(repo.replacements, hasLength(2));
