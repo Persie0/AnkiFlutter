@@ -16,7 +16,7 @@ use anki_proto::card_rendering::{
     rendered_template_node::Value, RenderCardResponse, RenderExistingCardRequest,
     RenderedTemplateNode,
 };
-use anki_proto::cards::{CardIds, RemoveCardsRequest};
+use anki_proto::cards::{Card, CardId, CardIds, RemoveCardsRequest};
 use anki_proto::collection::{
     CheckDatabaseResponse, CloseCollectionRequest, CreateBackupRequest, OpChangesAfterUndo,
     OpChangesWithCount, OpChangesWithId, OpenCollectionRequest, UndoStatus,
@@ -25,7 +25,7 @@ use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
 use anki_proto::media::{CheckMediaResponse, TrashMediaFilesRequest};
 use anki_proto::notes::{Note, NoteId};
-use anki_proto::scheduler::BuryOrSuspendCardsRequest;
+use anki_proto::scheduler::{BuryOrSuspendCardsRequest, SetDueDateRequest};
 use anki_proto::search::{BrowserColumns, FindAndReplaceRequest};
 use prost::Message;
 use tempfile::TempDir;
@@ -517,6 +517,81 @@ fn find_and_replace_updates_selected_real_anki_note_only_once() {
     let updated = Note::decode(bytes.as_slice()).unwrap();
     assert_eq!(updated.fields[0], "color word");
     assert_eq!(updated.fields[1], "the back");
+}
+
+#[test]
+fn browser_set_due_date_reschedules_only_the_selected_real_card() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype should exist");
+
+    let mut selected_note = notetype.new_note();
+    selected_note.set_field(0, "selected due date").unwrap();
+    selected_note.set_field(1, "back").unwrap();
+    collection.add_note(&mut selected_note, DeckId(1)).unwrap();
+    let selected_id = collection
+        .search_cards(selected_note.id, SortMode::NoOrder)
+        .unwrap()[0]
+        .0;
+
+    let mut other_note = notetype.new_note();
+    other_note.set_field(0, "unselected due date").unwrap();
+    other_note.set_field(1, "back").unwrap();
+    collection.add_note(&mut other_note, DeckId(1)).unwrap();
+    let other_id = collection
+        .search_cards(other_note.id, SortMode::NoOrder)
+        .unwrap()[0]
+        .0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: other_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let other_before = Card::decode(bytes.as_slice()).unwrap();
+
+    let (status, bytes) = backend.invoke(
+        74, // AnkiFlutter stable FFI ID for SetDueDate
+        &SetDueDateRequest {
+            card_ids: vec![selected_id],
+            days: "14".to_string(),
+            config_key: None,
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "set due date failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: selected_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let updated = Card::decode(bytes.as_slice()).unwrap();
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: other_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let other_after = Card::decode(bytes.as_slice()).unwrap();
+
+    assert_eq!(other_after.queue, other_before.queue);
+    assert_eq!(other_after.due, other_before.due);
+    assert_ne!(
+        updated.queue, other_after.queue,
+        "the selected new card should be rescheduled into the review queue"
+    );
 }
 
 #[test]
