@@ -279,6 +279,21 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendDecksService",
         "add_or_update_filtered_deck",
     ),
+    (
+        "TAG_MANAGER_RENAME_TAGS",
+        "BackendTagsService",
+        "rename_tags",
+    ),
+    (
+        "TAG_MANAGER_REMOVE_TAGS",
+        "BackendTagsService",
+        "remove_tags",
+    ),
+    (
+        "TAG_MANAGER_CLEAR_UNUSED_TAGS",
+        "BackendTagsService",
+        "clear_unused_tags",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {
