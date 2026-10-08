@@ -602,6 +602,7 @@ class _SyncPageState extends State<SyncPage> {
                   : 'Official AnkiWeb endpoint',
             ),
           ),
+        _messageArea(),
         const SizedBox(height: 16),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
@@ -682,7 +683,6 @@ class _SyncPageState extends State<SyncPage> {
             ),
           ],
         ),
-        _messageArea(),
       ],
     );
   }
