@@ -230,7 +230,9 @@ class _CheckMediaPageState extends State<CheckMediaPage> {
               const SizedBox(height: 4),
               Text('Unused files: ${result.unused.length}'),
               const SizedBox(height: 4),
-              Text('Affected notes: ${result.missingMediaNotes.length}'),
+              Text(
+                'Affected notes: ${result.missingMediaNotes.map((id) => id.toInt()).where((id) => id > 0).toSet().length}',
+              ),
               if (result.haveTrash) ...[
                 const SizedBox(height: 8),
                 const Text('Media trash exists.'),
