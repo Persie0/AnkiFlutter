@@ -30,6 +30,11 @@ void main() {
 
     expect(find.text('Card Info'), findsOneWidget);
     expect(find.text('Physics::Energy'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Review history'),
+      300,
+      scrollable: find.byType(Scrollable).first,
+    );
     expect(find.text('Review history'), findsOneWidget);
     expect(info.requestedIds, [88]);
 
