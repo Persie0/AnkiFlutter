@@ -24,17 +24,31 @@ class AnkiReviewTtsService implements ReviewTtsService {
 
   final BackendInvoker _backend;
   final ReviewTtsTempDirectoryProvider _tempDirectoryProvider;
-  final Set<String> _generatedPaths = <String>{};
 
-  int _sequence = 0;
+  // Each synthesis gets a private directory, so overlapping review sessions
+  // never overwrite or delete another session's generated audio.
+  final Set<Directory> _generatedDirectories = <Directory>{};
+  final Set<Future<Uri?>> _inFlight = <Future<Uri?>>{};
+  Future<void>? _disposeFuture;
   bool _disposed = false;
 
   @override
-  Future<Uri?> materialize(ReviewTtsTag tag) async {
-    if (_disposed) {
-      return null;
-    }
+  Future<Uri?> materialize(ReviewTtsTag tag) {
+    if (_disposed) return Future<Uri?>.value(null);
+    final task = _materialize(tag);
+    _inFlight.add(task);
+    // Observe errors only for lifecycle tracking; the caller still receives
+    // the original task's error.
+    task.then<void>(
+      (_) { _inFlight.remove(task); },
+      onError: (Object error, StackTrace stackTrace) {
+        _inFlight.remove(task);
+      },
+    );
+    return task;
+  }
 
+  Future<Uri?> _materialize(ReviewTtsTag tag) async {
     final card_rendering_pb.AllTtsVoicesResponse response;
     try {
       final bytes = await _backend.invoke(
@@ -47,53 +61,70 @@ class AnkiReviewTtsService implements ReviewTtsService {
     } on AnkiBackendException {
       return null;
     }
+    if (_disposed) return null;
 
     final voice = _selectVoice(response.voices, tag);
-    if (voice == null) {
-      return null;
-    }
+    if (voice == null) return null;
 
-    final directory = await _tempDirectoryProvider();
-    await directory.create(recursive: true);
-    final path = _nextPath(directory);
+    final root = await _tempDirectoryProvider();
+    if (_disposed) return null;
+    await root.create(recursive: true);
+    final directory = await root.createTemp('anki-review-tts-');
+    final path = '${directory.path}${Platform.pathSeparator}voice.wav';
 
     try {
-      await _backend.invoke(
-        BackendOperation.writeTtsStream,
-        Uint8List.fromList(
-          card_rendering_pb.WriteTtsStreamRequest(
-            path: path,
-            voiceId: voice.id,
-            speed: tag.speed,
-            text: tag.text,
-          ).writeToBuffer(),
-        ),
-      );
-    } on AnkiBackendException {
-      await _deleteIfPresent(path);
-      return null;
+      if (_disposed) return null;
+      try {
+        await _backend.invoke(
+          BackendOperation.writeTtsStream,
+          Uint8List.fromList(
+            card_rendering_pb.WriteTtsStreamRequest(
+              path: path,
+              voiceId: voice.id,
+              speed: tag.speed,
+              text: tag.text,
+            ).writeToBuffer(),
+          ),
+        );
+      } on AnkiBackendException {
+        return null;
+      }
+      if (_disposed) return null;
+      final file = File(path);
+      if (!await file.exists()) return null;
+      if (_disposed) return null;
+      _generatedDirectories.add(directory);
+      return file.uri;
+    } finally {
+      // A cancelled or failed synthesis does not leave empty temp folders.
+      if (!_generatedDirectories.contains(directory) &&
+          await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
     }
-
-    final file = File(path);
-    if (!await file.exists()) {
-      return null;
-    }
-
-    _generatedPaths.add(path);
-    return file.uri;
   }
 
   @override
-  Future<void> dispose() async {
-    if (_disposed) {
-      return;
-    }
-    _disposed = true;
+  Future<void> dispose() => _disposeFuture ??= _dispose();
 
-    final paths = _generatedPaths.toList(growable: false);
-    _generatedPaths.clear();
-    for (final path in paths) {
-      await _deleteIfPresent(path);
+  Future<void> _dispose() async {
+    _disposed = true;
+    // A native TTS write may already be executing. Deleting its folder
+    // before it finishes can otherwise leak a late-created WAV file.
+    await Future.wait<void>(
+      _inFlight.toList().map(
+        (task) => task.then<void>(
+          (_) {},
+          onError: (Object error, StackTrace stackTrace) {},
+        ),
+      ),
+    );
+    final directories = _generatedDirectories.toList(growable: false);
+    _generatedDirectories.clear();
+    for (final directory in directories) {
+      if (await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
     }
   }
 
@@ -133,18 +164,7 @@ class AnkiReviewTtsService implements ReviewTtsService {
     return availableForLanguage.first;
   }
 
-  String _nextPath(Directory directory) {
-    _sequence += 1;
-    return '${directory.path}${Platform.pathSeparator}'
-        'anki-review-tts-$_sequence.wav';
-  }
 
-  Future<void> _deleteIfPresent(String path) async {
-    final file = File(path);
-    if (await file.exists()) {
-      await file.delete();
-    }
-  }
 }
 
 String _normalizeLanguage(String language) => language.replaceAll('-', '_');
