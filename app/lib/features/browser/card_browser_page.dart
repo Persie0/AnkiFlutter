@@ -470,6 +470,65 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     }
   }
 
+  Future<void> _repositionSelectedCards() async {
+    final repository = widget.repository is CardBrowserRepositionRepository
+        ? widget.repository as CardBrowserRepositionRepository
+        : null;
+    if (repository == null ||
+        _selectedCardIds.isEmpty ||
+        _loading ||
+        _bulkActionInProgress) {
+      return;
+    }
+
+    // Reposition must respect browser search/sort order, not the order in
+    // which the user happened to tap selection checkboxes.
+    final orderedMatches = _result?.matchingCardIds ?? const <int>[];
+    final cardIds = orderedMatches.isNotEmpty
+        ? [
+            for (final id in orderedMatches)
+              if (_selectedCardIds.contains(id)) id,
+          ]
+        : _selectedCardIds.toList(growable: false);
+    if (cardIds.length != _selectedCardIds.length) return;
+
+    setState(() => _bulkActionInProgress = true);
+    try {
+      final defaults = await repository.repositionDefaults();
+      if (!mounted) return;
+      final options = await showDialog<CardBrowserRepositionOptions>(
+        context: context,
+        builder: (_) => _BrowserRepositionDialog(
+          cardCount: cardIds.length,
+          defaults: defaults,
+        ),
+      );
+      if (!mounted || options == null) return;
+
+      final changed = await repository.repositionNewCards(cardIds, options);
+      if (!mounted) return;
+      if (changed == 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('No selected new cards were changed.')),
+        );
+        return;
+      }
+      setState(() => _selectedCardIds.clear());
+      await _searchAfterBulkMove();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Repositioned $changed new cards.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reposition cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _bulkActionInProgress = false);
+    }
+  }
+
   Future<void> _setSelectedCardsDueDate() async {
     final repository = widget.repository is CardBrowserSetDueDateRepository
         ? widget.repository as CardBrowserSetDueDateRepository
@@ -998,6 +1057,14 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                       : () => unawaited(_forgetSelectedCards()),
                   child: const Text('Forget selected'),
                 ),
+              if (widget.repository is CardBrowserRepositionRepository)
+                OutlinedButton(
+                  key: const ValueKey('browser-reposition-selected'),
+                  onPressed: _loading || _bulkActionInProgress
+                      ? null
+                      : () => unawaited(_repositionSelectedCards()),
+                  child: const Text('Reposition new'),
+                ),
               if (widget.repository is CardBrowserSetDueDateRepository)
                 OutlinedButton(
                   key: const ValueKey('browser-set-due'),
@@ -1351,6 +1418,131 @@ class _BrowserCardExportDialogState extends State<_BrowserCardExportDialog> {
             ),
           ),
           child: const Text('Export'),
+        ),
+      ],
+    );
+  }
+}
+
+class _BrowserRepositionDialog extends StatefulWidget {
+  const _BrowserRepositionDialog({
+    required this.cardCount,
+    required this.defaults,
+  });
+
+  final int cardCount;
+  final CardBrowserRepositionDefaults defaults;
+
+  @override
+  State<_BrowserRepositionDialog> createState() =>
+      _BrowserRepositionDialogState();
+}
+
+class _BrowserRepositionDialogState extends State<_BrowserRepositionDialog> {
+  final TextEditingController _startingFrom = TextEditingController(text: '1');
+  final TextEditingController _stepSize = TextEditingController(text: '1');
+  late bool _randomize;
+  late bool _shiftExisting;
+
+  @override
+  void initState() {
+    super.initState();
+    _randomize = widget.defaults.randomize;
+    _shiftExisting = widget.defaults.shiftExisting;
+  }
+
+  @override
+  void dispose() {
+    _startingFrom.dispose();
+    _stepSize.dispose();
+    super.dispose();
+  }
+
+  int? _positiveUint32(String text) {
+    final value = int.tryParse(text.trim());
+    return value == null || value < 1 || value > 0xffffffff ? null : value;
+  }
+
+  void _confirm() {
+    final start = _positiveUint32(_startingFrom.text);
+    final step = _positiveUint32(_stepSize.text);
+    if (start == null || step == null) return;
+    Navigator.of(context).pop(
+      CardBrowserRepositionOptions(
+        startingFrom: start,
+        stepSize: step,
+        randomize: _randomize,
+        shiftExisting: _shiftExisting,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final startValid = _positiveUint32(_startingFrom.text) != null;
+    final stepValid = _positiveUint32(_stepSize.text) != null;
+    return AlertDialog(
+      title: Text(
+        'Reposition ${widget.cardCount} selected '
+        '${widget.cardCount == 1 ? 'card' : 'cards'}?',
+      ),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Only new cards are repositioned, in browser order. '
+              'Review and learning cards are unchanged.',
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const ValueKey('browser-reposition-start'),
+              controller: _startingFrom,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Starting position',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              key: const ValueKey('browser-reposition-step'),
+              controller: _stepSize,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Step size',
+                border: OutlineInputBorder(),
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Randomize selected order'),
+              value: _randomize,
+              onChanged: (value) =>
+                  setState(() => _randomize = value ?? false),
+            ),
+            CheckboxListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Shift existing new cards'),
+              value: _shiftExisting,
+              onChanged: (value) =>
+                  setState(() => _shiftExisting = value ?? false),
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          key: const ValueKey('browser-confirm-reposition'),
+          onPressed: startValid && stepValid ? _confirm : null,
+          child: const Text('Reposition'),
         ),
       ],
     );

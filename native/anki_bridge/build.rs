@@ -253,6 +253,12 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendSearchService",
         "find_and_replace",
     ),
+    ("SORT_CARDS", "BackendSchedulerService", "sort_cards"),
+    (
+        "REPOSITION_DEFAULTS",
+        "BackendSchedulerService",
+        "reposition_defaults",
+    ),
 ];
 
 fn main() -> Result<(), Box<dyn Error>> {

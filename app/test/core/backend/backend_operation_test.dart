@@ -91,6 +91,8 @@ void main() {
         'checkDatabase': 80,
         'createBackup': 81,
         'findAndReplace': 82,
+        'sortCards': 83,
+        'repositionDefaults': 84,
       },
     );
 

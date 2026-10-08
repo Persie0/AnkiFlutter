@@ -25,7 +25,9 @@ use anki_proto::decks::{DeckTreeNode, DeckTreeRequest};
 use anki_proto::generic::Empty;
 use anki_proto::media::{CheckMediaResponse, TrashMediaFilesRequest};
 use anki_proto::notes::{Note, NoteId};
-use anki_proto::scheduler::{BuryOrSuspendCardsRequest, SetDueDateRequest};
+use anki_proto::scheduler::{
+    BuryOrSuspendCardsRequest, RepositionDefaultsResponse, SetDueDateRequest, SortCardsRequest,
+};
 use anki_proto::search::{BrowserColumns, FindAndReplaceRequest};
 use prost::Message;
 use tempfile::TempDir;
@@ -517,6 +519,85 @@ fn find_and_replace_updates_selected_real_anki_note_only_once() {
     let updated = Note::decode(bytes.as_slice()).unwrap();
     assert_eq!(updated.fields[0], "color word");
     assert_eq!(updated.fields[1], "the back");
+}
+
+#[test]
+fn browser_reposition_uses_real_anki_new_card_order_and_defaults() {
+    let temp = TempDir::new().unwrap();
+    let open = collection_request(&temp);
+    let mut builder = CollectionBuilder::new(&open.collection_path);
+    builder.set_media_paths(open.media_folder_path.clone(), open.media_db_path.clone());
+    let mut collection = builder.build().unwrap();
+    let notetype = collection
+        .get_notetype_by_name("Basic")
+        .unwrap()
+        .expect("Basic notetype should exist");
+
+    let mut selected_note = notetype.new_note();
+    selected_note.set_field(0, "reposition selected").unwrap();
+    selected_note.set_field(1, "answer").unwrap();
+    collection.add_note(&mut selected_note, DeckId(1)).unwrap();
+    let selected_id = collection
+        .search_cards(selected_note.id, SortMode::NoOrder)
+        .unwrap()[0]
+        .0;
+
+    let mut other_note = notetype.new_note();
+    other_note.set_field(0, "reposition untouched").unwrap();
+    other_note.set_field(1, "answer").unwrap();
+    collection.add_note(&mut other_note, DeckId(1)).unwrap();
+    let other_id = collection
+        .search_cards(other_note.id, SortMode::NoOrder)
+        .unwrap()[0]
+        .0;
+    collection.close(None).unwrap();
+
+    let backend = TestBackend::new();
+    let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+
+    let (status, bytes) = backend.invoke(84, &Empty::default());
+    assert_eq!(status, STATUS_SUCCESS);
+    let _defaults = RepositionDefaultsResponse::decode(bytes.as_slice()).unwrap();
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: other_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let other_before = Card::decode(bytes.as_slice()).unwrap();
+
+    let (status, bytes) = backend.invoke(
+        83,
+        &SortCardsRequest {
+            card_ids: vec![selected_id],
+            starting_from: 50,
+            step_size: 1,
+            randomize: false,
+            shift_existing: false,
+        },
+    );
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "reposition failed: {}",
+        String::from_utf8_lossy(&bytes)
+    );
+    let changes = OpChangesWithCount::decode(bytes.as_slice()).unwrap();
+    assert_eq!(changes.count, 1, "only one selected new card must change");
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: selected_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let selected_after = Card::decode(bytes.as_slice()).unwrap();
+    assert_eq!(selected_after.due, 50);
+
+    let (status, bytes) = backend.invoke(31, &CardId { cid: other_id });
+    assert_eq!(status, STATUS_SUCCESS);
+    let other_after = Card::decode(bytes.as_slice()).unwrap();
+    assert_eq!(other_after.due, other_before.due);
+    assert_eq!(other_after.queue, other_before.queue);
 }
 
 #[test]
