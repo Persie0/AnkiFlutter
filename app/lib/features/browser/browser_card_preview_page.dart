@@ -11,6 +11,7 @@ class BrowserCardPreviewPage extends StatefulWidget {
   const BrowserCardPreviewPage({
     required this.cardId,
     required this.repository,
+    this.orderedCardIds = const [],
     this.mediaBaseUri,
     this.surfaceBuilder,
     super.key,
@@ -18,6 +19,10 @@ class BrowserCardPreviewPage extends StatefulWidget {
 
   final int cardId;
   final CardRenderRepository repository;
+
+  /// Optional complete browser-search order. Without it preview stays a
+  /// single-card view, as before. The active card must be in this list.
+  final List<int> orderedCardIds;
   final Uri? mediaBaseUri;
   final Widget Function(BuildContext context, String html)? surfaceBuilder;
 
@@ -31,10 +36,40 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
   bool _loading = true;
   bool _showAnswer = false;
   int _generation = 0;
+  late List<int> _orderedCardIds;
+  late int _position;
+
+  int get _currentCardId => _orderedCardIds[_position];
+
+  void _resetCardOrder() {
+    final ids = widget.orderedCardIds;
+    // A browser may supply only currently rendered rows, or a stale selection.
+    // Never navigate to an unrelated card if the active ID isn't in the list.
+    final ordered = ids.contains(widget.cardId)
+        ? ids.toSet().toList(growable: false)
+        : <int>[widget.cardId];
+    _orderedCardIds = List<int>.unmodifiable(ordered);
+    _position = _orderedCardIds.indexOf(widget.cardId);
+  }
+
+  void _navigate(int delta) {
+    final next = _position + delta;
+    if (next < 0 || next >= _orderedCardIds.length) return;
+    setState(() {
+      _position = next;
+      _content = null;
+      _error = null;
+      _showAnswer = false;
+      _loading = true;
+    });
+    // The generation guard in _load() makes old render completions harmless.
+    unawaited(_load());
+  }
 
   @override
   void initState() {
     super.initState();
+    _resetCardOrder();
     unawaited(_load());
   }
 
@@ -42,10 +77,12 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
   void didUpdateWidget(covariant BrowserCardPreviewPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.cardId == widget.cardId &&
-        oldWidget.repository == widget.repository) {
+        oldWidget.repository == widget.repository &&
+        oldWidget.orderedCardIds == widget.orderedCardIds) {
       return;
     }
     _generation++;
+    _resetCardOrder();
     _content = null;
     _error = null;
     _showAnswer = false;
@@ -65,7 +102,7 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
       _error = null;
     });
     try {
-      final content = await widget.repository.render(widget.cardId);
+      final content = await widget.repository.render(_currentCardId);
       if (!mounted || generation != _generation) return;
       setState(() {
         _content = content;
@@ -84,7 +121,33 @@ class _BrowserCardPreviewPageState extends State<BrowserCardPreviewPage> {
   Widget build(BuildContext context) {
     final content = _content;
     return Scaffold(
-      appBar: AppBar(title: Text('Preview card ${widget.cardId}')),
+      appBar: AppBar(
+        title: Text('Preview card $_currentCardId'),
+        actions: [
+          if (_orderedCardIds.length > 1) ...[
+            Center(
+              child: Text(
+                '${_position + 1} / ${_orderedCardIds.length}',
+                key: const ValueKey('browser-preview-position'),
+              ),
+            ),
+            IconButton(
+              key: const ValueKey('browser-preview-previous'),
+              tooltip: 'Previous card',
+              onPressed: _position > 0 ? () => _navigate(-1) : null,
+              icon: const Icon(Icons.chevron_left),
+            ),
+            IconButton(
+              key: const ValueKey('browser-preview-next'),
+              tooltip: 'Next card',
+              onPressed: _position + 1 < _orderedCardIds.length
+                  ? () => _navigate(1)
+                  : null,
+              icon: const Icon(Icons.chevron_right),
+            ),
+          ],
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
