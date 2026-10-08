@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anki_flutter/core/backend/backend_invoker.dart';
 import 'package:anki_flutter/features/browser/card_browser_page.dart';
+import 'package:anki_flutter/features/browser/browser_state_store.dart';
 import 'package:anki_flutter/features/browser/browser_card_export.dart';
 import 'package:anki_flutter/features/browser/data/anki_card_browser_repository.dart';
 import 'package:anki_flutter/features/collection/recent_collection_store.dart';
@@ -16,6 +17,7 @@ import 'package:anki_flutter/features/import_export/package_transfer_page.dart';
 import 'package:anki_flutter/features/media/check_media_page.dart';
 import 'package:anki_flutter/features/media/data/anki_media_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
+import 'package:anki_flutter/features/notes/note_editor_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
 import 'package:anki_flutter/features/notetypes/data/anki_notetype_repository.dart';
 import 'package:anki_flutter/features/notetypes/notetype_list_page.dart';
@@ -52,6 +54,7 @@ class DeckListPage extends StatefulWidget {
     this.recentCollectionsStore,
     this.backend,
     this.mediaBaseUri,
+    this.browserStateStore,
     this.reviewControllerBuilder,
     this.startupError,
     super.key,
@@ -65,6 +68,7 @@ class DeckListPage extends StatefulWidget {
   final RecentCollectionStore? recentCollectionsStore;
   final BackendInvoker? backend;
   final Uri? Function()? mediaBaseUri;
+  final BrowserStateStore? browserStateStore;
   final ReviewControllerBuilder? reviewControllerBuilder;
   final Object? startupError;
 
@@ -307,6 +311,21 @@ class _DeckListPageState extends State<DeckListPage> {
       MaterialPageRoute<void>(
         builder: (_) => CheckMediaPage(
           repository: AnkiMediaRepository(backend: backend),
+          onOpenNote: (noteId) => Navigator.of(context).push<bool>(
+            MaterialPageRoute<bool>(
+              builder: (_) => NoteEditorPage.edit(
+                noteId: noteId,
+                repository: AnkiNoteRepository(backend: backend),
+              ),
+            ),
+          ),
+          onBrowseAffectedNotes: (noteIds) {
+            // Use Anki's native note-ID search syntax. Every result remains
+            // editable through the existing browser and note editor.
+            _openBrowser(
+              initialQuery: noteIds.map((id) => 'nid:$id').join(' or '),
+            );
+          },
         ),
       ),
     );
@@ -326,12 +345,14 @@ class _DeckListPageState extends State<DeckListPage> {
     );
   }
 
-  void _openBrowser() {
+  void _openBrowser({String? initialQuery}) {
     final backend = widget.backend;
     if (backend == null) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CardBrowserPage(
+          initialQuery: initialQuery,
+          stateStore: widget.browserStateStore,
           repository: AnkiCardBrowserRepository(backend: backend),
           noteRepository: AnkiNoteRepository(backend: backend),
           cardExporter: NativeBrowserCardExporter(

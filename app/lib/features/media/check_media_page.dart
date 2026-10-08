@@ -9,9 +9,20 @@ import 'package:flutter/services.dart';
 /// Media integrity audit delegated to Anki's native backend.
 /// Destructive cleanup is opt-in, confirmed, and moves files to reversible trash.
 class CheckMediaPage extends StatefulWidget {
-  const CheckMediaPage({required this.repository, super.key});
+  const CheckMediaPage({
+    required this.repository,
+    this.onOpenNote,
+    this.onBrowseAffectedNotes,
+    super.key,
+  });
 
   final MediaRepository repository;
+
+  /// Optional navigation to the native Anki note editor. True means saved.
+  final Future<bool?> Function(int noteId)? onOpenNote;
+
+  /// Optional navigation to Browse, with the exact note IDs from Anki.
+  final void Function(List<int> noteIds)? onBrowseAffectedNotes;
 
   @override
   State<CheckMediaPage> createState() => _CheckMediaPageState();
@@ -134,6 +145,22 @@ class _CheckMediaPageState extends State<CheckMediaPage> {
     }
   }
 
+  Future<void> _openAffectedNote(int noteId) async {
+    final openNote = widget.onOpenNote;
+    if (openNote == null || _checking || _changingTrash) return;
+    try {
+      final saved = await openNote(noteId);
+      if (saved == true && mounted) {
+        await _check();
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not open note $noteId: $error')),
+      );
+    }
+  }
+
   Future<void> _copyReport(String text) async {
     try {
       await Clipboard.setData(ClipboardData(text: text));
@@ -203,7 +230,9 @@ class _CheckMediaPageState extends State<CheckMediaPage> {
               const SizedBox(height: 4),
               Text('Unused files: ${result.unused.length}'),
               const SizedBox(height: 4),
-              Text('Affected notes: ${result.missingMediaNotes.length}'),
+              Text(
+                'Affected notes: ${result.missingMediaNotes.map((id) => id.toInt()).where((id) => id > 0).toSet().length}',
+              ),
               if (result.haveTrash) ...[
                 const SizedBox(height: 8),
                 const Text('Media trash exists.'),
@@ -275,17 +304,79 @@ class _CheckMediaPageState extends State<CheckMediaPage> {
                 keyName: 'unused',
                 onShowMore: () => setState(() => _unusedVisible += _pageSize),
               ),
-              _buildGroup(
-                title: 'Notes with missing media',
-                description: 'Anki note IDs referencing missing files.',
-                filenames: result.missingMediaNotes
-                    .map((id) => 'Note ID ${id.toInt()}')
+              _buildAffectedNotes(
+                result.missingMediaNotes
+                    .map((id) => id.toInt())
+                    .where((id) => id > 0)
+                    .toSet()
                     .toList(growable: false),
-                visible: _notesVisible,
-                keyName: 'notes',
-                onShowMore: () => setState(() => _notesVisible += _pageSize),
               ),
               const SizedBox(height: 12),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAffectedNotes(List<int> noteIds) {
+    if (noteIds.isEmpty) return const SizedBox.shrink();
+    final visibleCount = _notesVisible < noteIds.length
+        ? _notesVisible
+        : noteIds.length;
+    final browse = widget.onBrowseAffectedNotes;
+    return Card(
+      key: const ValueKey('media-check-group-notes'),
+      margin: const EdgeInsets.only(top: 16),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Notes with missing media',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 4),
+            const Text('Anki note IDs referencing missing files.'),
+            if (browse != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                key: const ValueKey('media-browse-affected-notes'),
+                onPressed: _checking || _changingTrash
+                    ? null
+                    : () => browse(List<int>.unmodifiable(noteIds)),
+                icon: const Icon(Icons.search),
+                label: Text('Browse affected notes (${noteIds.length})'),
+              ),
+            ],
+            const SizedBox(height: 8),
+            for (final noteId in noteIds.take(visibleCount))
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 3),
+                child: Row(
+                  children: [
+                    Expanded(child: SelectableText('Note ID $noteId')),
+                    if (widget.onOpenNote != null)
+                      TextButton(
+                        key: ValueKey('media-open-note-$noteId'),
+                        onPressed: _checking || _changingTrash
+                            ? null
+                            : () => unawaited(_openAffectedNote(noteId)),
+                        child: const Text('Edit note'),
+                      ),
+                  ],
+                ),
+              ),
+            if (visibleCount < noteIds.length) ...[
+              const SizedBox(height: 8),
+              TextButton(
+                key: const ValueKey('media-check-more-notes'),
+                onPressed: () => setState(() => _notesVisible += _pageSize),
+                child: Text(
+                  'Show more (${noteIds.length - visibleCount} remaining)',
+                ),
+              ),
             ],
           ],
         ),

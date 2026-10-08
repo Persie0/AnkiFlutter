@@ -13,6 +13,7 @@ class CardBrowserPage extends StatefulWidget {
     required this.noteRepository,
     this.stateStore,
     this.cardExporter,
+    this.initialQuery,
     super.key,
   });
 
@@ -20,6 +21,10 @@ class CardBrowserPage extends StatefulWidget {
   final NoteEntryRepository noteRepository;
   final BrowserStateStore? stateStore;
   final BrowserCardExporter? cardExporter;
+
+  /// One-time entry-point filter. Overrides a saved search without immediately
+  /// overwriting the user's persistent browser preferences.
+  final String? initialQuery;
 
   @override
   State<CardBrowserPage> createState() => _CardBrowserPageState();
@@ -64,7 +69,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
     CardBrowserSortOption? selectedSortOption;
     CardBrowserSort? restoredSort;
     if (savedState case final state?) {
-      _queryController.text = state.query;
+      _queryController.text = widget.initialQuery ?? state.query;
       final sortColumn = state.sortColumn;
       if (sortColumn != null) {
         for (final option in options) {
@@ -78,6 +83,12 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
           }
         }
       }
+    }
+
+    // A deep link from Check Media must also work for first-time browser use
+    // with no persisted query.
+    if (savedState == null && widget.initialQuery != null) {
+      _queryController.text = widget.initialQuery!;
     }
 
     setState(() {
