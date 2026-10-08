@@ -225,30 +225,59 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
     let backend = TestBackend::new();
     let open = collection_request(&temp);
     let (status, bytes) = backend.invoke(OPEN_COLLECTION, &open);
-    assert_eq!(status, STATUS_SUCCESS, "open: {}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "open: {}",
+        String::from_utf8_lossy(&bytes)
+    );
 
     let (status, bytes) = backend.invoke(NEW_DECK, &Empty::default());
     assert_eq!(status, STATUS_SUCCESS);
     let mut deck = anki_proto::decks::Deck::decode(bytes.as_slice()).unwrap();
     deck.name = "History roundtrip".to_string();
     let (status, bytes) = backend.invoke(ADD_DECK, &deck);
-    assert_eq!(status, STATUS_SUCCESS, "add: {}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "add: {}",
+        String::from_utf8_lossy(&bytes)
+    );
     let id = OpChangesWithId::decode(bytes.as_slice()).unwrap().id;
-    assert!(fetch_tree(&backend).children.iter().any(|node| node.deck_id == id));
+    assert!(fetch_tree(&backend)
+        .children
+        .iter()
+        .any(|node| node.deck_id == id));
 
     let (status, bytes) = backend.invoke(10, &Empty::default());
     assert_eq!(status, STATUS_SUCCESS);
     let state = UndoStatus::decode(bytes.as_slice()).unwrap();
-    assert!(!state.undo.is_empty(), "Anki must offer undo for newly created deck");
+    assert!(
+        !state.undo.is_empty(),
+        "Anki must offer undo for newly created deck"
+    );
 
     let (status, bytes) = backend.invoke(11, &Empty::default());
-    assert_eq!(status, STATUS_SUCCESS, "undo: {}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "undo: {}",
+        String::from_utf8_lossy(&bytes)
+    );
     let undone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
     assert!(!undone.new_status.unwrap().redo.is_empty());
-    assert!(!fetch_tree(&backend).children.iter().any(|node| node.deck_id == id));
+    assert!(!fetch_tree(&backend)
+        .children
+        .iter()
+        .any(|node| node.deck_id == id));
 
     let (status, bytes) = backend.invoke(79, &Empty::default());
-    assert_eq!(status, STATUS_SUCCESS, "redo: {}", String::from_utf8_lossy(&bytes));
+    assert_eq!(
+        status,
+        STATUS_SUCCESS,
+        "redo: {}",
+        String::from_utf8_lossy(&bytes)
+    );
     let redone = OpChangesAfterUndo::decode(bytes.as_slice()).unwrap();
     assert!(!redone.new_status.unwrap().undo.is_empty());
     assert!(fetch_tree(&backend).children.iter().any(|node| node.deck_id == id));
