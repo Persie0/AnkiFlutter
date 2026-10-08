@@ -44,6 +44,21 @@ void main() {
     expect(find.text('Anki reported no database problems.'), findsOneWidget);
   });
 
+  testWidgets('deck-list refresh error does not misreport a successful Anki check',
+      (tester) async {
+    final repository = _Repository()..messages = [];
+    await tester.pumpWidget(_app(
+      repository,
+      onCollectionChanged: () async => throw StateError('refresh blocked'),
+    ));
+    await tester.pumpAndSettle();
+    await _confirm(tester);
+    expect(repository.calls, 1);
+    expect(find.text('Anki reported no database problems.'), findsOneWidget);
+    expect(find.textContaining('refresh blocked'), findsOneWidget);
+    expect(find.textContaining('Database check failed:'), findsNothing);
+  });
+
   testWidgets('failure shows error and retains ability to retry',
       (tester) async {
     final repository = _Repository()..fail = true;
