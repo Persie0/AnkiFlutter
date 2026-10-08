@@ -241,7 +241,10 @@ fn native_database_check_uses_upstream_anki_on_real_collection() {
     );
     let _report = CheckDatabaseResponse::decode(bytes.as_slice()).unwrap();
     // A completed database check must leave the collection readable.
-    assert!(fetch_tree(&backend).children.iter().any(|node| node.deck_id == 1));
+    assert!(fetch_tree(&backend)
+        .children
+        .iter()
+        .any(|node| node.deck_id == 1));
 }
 
 #[test]
@@ -295,7 +298,10 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
     let (status, bytes) = backend.invoke(10, &Empty::default());
     assert_eq!(status, STATUS_SUCCESS);
     let after_undo = UndoStatus::decode(bytes.as_slice()).unwrap();
-    assert!(!after_undo.redo.is_empty(), "redo must be available after undo");
+    assert!(
+        !after_undo.redo.is_empty(),
+        "redo must be available after undo"
+    );
     assert!(!fetch_tree(&backend)
         .children
         .iter()
@@ -312,7 +318,10 @@ fn native_undo_and_redo_restore_a_deck_and_their_status() {
     let (status, bytes) = backend.invoke(10, &Empty::default());
     assert_eq!(status, STATUS_SUCCESS);
     let after_redo = UndoStatus::decode(bytes.as_slice()).unwrap();
-    assert!(!after_redo.undo.is_empty(), "undo must be available after redo");
+    assert!(
+        !after_redo.undo.is_empty(),
+        "undo must be available after redo"
+    );
     assert!(fetch_tree(&backend)
         .children
         .iter()
