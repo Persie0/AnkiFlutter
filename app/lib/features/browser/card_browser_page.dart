@@ -1072,14 +1072,71 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
 
   @override
   Widget build(BuildContext context) {
+    final compactToolbar = MediaQuery.sizeOf(context).width < 650;
     return Scaffold(
       appBar: AppBar(
         title: Text(
           _activeSavedSearchName == null
               ? 'Browse cards'
               : 'Browse · $_activeSavedSearchName',
+          overflow: TextOverflow.ellipsis,
         ),
         actions: [
+          if (compactToolbar)
+            PopupMenuButton<int>(
+              key: const ValueKey('browser-compact-actions'),
+              tooltip: 'Browser actions',
+              icon: const Icon(Icons.more_vert),
+              enabled: !_bulkActionInProgress,
+              itemBuilder: (_) => [
+                PopupMenuItem<int>(
+                  value: 0,
+                  enabled: !_loading && _history.canGoBack,
+                  child: const Text('Previous search'),
+                ),
+                PopupMenuItem<int>(
+                  value: 1,
+                  enabled: !_loading && _history.canGoForward,
+                  child: const Text('Next search'),
+                ),
+                const PopupMenuDivider(),
+                PopupMenuItem<int>(
+                  value: 2,
+                  enabled: _queryController.text.trim().isNotEmpty,
+                  child: const Text('Save current search'),
+                ),
+                PopupMenuItem<int>(
+                  value: 3,
+                  enabled: _activeSavedSearchName != null,
+                  child: const Text('Delete selected saved search'),
+                ),
+                if (_savedSearches.isNotEmpty) const PopupMenuDivider(),
+                for (var index = 0; index < _savedSearches.length; index++)
+                  PopupMenuItem<int>(
+                    value: index + 4,
+                    enabled: !_loading,
+                    child: Text('Load: ${_savedSearches[index].name}'),
+                  ),
+              ],
+              onSelected: (choice) {
+                switch (choice) {
+                  case 0:
+                    _navigateSearchHistory(forward: false);
+                  case 1:
+                    _navigateSearchHistory(forward: true);
+                  case 2:
+                    unawaited(_saveNamedSearch());
+                  case 3:
+                    unawaited(_deleteSavedSearch());
+                  default:
+                    final index = choice - 4;
+                    if (index >= 0 && index < _savedSearches.length) {
+                      unawaited(_applySavedSearch(_savedSearches[index].name));
+                    }
+                }
+              },
+            )
+          else ...[
           IconButton(
             key: const ValueKey('browser-search-history-back'),
             tooltip: 'Previous search',
@@ -1134,6 +1191,7 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                 : () => unawaited(_deleteSavedSearch()),
             icon: const Icon(Icons.delete_outline),
           ),
+          ],
         ],
       ),
       body: SafeArea(
@@ -1155,8 +1213,11 @@ class _CardBrowserPageState extends State<CardBrowserPage> {
                     onPressed: _loading || _bulkActionInProgress
                         ? null
                         : () => unawaited(
-                        _search(clearSelection: true, recordHistory: true),
-                      ),
+                            _search(
+                              clearSelection: true,
+                              recordHistory: true,
+                            ),
+                          ),
                     icon: const Icon(Icons.search),
                   ),
                 ),
