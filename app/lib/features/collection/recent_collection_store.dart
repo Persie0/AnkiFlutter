@@ -53,7 +53,7 @@ class FileRecentCollectionStore implements RecentCollectionStore {
         'Collection path must not be blank.',
       );
     }
-    final paths = await load();
+    final paths = await _loadForMutation();
     await _write([
       path,
       ...paths.where((recentPath) => recentPath != path),
@@ -62,8 +62,25 @@ class FileRecentCollectionStore implements RecentCollectionStore {
 
   @override
   Future<void> forget(String collectionPath) async {
-    final paths = await load();
+    final paths = await _loadForMutation();
     await _write(paths.where((path) => path != collectionPath).toList());
+  }
+
+  /// Refuse to destroy an unreadable registry during a seemingly harmless
+  /// remember/forget operation. Display reads stay tolerant for startup.
+  Future<List<String>> _loadForMutation() async {
+    if (!await _file.exists()) return const [];
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(await _file.readAsString());
+    } on FormatException {
+      throw StateError('Recent collections data is corrupt; original file preserved.');
+    }
+    if (decoded is! List ||
+        decoded.any((value) => value is! String || value.isEmpty)) {
+      throw StateError('Recent collections data is invalid; original file preserved.');
+    }
+    return decoded.cast<String>();
   }
 
   Future<void> _write(Iterable<String> paths) async {
