@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:anki_flutter/core/backend/generated/anki/sync.pb.dart' as sync;
 import 'package:anki_flutter/features/sync/data/anki_sync_repository.dart';
+import 'package:anki_flutter/features/collection/data/anki_collection_backup_repository.dart';
 import 'package:anki_flutter/features/sync/data/sync_auth_store.dart';
 import 'package:anki_flutter/features/sync/sync_page.dart';
 import 'package:flutter/material.dart';
@@ -57,6 +58,124 @@ void main() {
 
     expect(repository.fullUpload, isFalse);
     expect(repository.fullServerUsn, 17);
+  });
+
+  testWidgets('full download creates native backup before replacement',
+      (tester) async {
+    final repository = _Repository(
+      collectionResponse: sync.SyncCollectionResponse(
+        required: sync.SyncCollectionResponse_ChangesRequired.FULL_SYNC,
+      ),
+    );
+    final backup = _Backup();
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(MaterialApp(home: SyncPage(
+      repository: repository,
+      authStore: store,
+      backupRepository: backup,
+      chooseBackupDirectory: () async => '/native/backups',
+    )));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.byKey(const ValueKey('sync-now')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-download')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.text('Protect the local collection'), findsOneWidget);
+    expect(find.textContaining('Media files are not included'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
+    await tester.pumpAndSettle();
+
+    expect(backup.directories, ['/native/backups']);
+    expect(repository.fullUpload, isFalse);
+  });
+
+  testWidgets('declined backup never starts destructive full download',
+      (tester) async {
+    final repository = _Repository(
+      collectionResponse: sync.SyncCollectionResponse(
+        required: sync.SyncCollectionResponse_ChangesRequired.FULL_DOWNLOAD,
+      ),
+    );
+    final backup = _Backup();
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(MaterialApp(home: SyncPage(
+      repository: repository,
+      authStore: store,
+      backupRepository: backup,
+      chooseBackupDirectory: () async => null,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sync-now')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.text('Download'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
+    await tester.pumpAndSettle();
+
+    expect(backup.directories, isEmpty);
+    expect(repository.fullUpload, isNull);
+  });
+
+  testWidgets('failed native backup blocks replacing local collection',
+      (tester) async {
+    final repository = _Repository(
+      collectionResponse: sync.SyncCollectionResponse(
+        required: sync.SyncCollectionResponse_ChangesRequired.FULL_SYNC,
+      ),
+    );
+    final backup = _Backup()..created = false;
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(MaterialApp(home: SyncPage(
+      repository: repository,
+      authStore: store,
+      backupRepository: backup,
+      chooseBackupDirectory: () async => '/native/backups',
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sync-now')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-download')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-create-backup')));
+    await tester.pumpAndSettle();
+
+    expect(repository.fullUpload, isNull);
+    expect(backup.directories, ['/native/backups']);
+    expect(find.textContaining('Anki did not create the backup'), findsOneWidget);
+  });
+
+  testWidgets('explicit skip backup allows full download', (tester) async {
+    final repository = _Repository(
+      collectionResponse: sync.SyncCollectionResponse(
+        required: sync.SyncCollectionResponse_ChangesRequired.FULL_SYNC,
+      ),
+    );
+    final backup = _Backup();
+    final store = _Store()..value = sync.SyncAuth(hkey: 'host-key');
+    await tester.pumpWidget(MaterialApp(home: SyncPage(
+      repository: repository,
+      authStore: store,
+      backupRepository: backup,
+    )));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('sync-now')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-download')));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const ValueKey('full-sync-skip-backup')));
+    await tester.pumpAndSettle();
+
+    expect(backup.directories, isEmpty);
+    expect(repository.fullUpload, isFalse);
   });
 
   testWidgets('sign out ignores a pending response from the previous account',
@@ -122,6 +241,19 @@ void main() {
   });
 
 }
+
+
+class _Backup implements CollectionBackupRepository {
+  final directories = <String>[];
+  bool created = true;
+
+  @override
+  Future<bool> createBackup(String backupDirectory) async {
+    directories.add(backupDirectory);
+    return created;
+  }
+}
+
 
 class _Store implements SyncAuthStore {
   sync.SyncAuth? value;
