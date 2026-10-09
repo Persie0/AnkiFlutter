@@ -279,6 +279,7 @@ const OPERATIONS: &[(&str, &str, &str)] = &[
         "BackendDecksService",
         "add_or_update_filtered_deck",
     ),
+    ("SORT_DECK", "BackendSchedulerService", "sort_deck"),
     (
         "TAG_MANAGER_RENAME_TAGS",
         "BackendTagsService",
