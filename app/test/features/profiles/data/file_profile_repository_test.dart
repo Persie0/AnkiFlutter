@@ -32,6 +32,76 @@ void main() {
     expect(await repository.list(), [profile]);
   });
 
+  test('timestamp collision never reuses an existing managed profile folder',
+      () async {
+    final constantTime = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 1000,
+    );
+    final first = await constantTime.create('First');
+    final second = await constantTime.create('Second');
+    final third = await constantTime.create('Third');
+
+    expect({first.id, second.id, third.id}.length, 3);
+    final occupied = Directory(
+      '${repository.profilesDirectory.path}${Platform.pathSeparator}'
+      'unused-1000',
+    );
+    await occupied.create();
+    final marker = File('${occupied.path}${Platform.pathSeparator}keep.txt');
+    await marker.writeAsString('keep');
+    final fourth = await constantTime.create('Unused');
+
+    expect(fourth.id, isNot('unused-1000'));
+    expect(await marker.readAsString(), 'keep');
+    expect(Directory(fourth.profileDirectory).existsSync(), isTrue);
+  });
+
+  test('repeated external registration timestamp allocates unique IDs',
+      () async {
+    final fixed = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 1234,
+    );
+    final first = await fixed.registerExternal(
+      name: 'First external',
+      collectionPath: '${tempDirectory.path}/one.anki2',
+    );
+    final second = await fixed.registerExternal(
+      name: 'Second external',
+      collectionPath: '${tempDirectory.path}/two.anki2',
+    );
+    expect(first.id, isNot(second.id));
+    expect((await fixed.list()).map((profile) => profile.id).toSet(), hasLength(2));
+  });
+
+  test('failed registry commit rolls back newly created managed profile folder',
+      () async {
+    // A folder at the registry's intended file path prevents rename commit.
+    final registryFolder = Directory(repository.registryFile.path);
+    await registryFolder.create();
+    final fixed = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 456,
+    );
+
+    await expectLater(
+      fixed.create('Cleanup'),
+      throwsA(isA<FileSystemException>()),
+    );
+    expect(Directory(
+      '${repository.profilesDirectory.path}${Platform.pathSeparator}'
+      'cleanup-456',
+    ).existsSync(), isFalse);
+    expect(await registryFolder.exists(), isTrue);
+  });
+
   test('rejects duplicate profile names case-insensitively', () async {
     await repository.create('Personal');
 
@@ -113,6 +183,54 @@ void main() {
           entry.path.contains('.anki-profile-write-')),
       isEmpty,
     );
+  });
+
+  test('corrupted registry is not replaced when adding a profile', () async {
+    await repository.registryFile.writeAsString('{broken json');
+    final before = await repository.registryFile.readAsBytes();
+
+    await expectLater(
+      repository.create('New profile'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsBytes(), before);
+    expect(Directory(
+      '${repository.profilesDirectory.path}${Platform.pathSeparator}'
+      'new-profile',
+    ).existsSync(), isFalse);
+    final folders = repository.profilesDirectory;
+    expect(!await folders.exists() || folders.listSync().isEmpty, isTrue);
+  });
+
+  test('future profile registry versions are preserved on attempted writes',
+      () async {
+    const futureJson = '{"version":2,"profiles":[]}';
+    await repository.registryFile.writeAsString(futureJson);
+    await expectLater(
+      repository.create('New profile'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsString(), futureJson);
+  });
+
+  test('partially malformed entries are not discarded by a rename',
+      () async {
+    final original = await repository.create('Valid');
+    final json = jsonDecode(await repository.registryFile.readAsString())
+        as Map<String, dynamic>;
+    (json['profiles'] as List).add(<String, Object>{
+      'id': 'damaged',
+      'name': 'Incomplete',
+    });
+    final originalJson = jsonEncode(json);
+    await repository.registryFile.writeAsString(originalJson);
+
+    await expectLater(
+      repository.rename(original.id, 'Renamed'),
+      throwsA(isA<FormatException>()),
+    );
+    expect(await repository.registryFile.readAsString(), originalJson);
+    expect(Directory(original.profileDirectory).existsSync(), isTrue);
   });
 
   test('recovers from malformed registry as an empty profile list', () async {
