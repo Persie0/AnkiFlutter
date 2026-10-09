@@ -8,6 +8,7 @@ import 'package:anki_flutter/features/deck_options/deck_options_page.dart';
 import 'package:anki_flutter/features/deck_options/filtered_deck_options_page.dart';
 import 'package:anki_flutter/features/decks/deck_node.dart';
 import 'package:anki_flutter/features/decks/data/anki_filtered_deck_repository.dart';
+import 'package:anki_flutter/features/decks/data/anki_deck_new_card_order_repository.dart';
 import 'package:anki_flutter/features/decks/data/anki_filtered_deck_options_repository.dart';
 import 'package:anki_flutter/features/notes/add_note_page.dart';
 import 'package:anki_flutter/features/notes/data/anki_note_repository.dart';
@@ -40,6 +41,7 @@ class DeckOverviewPage extends StatefulWidget {
     this.onBrowse,
     this.filteredDeckRepository,
     this.filteredDeckOptionsRepository,
+    this.newCardOrderRepository,
     this.reviewControllerBuilder,
     super.key,
   });
@@ -58,6 +60,7 @@ class DeckOverviewPage extends StatefulWidget {
   /// Overrides the native repository in tests or custom backend integrations.
   final FilteredDeckRepository? filteredDeckRepository;
   final FilteredDeckOptionsRepository? filteredDeckOptionsRepository;
+  final DeckNewCardOrderRepository? newCardOrderRepository;
   final ReviewControllerBuilder? reviewControllerBuilder;
 
   @override
@@ -67,6 +70,68 @@ class DeckOverviewPage extends StatefulWidget {
 class _DeckOverviewPageState extends State<DeckOverviewPage> {
   ReviewController? _reviewController;
   bool _mutating = false;
+
+  DeckNewCardOrderRepository? get _newCardOrderRepository {
+    if (widget.deck.filtered) return null;
+    final provided = widget.newCardOrderRepository;
+    if (provided != null) return provided;
+    final backend = widget.backend;
+    return backend == null ? null : AnkiDeckNewCardOrderRepository(backend: backend);
+  }
+
+  Future<void> _reorderNewCards({required bool randomize}) async {
+    final repository = _newCardOrderRepository;
+    if (repository == null || _mutating) return;
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(randomize ? 'Shuffle new cards?' : 'Restore new-card order?'),
+        content: Text(
+          randomize
+              ? 'Change the position of new cards in this deck to a random order? '
+                  'Review history and existing review intervals will be preserved.'
+              : 'Order new cards in this deck by their original insertion order? '
+                  'Review history and existing review intervals will be preserved.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            key: const ValueKey('confirm-new-card-order'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: Text(randomize ? 'Shuffle' : 'Restore order'),
+          ),
+        ],
+      ),
+    );
+    if (approved != true || !mounted || _mutating) return;
+    setState(() => _mutating = true);
+    try {
+      final count = await repository.reorder(
+        widget.deck.id,
+        randomize: randomize,
+      );
+      if (!mounted) return;
+      await widget.onChanged?.call();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(
+          randomize
+              ? 'Shuffled $count new cards.'
+              : 'Restored order of $count new cards.',
+        )),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not reorder new cards: $error')),
+      );
+    } finally {
+      if (mounted) setState(() => _mutating = false);
+    }
+  }
 
   FilteredDeckRepository? get _filteredDeckRepository {
     if (!widget.deck.filtered) return null;
@@ -431,14 +496,78 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
     super.dispose();
   }
 
+  void _compactAction(String action) {
+    switch (action) {
+      case 'all':
+        _browseDeck(_DeckBrowseFilter.all);
+      case 'due':
+        _browseDeck(_DeckBrowseFilter.due);
+      case 'new':
+        _browseDeck(_DeckBrowseFilter.newCards);
+      case 'suspended':
+        _browseDeck(_DeckBrowseFilter.suspended);
+      case 'options':
+        unawaited(_deckOptions());
+      case 'preferences':
+        unawaited(_preferences());
+      case 'custom-study':
+        unawaited(_customStudy());
+      case 'statistics':
+        unawaited(_statistics());
+      case 'add-note':
+        unawaited(_addNote());
+      case 'rename':
+        unawaited(_rename());
+      case 'remove':
+        unawaited(_remove());
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final deck = widget.deck;
+    final compactToolbar = MediaQuery.sizeOf(context).width < 720;
     return Scaffold(
       appBar: AppBar(
-        title: Text(deck.name),
+        title: Text(deck.name, overflow: TextOverflow.ellipsis),
         actions: [
-          if (widget.onBrowse != null)
+          if (compactToolbar &&
+              (widget.onBrowse != null ||
+                  widget.backend != null ||
+                  widget.onAddNote != null ||
+                  widget.onRename != null ||
+                  widget.onRemove != null ||
+                  widget.filteredDeckOptionsRepository != null))
+            PopupMenuButton<String>(
+              key: const ValueKey('deck-overview-actions'),
+              tooltip: 'More deck actions',
+              enabled: !_mutating,
+              icon: const Icon(Icons.more_vert),
+              onSelected: _compactAction,
+              itemBuilder: (_) => [
+                if (widget.onBrowse != null) ...[
+                  const PopupMenuItem(value: 'all', child: Text('Browse all cards')),
+                  const PopupMenuItem(value: 'due', child: Text('Browse due cards')),
+                  const PopupMenuItem(value: 'new', child: Text('Browse new cards')),
+                  const PopupMenuItem(value: 'suspended', child: Text('Browse suspended cards')),
+                ],
+                if (widget.backend != null ||
+                    (widget.deck.filtered && widget.filteredDeckOptionsRepository != null))
+                  const PopupMenuItem(value: 'options', child: Text('Deck options')),
+                if (widget.backend != null) ...[
+                  const PopupMenuItem(value: 'preferences', child: Text('Preferences')),
+                  const PopupMenuItem(value: 'custom-study', child: Text('Custom study')),
+                  const PopupMenuItem(value: 'statistics', child: Text('Deck statistics')),
+                ],
+                if (widget.onAddNote != null)
+                  const PopupMenuItem(value: 'add-note', child: Text('Add note')),
+                if (widget.onRename != null)
+                  const PopupMenuItem(value: 'rename', child: Text('Rename deck')),
+                if (widget.onRemove != null)
+                  const PopupMenuItem(value: 'remove', child: Text('Delete deck')),
+              ],
+            ),
+          if (!compactToolbar && widget.onBrowse != null)
             PopupMenuButton<_DeckBrowseFilter>(
               key: const ValueKey('deck-browse-menu'),
               tooltip: 'Browse deck cards',
@@ -464,45 +593,45 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 ),
               ],
             ),
-          if (widget.backend != null ||
+          if (!compactToolbar && (widget.backend != null ||
               (widget.deck.filtered &&
-                  widget.filteredDeckOptionsRepository != null))
+                  widget.filteredDeckOptionsRepository != null)))
             IconButton(
               tooltip: widget.deck.filtered ? 'Filtered deck options' : 'Deck options',
               onPressed: _mutating ? null : _deckOptions,
               icon: const Icon(Icons.settings_outlined),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Preferences',
               onPressed: _mutating ? null : _preferences,
               icon: const Icon(Icons.settings_suggest_outlined),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Custom study',
               onPressed: _mutating ? null : _customStudy,
               icon: const Icon(Icons.tune),
             ),
-          if (widget.backend != null)
+          if (!compactToolbar && widget.backend != null)
             IconButton(
               tooltip: 'Deck statistics',
               onPressed: _mutating ? null : _statistics,
               icon: const Icon(Icons.bar_chart_outlined),
             ),
-          if (widget.onAddNote != null)
+          if (!compactToolbar && widget.onAddNote != null)
             IconButton(
               tooltip: 'Add note',
               onPressed: () => unawaited(_addNote()),
               icon: const Icon(Icons.note_add_outlined),
             ),
-          if (widget.onRename != null)
+          if (!compactToolbar && widget.onRename != null)
             IconButton(
               tooltip: 'Rename deck',
               onPressed: _mutating ? null : _rename,
               icon: const Icon(Icons.edit_outlined),
             ),
-          if (widget.onRemove != null)
+          if (!compactToolbar && widget.onRemove != null)
             IconButton(
               tooltip: 'Delete deck',
               onPressed: _mutating ? null : _remove,
@@ -510,10 +639,15 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
             ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
+      body: SafeArea(
+        child: LayoutBuilder(
+          builder: (_, bounds) => SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: bounds.maxHeight),
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -522,6 +656,26 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
               Text('Learn ${deck.learnCount}'),
               const SizedBox(height: 8),
               Text('Review ${deck.reviewCount}'),
+              if (_newCardOrderRepository != null) ...[
+                const SizedBox(height: 16),
+                OutlinedButton.icon(
+                  key: const ValueKey('deck-shuffle-new-cards'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _reorderNewCards(randomize: true),
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text('Shuffle new cards'),
+                ),
+                const SizedBox(height: 8),
+                TextButton.icon(
+                  key: const ValueKey('deck-restore-new-card-order'),
+                  onPressed: _mutating
+                      ? null
+                      : () => _reorderNewCards(randomize: false),
+                  icon: const Icon(Icons.sort),
+                  label: const Text('Restore new-card order'),
+                ),
+              ],
               if (_filteredDeckRepository != null) ...[
                 const SizedBox(height: 24),
                 OutlinedButton.icon(
@@ -548,6 +702,10 @@ class _DeckOverviewPageState extends State<DeckOverviewPage> {
                 child: const Text('Study'),
               ),
             ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
       ),
