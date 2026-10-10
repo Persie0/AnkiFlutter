@@ -53,17 +53,21 @@ class FileRecentCollectionStore implements RecentCollectionStore {
         'Collection path must not be blank.',
       );
     }
-    final paths = await load();
-    await _write([
-      path,
-      ...paths.where((recentPath) => recentPath != path),
-    ].take(maxEntries));
+    await runSerializedStateMutation(_file, () async {
+      final paths = await load();
+      await _write([
+        path,
+        ...paths.where((recentPath) => recentPath != path),
+      ].take(maxEntries));
+    });
   }
 
   @override
   Future<void> forget(String collectionPath) async {
-    final paths = await load();
-    await _write(paths.where((path) => path != collectionPath).toList());
+    await runSerializedStateMutation(_file, () async {
+      final paths = await load();
+      await _write(paths.where((path) => path != collectionPath).toList());
+    });
   }
 
   Future<void> _write(Iterable<String> paths) async {
