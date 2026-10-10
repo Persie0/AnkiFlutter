@@ -45,6 +45,12 @@ void main() {
     final store = FileRecentCollectionStore(file: file);
 
     expect(await store.load(), isEmpty);
+    await expectLater(
+      store.remember('/collections/old.anki2'),
+      throwsStateError,
+    );
+    expect(await file.readAsString(), '{not-json');
+    await file.delete();
     await store.remember('/collections/old.anki2');
     await store.forget('/collections/old.anki2');
 
@@ -64,6 +70,24 @@ void main() {
       '/collections/third.anki2',
       '/collections/second.anki2',
     ]);
+  });
+
+  test('corrupt and unsupported recents are preserved by mutations', () async {
+    final file = File('${tempDirectory.path}/safe-recent.json');
+    final first = FileRecentCollectionStore(file: file);
+    final second = FileRecentCollectionStore(file: file);
+    for (final original in [
+      '{broken',
+      '{"version":2,"paths":["/future.anki2"]}',
+      '["/valid.anki2", 42]',
+      '[""]',
+    ]) {
+      await file.writeAsString(original);
+      expect(await first.load(), anyOf(isEmpty, isNotEmpty));
+      await expectLater(first.remember('/new.anki2'), throwsStateError);
+      await expectLater(second.forget('/old.anki2'), throwsStateError);
+      expect(await file.readAsString(), original);
+    }
   });
 
 }
