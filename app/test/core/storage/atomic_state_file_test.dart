@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:anki_flutter/core/storage/atomic_state_file.dart';
@@ -46,4 +47,27 @@ void main() {
       isEmpty,
     );
   });
+  test('serializes mutations and recovers after a failed operation', () async {
+    final file = File('${root.path}/serialized.json');
+    final started = Completer<void>();
+    final release = Completer<void>();
+    final calls = <String>[];
+    final first = runSerializedStateMutation<void>(file, () async {
+      calls.add('first');
+      started.complete();
+      await release.future;
+      throw StateError('expected failure');
+    });
+    await started.future;
+    final second = runSerializedStateMutation<int>(file, () async {
+      calls.add('second');
+      return 42;
+    });
+    expect(calls, ['first']);
+    release.complete();
+    await expectLater(first, throwsStateError);
+    expect(await second, 42);
+    expect(calls, ['first', 'second']);
+  });
+
 }
