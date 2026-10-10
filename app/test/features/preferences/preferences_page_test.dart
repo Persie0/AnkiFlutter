@@ -85,6 +85,104 @@ void main() {
     expect(repository.loadCount, 2);
     expect(find.text('Scheduling'), findsOneWidget);
   });
+
+  testWidgets('back confirms unsaved fields and keeps editing on cancel',
+      (tester) async {
+    final repository = _Repository(config.Preferences(
+      scheduling: config.Preferences_Scheduling(rollover: 4),
+    ));
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (context) => TextButton(
+          key: const ValueKey('open-preferences'),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => PreferencesPage(repository: repository),
+          )),
+          child: const Text('Open preferences'),
+        )),
+      ),
+    ));
+    await tester.tap(find.byKey(const ValueKey('open-preferences')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const ValueKey('pref-rollover')), '6');
+    await tester.pump();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Discard unsaved preferences?'), findsOneWidget);
+    await tester.tap(find.byKey(const ValueKey('preferences-keep-editing')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PreferencesPage), findsOneWidget);
+    expect(repository.saved, isNull);
+
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('preferences-discard')));
+    await tester.pumpAndSettle();
+    expect(find.byType(PreferencesPage), findsNothing);
+    expect(repository.saved, isNull);
+  });
+
+  testWidgets('saving changed fields allows leaving without discard dialog',
+      (tester) async {
+    final repository = _Repository(config.Preferences(
+      scheduling: config.Preferences_Scheduling(rollover: 4),
+    ));
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (context) => TextButton(
+          key: const ValueKey('open-preferences'),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => PreferencesPage(repository: repository),
+          )),
+          child: const Text('Open preferences'),
+        )),
+      ),
+    ));
+    await tester.tap(find.byKey(const ValueKey('open-preferences')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const ValueKey('pref-rollover')), '8');
+    await tester.pump();
+    await tester.tap(find.byKey(const ValueKey('preferences-save')));
+    await tester.pumpAndSettle();
+    expect(repository.saved!.scheduling.rollover, 8);
+    expect(find.text('Preferences saved.'), findsOneWidget);
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.byType(PreferencesPage), findsNothing);
+    expect(find.text('Discard unsaved preferences?'), findsNothing);
+  });
+
+  testWidgets('switch-only edits also require confirmation', (tester) async {
+    final repository = _Repository(config.Preferences(
+      scheduling: config.Preferences_Scheduling(rollover: 4),
+      reviewing: config.Preferences_Reviewing(
+        showIntervalsOnButtons: false,
+      ),
+    ));
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Builder(builder: (context) => TextButton(
+          key: const ValueKey('open-preferences'),
+          onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+            builder: (_) => PreferencesPage(repository: repository),
+          )),
+          child: const Text('Open preferences'),
+        )),
+      ),
+    ));
+    await tester.tap(find.byKey(const ValueKey('open-preferences')));
+    await tester.pumpAndSettle();
+    tester.widget<SwitchListTile>(
+      find.byKey(const ValueKey('pref-show-intervals')),
+    ).onChanged!(true);
+    await tester.pump();
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    expect(find.text('Discard unsaved preferences?'), findsOneWidget);
+  });
+
 }
 
 class _Repository implements PreferencesRepository {
