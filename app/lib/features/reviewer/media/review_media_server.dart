@@ -45,6 +45,11 @@ class ReviewMediaServer {
 
   Future<void> _handleRequest(HttpRequest request) async {
     try {
+      // Collection media can contain private note content. Do not persist it
+      // in browser disk caches or allow content-type sniffing.
+      request.response.headers.set('cache-control', 'private, no-store');
+      request.response.headers.set('x-content-type-options', 'nosniff');
+      request.response.headers.set('referrer-policy', 'no-referrer');
       if (request.method != 'GET' && request.method != 'HEAD') {
         request.response.statusCode = HttpStatus.methodNotAllowed;
         request.response.headers.set('allow', 'GET, HEAD');
@@ -88,12 +93,39 @@ class ReviewMediaServer {
 
       final resolvedFile = File(canonicalFile);
       final length = await resolvedFile.length();
-      request.response.statusCode = HttpStatus.ok;
-      request.response.contentLength = length;
       request.response.headers.contentType = _contentTypeFor(resolvedFile.path);
+      request.response.headers.set('accept-ranges', 'bytes');
+
+      // Browsers request byte ranges when seeking within audio or video.
+      // Serving 200 and the full file for each seek breaks media playback.
+      final rangeHeader = request.headers.value('range');
+      final range = rangeHeader == null
+          ? null
+          : _parseRange(rangeHeader, length);
+      if (rangeHeader != null && range == null) {
+        request.response.statusCode = HttpStatus.requestedRangeNotSatisfiable;
+        request.response.headers.set('content-range', 'bytes */$length');
+        request.response.contentLength = 0;
+        await request.response.close();
+        return;
+      }
+
+      final start = range?.start ?? 0;
+      final endExclusive = range == null ? length : range.end + 1;
+      request.response.statusCode =
+          range == null ? HttpStatus.ok : HttpStatus.partialContent;
+      request.response.contentLength = endExclusive - start;
+      if (range != null) {
+        request.response.headers.set(
+          'content-range',
+          'bytes $start-${range.end}/$length',
+        );
+      }
 
       if (request.method == 'GET') {
-        await request.response.addStream(resolvedFile.openRead());
+        await request.response.addStream(
+          resolvedFile.openRead(start, endExclusive),
+        );
       }
       await request.response.close();
     } catch (_) {
@@ -103,6 +135,32 @@ class ReviewMediaServer {
       } catch (_) {
         // The response may already have started; there is nothing left to send.
       }
+    }
+  }
+
+  _ByteRange? _parseRange(String header, int size) {
+    if (size == 0) return null;
+    final match = RegExp(r'^bytes=(\d*)-(\d*)$').firstMatch(header.trim());
+    if (match == null) return null;
+    final first = match.group(1)!;
+    final last = match.group(2)!;
+    if (first.isEmpty && last.isEmpty) return null;
+
+    try {
+      if (first.isEmpty) {
+        final suffix = int.parse(last);
+        if (suffix <= 0) return null;
+        return _ByteRange(
+          suffix >= size ? 0 : size - suffix,
+          size - 1,
+        );
+      }
+      final start = int.parse(first);
+      final end = last.isEmpty ? size - 1 : int.parse(last);
+      if (start < 0 || start >= size || end < start) return null;
+      return _ByteRange(start, end >= size ? size - 1 : end);
+    } on FormatException {
+      return null;
     }
   }
 
@@ -176,4 +234,10 @@ class ReviewMediaServer {
     }
     return ContentType.binary;
   }
+}
+class _ByteRange {
+  const _ByteRange(this.start, this.end);
+
+  final int start;
+  final int end;
 }

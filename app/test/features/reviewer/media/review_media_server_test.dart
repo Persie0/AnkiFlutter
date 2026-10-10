@@ -43,6 +43,87 @@ void main() {
     expect(await headResponse.fold<int>(0, (length, bytes) => length + bytes.length), 0);
   });
 
+  test('supports audio/video byte range seeking and HEAD metadata', () async {
+    final fixture = await _SecurityFixture.create();
+    addTearDown(fixture.dispose);
+    final file = File(
+      '${fixture.mediaRoot.path}${Platform.pathSeparator}video.mp4',
+    );
+    await file.writeAsBytes([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    final uri = fixture.baseUri.resolve('video.mp4');
+
+    Future<HttpClientResponse> rangeResponse(String method, String range) async {
+      final request = await fixture.client.openUrl(method, uri);
+      request.headers.set('range', range);
+      return request.close();
+    }
+
+    final first = await rangeResponse('GET', 'bytes=2-5');
+    expect(first.statusCode, HttpStatus.partialContent);
+    expect(first.headers.value('content-range'), 'bytes 2-5/10');
+    expect(first.headers.value('accept-ranges'), 'bytes');
+    expect(first.contentLength, 4);
+    expect(await first.fold<List<int>>([], (list, data) => list..addAll(data)),
+        [2, 3, 4, 5]);
+
+    final suffix = await rangeResponse('GET', 'bytes=-3');
+    expect(suffix.statusCode, HttpStatus.partialContent);
+    expect(suffix.headers.value('content-range'), 'bytes 7-9/10');
+    expect(await suffix.fold<List<int>>([], (list, data) => list..addAll(data)),
+        [7, 8, 9]);
+
+    final remaining = await rangeResponse('GET', 'bytes=8-');
+    expect(remaining.statusCode, HttpStatus.partialContent);
+    expect(await remaining.fold<List<int>>([], (list, data) => list..addAll(data)),
+        [8, 9]);
+
+    final head = await rangeResponse('HEAD', 'bytes=4-6');
+    expect(head.statusCode, HttpStatus.partialContent);
+    expect(head.contentLength, 3);
+    expect(head.headers.value('content-range'), 'bytes 4-6/10');
+    expect(await head.fold<int>(0, (count, data) => count + data.length), 0);
+  });
+
+  test('returns 416 for malformed, multiple or unsatisfiable ranges',
+      () async {
+    final fixture = await _SecurityFixture.create();
+    addTearDown(fixture.dispose);
+    await File('${fixture.mediaRoot.path}/audio.mp3').writeAsBytes([1, 2, 3]);
+    for (final range in [
+      'bytes=3-',
+      'bytes=2-1',
+      'bytes=-0',
+      'bytes=0-1,2-2',
+      'bytes=hello',
+    ]) {
+      final request = await fixture.client.getUrl(
+        fixture.baseUri.resolve('audio.mp3'),
+      );
+      request.headers.set('range', range);
+      final response = await request.close();
+      expect(response.statusCode, HttpStatus.requestedRangeNotSatisfiable,
+          reason: 'invalid range: $range');
+      expect(response.headers.value('content-range'), 'bytes */3');
+      await response.drain<void>();
+    }
+  });
+
+  test('disables sniffing, referrers and browser storage of private media',
+      () async {
+    final fixture = await _SecurityFixture.create();
+    addTearDown(fixture.dispose);
+    await File('${fixture.mediaRoot.path}/note.html')
+        .writeAsString('<p>private card</p>');
+    final response = await fixture.client
+        .getUrl(fixture.baseUri.resolve('note.html'))
+        .then((request) => request.close());
+    expect(response.statusCode, HttpStatus.ok);
+    expect(response.headers.value('x-content-type-options'), 'nosniff');
+    expect(response.headers.value('referrer-policy'), 'no-referrer');
+    expect(response.headers.value('cache-control'), 'private, no-store');
+    await response.drain<void>();
+  });
+
   test('rejects literal and percent-encoded parent traversal', () async {
     final fixture = await _SecurityFixture.create();
     addTearDown(fixture.dispose);
