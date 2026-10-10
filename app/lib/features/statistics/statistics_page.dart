@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:anki_flutter/features/statistics/statistics_extra_graphs.dart';
+
 import 'package:anki_flutter/core/backend/generated/anki/stats.pb.dart' as stats;
 import 'package:anki_flutter/features/statistics/data/anki_statistics_repository.dart';
 import 'package:flutter/material.dart';
@@ -140,6 +142,7 @@ class _StatisticsPageState extends State<StatisticsPage> {
             const SizedBox(height: 24),
             _FutureDueSection(futureDue: graphs.futureDue),
           ],
+          StatisticsExtraGraphs(graphs: graphs, days: _days),
         ],
       ),
     );
