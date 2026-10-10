@@ -97,6 +97,7 @@ void main() {
         'rebuildFilteredDeck': 86,
         'getOrCreateFilteredDeck': 87,
         'addOrUpdateFilteredDeck': 88,
+        'sortDeck': 89,
       },
     );
 
