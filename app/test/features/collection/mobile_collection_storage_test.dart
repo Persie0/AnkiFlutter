@@ -134,4 +134,65 @@ void main() {
 
     await expectLater(storage.copySelectedCollection(source), throwsFormatException);
   });
+  test('simultaneous imports with the same name and timestamp never clobber',
+      () async {
+    final firstFolder = Directory('${temporaryDirectory.path}/first');
+    final secondFolder = Directory('${temporaryDirectory.path}/second');
+    await firstFolder.create();
+    await secondFolder.create();
+    final firstSource = File('${firstFolder.path}/Same.anki2');
+    final secondSource = File('${secondFolder.path}/Same.anki2');
+    await firstSource.writeAsBytes([1, 2, 3]);
+    await secondSource.writeAsBytes([9, 8, 7]);
+    await File('${firstFolder.path}/Same.media/a.wav').create(recursive: true);
+    await File('${secondFolder.path}/Same.media/a.wav').create(recursive: true);
+    await File('${firstFolder.path}/Same.media/a.wav').writeAsBytes([1]);
+    await File('${secondFolder.path}/Same.media/a.wav').writeAsBytes([9]);
+
+    final destination = Directory('${temporaryDirectory.path}/destination');
+    MobileCollectionStorage store() => MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 555,
+    );
+    final outcomes = await Future.wait<Object>([
+      store().copySelectedCollection(firstSource).then<Object>((value) => value,
+          onError: (Object error) => error),
+      store().copySelectedCollection(secondSource).then<Object>((value) => value,
+          onError: (Object error) => error),
+    ]);
+    expect(outcomes.whereType<String>(), hasLength(1));
+    expect(outcomes.whereType<StateError>(), hasLength(1));
+    final winnerBytes = outcomes[0] is String ? [1, 2, 3] : [9, 8, 7];
+    final winnerMedia = outcomes[0] is String ? [1] : [9];
+    expect(await File('${destination.path}/Same_555.anki2').readAsBytes(),
+        winnerBytes);
+    expect(await File('${destination.path}/Same_555.media/a.wav').readAsBytes(),
+        winnerMedia);
+    expect(destination.listSync().where((entry) =>
+        entry.path.contains('.anki-import-')), isEmpty);
+  });
+
+  test('linked media is rejected instead of silently losing attachments',
+      () async {
+    final sourceDirectory = Directory('${temporaryDirectory.path}/source');
+    await sourceDirectory.create();
+    final source = File('${sourceDirectory.path}/Linked.anki2');
+    await source.writeAsBytes([3, 4, 5]);
+    final media = Directory('${sourceDirectory.path}/Linked.media');
+    await media.create();
+    final actual = File('${temporaryDirectory.path}/outside.wav');
+    await actual.writeAsBytes([8, 8]);
+    await Link('${media.path}/linked.wav').create(actual.path);
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 777,
+    );
+    await expectLater(storage.copySelectedCollection(source),
+        throwsA(isA<FileSystemException>()));
+    expect(await actual.readAsBytes(), [8, 8]);
+    expect(await source.readAsBytes(), [3, 4, 5]);
+    expect(destination.listSync(), isEmpty);
+  }, skip: Platform.isWindows);
+
 }
