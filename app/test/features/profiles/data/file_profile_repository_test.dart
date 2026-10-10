@@ -121,4 +121,29 @@ void main() {
 
     expect(await repository.list(), isEmpty);
   });
+  test('concurrent profile mutations do not discard registry entries', () async {
+    final other = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+    );
+    await Future.wait([
+      repository.create('First'),
+      other.create('Second'),
+      repository.create('Third'),
+    ]);
+    expect((await repository.list()).map((profile) => profile.name).toSet(),
+        {'First', 'Second', 'Third'});
+
+    final results = await Future.wait<Object>([
+      repository.create('Duplicate').then<Object>((profile) => profile,
+          onError: (Object error) => error),
+      other.create('Duplicate').then<Object>((profile) => profile,
+          onError: (Object error) => error),
+    ]);
+    expect(results.whereType<ArgumentError>(), hasLength(1));
+    expect((await repository.list()).where((p) => p.name == 'Duplicate'),
+        hasLength(1));
+  });
+
 }
