@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'package:anki_flutter/core/storage/atomic_state_file.dart';
+
 import 'package:anki_flutter/features/collection/collection_location.dart';
 
 class ApplicationDataPaths {
@@ -87,70 +89,74 @@ class MobileCollectionStorage {
     );
     final sourceLocation = CollectionLocation.fromCollectionPath(source.path);
 
-    await collectionsDirectory.create(recursive: true);
+    // A fixed timestamp can be reused by overlapping file-picker imports.
+    // Hold the same per-destination queue throughout staging and promotion.
+    return runSerializedStateMutation(File(destinationPath), () async {
+      await collectionsDirectory.create(recursive: true);
 
-    // Never replace another previously imported collection or its media.
-    if (await File(destinationPath).exists() ||
-        await File(destinationLocation.mediaDbPath).exists() ||
-        await Directory(destinationLocation.mediaFolderPath).exists()) {
-      throw StateError('Collection import destination already exists.');
-    }
-
-    // Stage all three parts on the destination filesystem. The collection
-    // filename is made visible only after its companion media was copied.
-    // On any failure, delete only files created by this import.
-    final staging = await collectionsDirectory.createTemp('.anki-import-');
-    final separator = Platform.pathSeparator;
-    final stagedCollection = File('${staging.path}$separator$stem.anki2');
-    final stagedMediaDb = File('${staging.path}$separator$stem.media.db2');
-    final stagedMediaDir = Directory('${staging.path}$separator$stem.media');
-    var promotedMediaDb = false;
-    var promotedMediaDirectory = false;
-    var promotedCollection = false;
-
-    try {
-      await source.copy(stagedCollection.path);
-      await _copyFileIfPresent(sourceLocation.mediaDbPath, stagedMediaDb.path);
-      await _copyDirectoryIfPresent(
-        Directory(sourceLocation.mediaFolderPath),
-        stagedMediaDir,
-      );
-
-      // Destination can have appeared while staging. Refuse to overwrite it.
+      // Never replace another previously imported collection or its media.
       if (await File(destinationPath).exists() ||
           await File(destinationLocation.mediaDbPath).exists() ||
           await Directory(destinationLocation.mediaFolderPath).exists()) {
         throw StateError('Collection import destination already exists.');
       }
 
-      if (await stagedMediaDb.exists()) {
-        await stagedMediaDb.rename(destinationLocation.mediaDbPath);
-        promotedMediaDb = true;
+      // Stage all three parts on the destination filesystem. The collection
+      // filename is made visible only after its companion media was copied.
+      // On any failure, delete only files created by this import.
+      final staging = await collectionsDirectory.createTemp('.anki-import-');
+      final separator = Platform.pathSeparator;
+      final stagedCollection = File('${staging.path}$separator$stem.anki2');
+      final stagedMediaDb = File('${staging.path}$separator$stem.media.db2');
+      final stagedMediaDir = Directory('${staging.path}$separator$stem.media');
+      var promotedMediaDb = false;
+      var promotedMediaDirectory = false;
+      var promotedCollection = false;
+
+      try {
+        await source.copy(stagedCollection.path);
+        await _copyFileIfPresent(sourceLocation.mediaDbPath, stagedMediaDb.path);
+        await _copyDirectoryIfPresent(
+          Directory(sourceLocation.mediaFolderPath),
+          stagedMediaDir,
+        );
+
+        // Destination can have appeared while staging. Refuse to overwrite it.
+        if (await File(destinationPath).exists() ||
+            await File(destinationLocation.mediaDbPath).exists() ||
+            await Directory(destinationLocation.mediaFolderPath).exists()) {
+          throw StateError('Collection import destination already exists.');
+        }
+
+        if (await stagedMediaDb.exists()) {
+          await stagedMediaDb.rename(destinationLocation.mediaDbPath);
+          promotedMediaDb = true;
+        }
+        if (await stagedMediaDir.exists()) {
+          await stagedMediaDir.rename(destinationLocation.mediaFolderPath);
+          promotedMediaDirectory = true;
+        }
+        await stagedCollection.rename(destinationPath);
+        promotedCollection = true;
+        return destinationPath;
+      } catch (_) {
+        if (promotedCollection) {
+          await File(destinationPath).delete();
+        }
+        if (promotedMediaDirectory) {
+          await Directory(destinationLocation.mediaFolderPath)
+              .delete(recursive: true);
+        }
+        if (promotedMediaDb) {
+          await File(destinationLocation.mediaDbPath).delete();
+        }
+        rethrow;
+      } finally {
+        if (await staging.exists()) {
+          await staging.delete(recursive: true);
+        }
       }
-      if (await stagedMediaDir.exists()) {
-        await stagedMediaDir.rename(destinationLocation.mediaFolderPath);
-        promotedMediaDirectory = true;
-      }
-      await stagedCollection.rename(destinationPath);
-      promotedCollection = true;
-      return destinationPath;
-    } catch (_) {
-      if (promotedCollection) {
-        await File(destinationPath).delete();
-      }
-      if (promotedMediaDirectory) {
-        await Directory(destinationLocation.mediaFolderPath)
-            .delete(recursive: true);
-      }
-      if (promotedMediaDb) {
-        await File(destinationLocation.mediaDbPath).delete();
-      }
-      rethrow;
-    } finally {
-      if (await staging.exists()) {
-        await staging.delete(recursive: true);
-      }
-    }
+    });
   }
 
   Future<void> _copyFileIfPresent(String source, String destination) async {
@@ -164,6 +170,13 @@ class MobileCollectionStorage {
     Directory source,
     Directory destination,
   ) async {
+    if (await FileSystemEntity.type(source.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw FileSystemException(
+        'Linked media directories cannot be safely imported.',
+        source.path,
+      );
+    }
     if (!await source.exists()) {
       return;
     }
@@ -175,6 +188,12 @@ class MobileCollectionStorage {
         await entity.copy(childPath);
       } else if (entity is Directory) {
         await _copyDirectoryIfPresent(entity, Directory(childPath));
+      } else {
+        // Silently skipping linked files would produce a broken media import.
+        throw FileSystemException(
+          'Linked media entries cannot be safely imported.',
+          entity.path,
+        );
       }
     }
   }
