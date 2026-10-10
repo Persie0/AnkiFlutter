@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
+
 import 'package:anki_flutter/core/backend/generated/anki/config.pb.dart' as config;
 import 'package:anki_flutter/features/preferences/data/anki_preferences_repository.dart';
 import 'package:flutter/material.dart';
@@ -30,10 +32,79 @@ class _PreferencesPageState extends State<PreferencesPage> {
   bool _loading = true;
   bool _saving = false;
   bool _saved = false;
+  bool _allowExit = false;
+  bool _populatingControllers = false;
+  List<int> _savedPreferenceBytes = const [];
+  List<String> _savedFieldValues = const [];
+
+  List<TextEditingController> get _fieldControllers => [
+    _rolloverController,
+    _learnAheadMinutesController,
+    _timeLimitSecondsController,
+    _defaultSearchController,
+    _dailyBackupsController,
+    _weeklyBackupsController,
+    _monthlyBackupsController,
+    _minimumBackupMinutesController,
+  ];
+
+  List<String> get _currentFields =>
+      _fieldControllers.map((controller) => controller.text).toList();
+
+  bool get _hasUnsavedChanges {
+    final preferences = _preferences;
+    if (preferences == null) return false;
+    return !listEquals(_savedFieldValues, _currentFields) ||
+        !listEquals(_savedPreferenceBytes, preferences.writeToBuffer());
+  }
+
+  void _onFormChanged() {
+    if (!mounted || _populatingControllers || _preferences == null) return;
+    setState(() => _saved = false);
+  }
+
+  Future<void> _confirmExit() async {
+    if (!mounted || _saving || _allowExit) return;
+    if (!_hasUnsavedChanges) {
+      setState(() => _allowExit = true);
+    } else {
+      final discard = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Discard unsaved preferences?'),
+          content: const Text(
+            'Your preference changes have not been saved.',
+          ),
+          actions: [
+            TextButton(
+              key: const ValueKey('preferences-keep-editing'),
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Keep editing'),
+            ),
+            FilledButton(
+              key: const ValueKey('preferences-discard'),
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Discard changes'),
+            ),
+          ],
+        ),
+      );
+      if (!mounted || discard != true) return;
+      setState(() => _allowExit = true);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && Navigator.of(context).canPop()) {
+        Navigator.of(context).pop();
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
+    for (final controller in _fieldControllers) {
+      controller.addListener(_onFormChanged);
+    }
     unawaited(_load());
   }
 
@@ -49,10 +120,18 @@ class _PreferencesPageState extends State<PreferencesPage> {
       preferences.ensureReviewing();
       preferences.ensureEditing();
       preferences.ensureBackups();
-      _populateControllers(preferences);
+      _populatingControllers = true;
+      try {
+        _populateControllers(preferences);
+      } finally {
+        _populatingControllers = false;
+      }
       if (!mounted) return;
       setState(() {
         _preferences = preferences;
+        _savedPreferenceBytes = preferences.writeToBuffer();
+        _savedFieldValues = _currentFields;
+        _allowExit = false;
         _loading = false;
       });
     } catch (error) {
@@ -104,6 +183,8 @@ class _PreferencesPageState extends State<PreferencesPage> {
       if (!mounted) return;
       setState(() {
         _saving = false;
+        _savedPreferenceBytes = preferences.writeToBuffer();
+        _savedFieldValues = _currentFields;
         _saved = true;
       });
     } catch (error) {
@@ -117,6 +198,9 @@ class _PreferencesPageState extends State<PreferencesPage> {
 
   @override
   void dispose() {
+    for (final controller in _fieldControllers) {
+      controller.removeListener(_onFormChanged);
+    }
     _rolloverController.dispose();
     _learnAheadMinutesController.dispose();
     _timeLimitSecondsController.dispose();
@@ -130,9 +214,14 @@ class _PreferencesPageState extends State<PreferencesPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Preferences'),
+    return PopScope<void>(
+      canPop: _allowExit || (!_saving && !_hasUnsavedChanges),
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) unawaited(_confirmExit());
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Preferences'),
         actions: [
           IconButton(
             key: const ValueKey('preferences-save'),
@@ -142,7 +231,8 @@ class _PreferencesPageState extends State<PreferencesPage> {
           ),
         ],
       ),
-      body: SafeArea(child: _buildBody()),
+        body: SafeArea(child: _buildBody()),
+      ),
     );
   }
 
@@ -167,7 +257,7 @@ class _PreferencesPageState extends State<PreferencesPage> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 if (_saving) const LinearProgressIndicator(),
-                if (_saved)
+                if (_saved && !_hasUnsavedChanges)
                   const MaterialBanner(
                     content: Text('Preferences saved.'),
                     actions: [SizedBox.shrink()],
