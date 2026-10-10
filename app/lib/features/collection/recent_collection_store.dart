@@ -54,7 +54,7 @@ class FileRecentCollectionStore implements RecentCollectionStore {
       );
     }
     await runSerializedStateMutation(_file, () async {
-      final paths = await load();
+      final paths = await _loadForMutation();
       await _write([
         path,
         ...paths.where((recentPath) => recentPath != path),
@@ -65,9 +65,30 @@ class FileRecentCollectionStore implements RecentCollectionStore {
   @override
   Future<void> forget(String collectionPath) async {
     await runSerializedStateMutation(_file, () async {
-      final paths = await load();
+      final paths = await _loadForMutation();
       await _write(paths.where((path) => path != collectionPath).toList());
     });
+  }
+
+  /// Startup may display an empty list if this file is damaged, but edits
+  /// must not destroy the original data or an unsupported future schema.
+  Future<List<String>> _loadForMutation() async {
+    if (!await _file.exists()) return const [];
+    final Object? decoded;
+    try {
+      decoded = jsonDecode(await _file.readAsString());
+    } on FormatException {
+      throw StateError(
+        'Recent collections data is corrupt; original file preserved.',
+      );
+    }
+    if (decoded is! List ||
+        decoded.any((value) => value is! String || value.isEmpty)) {
+      throw StateError(
+        'Recent collections data is invalid; original file preserved.',
+      );
+    }
+    return decoded.cast<String>();
   }
 
   Future<void> _write(Iterable<String> paths) async {
