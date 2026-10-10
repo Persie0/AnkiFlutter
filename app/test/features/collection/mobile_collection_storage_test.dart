@@ -125,6 +125,67 @@ void main() {
     );
   });
 
+  test('rejects a nonempty SQLite WAL without leaving an import', () async {
+    final source = File('${temporaryDirectory.path}/French.anki2');
+    await source.writeAsBytes([1, 2, 3]);
+    final wal = File('${source.path}-wal');
+    await wal.writeAsBytes([4, 5, 6]);
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 42,
+    );
+
+    await expectLater(
+      storage.copySelectedCollection(source),
+      throwsA(isA<StateError>().having(
+        (error) => error.message,
+        'message',
+        contains('active SQLite journal'),
+      )),
+    );
+    expect(File('${destination.path}/French_42.anki2').existsSync(), isFalse);
+    expect(await wal.readAsBytes(), [4, 5, 6]);
+    if (await destination.exists()) {
+      expect(destination.listSync(), isEmpty);
+    }
+  });
+
+  test('rejects nonempty rollback journals without modifying source', () async {
+    final source = File('${temporaryDirectory.path}/Test.anki2');
+    await source.writeAsBytes([9, 8, 7]);
+    await File('${source.path}-journal').writeAsBytes([1]);
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+    );
+
+    await expectLater(
+      storage.copySelectedCollection(source),
+      throwsStateError,
+    );
+    expect(await source.readAsBytes(), [9, 8, 7]);
+    if (await destination.exists()) {
+      expect(destination.listSync(), isEmpty);
+    }
+  });
+
+  test('allows empty residual SQLite WAL alongside a closed database',
+      () async {
+    final source = File('${temporaryDirectory.path}/Closed.anki2');
+    await source.writeAsBytes([3, 2, 1]);
+    await File('${source.path}-wal').writeAsBytes([]);
+    final destination = Directory('${temporaryDirectory.path}/collections');
+    final storage = MobileCollectionStorage(
+      collectionsDirectory: destination,
+      timestampMicros: () => 77,
+    );
+
+    final imported = await storage.copySelectedCollection(source);
+    expect(await File(imported).readAsBytes(), [3, 2, 1]);
+    expect(File('${destination.path}/Closed_77.anki2').existsSync(), isTrue);
+  });
+
   test('rejects files that are not Anki collection databases', () async {
     final source = File('${temporaryDirectory.path}/notes.txt');
     await source.writeAsString('not a collection');
