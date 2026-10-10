@@ -20,3 +20,31 @@ Future<void> writeAtomicState(File destination, String content) async {
     }
   }
 }
+
+// Atomic replacement protects an individual write, not a read-modify-write
+// cycle. This queue is shared across store instances in one Dart isolate;
+// it is not a cross-process or cross-isolate filesystem lock.
+final Map<String, Future<void>> _stateMutationTails = <String, Future<void>>{};
+
+/// Serialize a complete read-modify-write operation for the same state file.
+///
+/// An error is propagated to its caller, but does not block later mutations.
+Future<T> runSerializedStateMutation<T>(
+  File destination,
+  Future<T> Function() mutation,
+) {
+  final key = destination.absolute.path;
+  final previous = _stateMutationTails[key] ?? Future<void>.value();
+  final result = previous.then<T>((_) => mutation());
+  final tail = result.then<void>(
+    (_) {},
+    onError: (Object error, StackTrace stackTrace) {},
+  );
+  _stateMutationTails[key] = tail;
+  tail.then((_) {
+    if (identical(_stateMutationTails[key], tail)) {
+      _stateMutationTails.remove(key);
+    }
+  });
+  return result;
+}
