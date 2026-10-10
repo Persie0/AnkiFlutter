@@ -45,19 +45,22 @@ class FileSyncAuthStore implements SyncAuthStore {
     if (auth.hkey.isEmpty) {
       throw ArgumentError('Sync host key must not be empty');
     }
-    await file.parent.create(recursive: true);
-    final data = <String, Object>{'hkey': auth.hkey};
-    if (auth.hasEndpoint() && auth.endpoint.isNotEmpty) {
-      data['endpoint'] = auth.endpoint;
-    }
-    if (auth.hasIoTimeoutSecs() && auth.ioTimeoutSecs > 0) {
-      data['ioTimeoutSecs'] = auth.ioTimeoutSecs;
-    }
-    await writeAtomicState(file, jsonEncode(data));
+    await runSerializedStateMutation(file, () async {
+      final data = <String, Object>{'hkey': auth.hkey};
+      if (auth.hasEndpoint() && auth.endpoint.isNotEmpty) {
+        data['endpoint'] = auth.endpoint;
+      }
+      if (auth.hasIoTimeoutSecs() && auth.ioTimeoutSecs > 0) {
+        data['ioTimeoutSecs'] = auth.ioTimeoutSecs;
+      }
+      await writeAtomicState(file, jsonEncode(data));
+    });
   }
 
   @override
   Future<void> clear() async {
-    if (await file.exists()) await file.delete();
+    await runSerializedStateMutation(file, () async {
+      if (await file.exists()) await file.delete();
+    });
   }
 }
