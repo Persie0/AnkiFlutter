@@ -170,6 +170,13 @@ class MobileCollectionStorage {
     Directory source,
     Directory destination,
   ) async {
+    if (await FileSystemEntity.type(source.path, followLinks: false) ==
+        FileSystemEntityType.link) {
+      throw FileSystemException(
+        'Linked media directories cannot be safely imported.',
+        source.path,
+      );
+    }
     if (!await source.exists()) {
       return;
     }
