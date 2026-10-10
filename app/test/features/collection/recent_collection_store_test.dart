@@ -50,4 +50,20 @@ void main() {
 
     expect(await store.load(), isEmpty);
   });
+  test('concurrent store instances preserve ordered recent changes', () async {
+    final file = File('${tempDirectory.path}/parallel.json');
+    final first = FileRecentCollectionStore(file: file, maxEntries: 12);
+    final second = FileRecentCollectionStore(file: file, maxEntries: 12);
+    await Future.wait([
+      first.remember('/collections/first.anki2'),
+      second.remember('/collections/second.anki2'),
+      first.remember('/collections/third.anki2'),
+      second.forget('/collections/first.anki2'),
+    ]);
+    expect(await first.load(), [
+      '/collections/third.anki2',
+      '/collections/second.anki2',
+    ]);
+  });
+
 }
