@@ -86,94 +86,98 @@ class FileProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<AnkiProfile> create(String name) async {
-    final normalizedName = _validateName(name);
-    final profiles = await list();
-    _ensureUniqueName(profiles, normalizedName);
+  Future<AnkiProfile> create(String name) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final profiles = await list();
+      _ensureUniqueName(profiles, normalizedName);
 
-    final id = '${_slug(normalizedName)}-${_timestampMicros()}';
-    final profileDirectory = Directory(
-      '${profilesDirectory.path}$pathSeparator$id',
-    );
-    await profileDirectory.create(recursive: true);
-    final profile = AnkiProfile(
-      id: id,
-      name: normalizedName,
-      collectionPath:
-          '${profileDirectory.path}${pathSeparator}collection.anki2',
-      profileDirectory: profileDirectory.path,
-      isManaged: true,
-    );
-    await _write([...profiles, profile]);
-    return profile;
+      final id = '${_slug(normalizedName)}-${_timestampMicros()}';
+      final profileDirectory = Directory(
+        '${profilesDirectory.path}$pathSeparator$id',
+      );
+      await profileDirectory.create(recursive: true);
+      final profile = AnkiProfile(
+        id: id,
+        name: normalizedName,
+        collectionPath:
+            '${profileDirectory.path}${pathSeparator}collection.anki2',
+        profileDirectory: profileDirectory.path,
+        isManaged: true,
+      );
+      await _write([...profiles, profile]);
+      return profile;
+    });
   }
-
   @override
   Future<AnkiProfile> registerExternal({
     required String name,
     required String collectionPath,
-  }) async {
-    final normalizedName = _validateName(name);
-    final path = collectionPath.trim();
-    if (path.isEmpty || !RegExp(r'\.anki2$', caseSensitive: false).hasMatch(path)) {
-      throw ArgumentError.value(
-        collectionPath,
-        'collectionPath',
-        'Select an Anki .anki2 collection.',
+  }) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final path = collectionPath.trim();
+      if (path.isEmpty || !RegExp(r'\.anki2$', caseSensitive: false).hasMatch(path)) {
+        throw ArgumentError.value(
+          collectionPath,
+          'collectionPath',
+          'Select an Anki .anki2 collection.',
+        );
+      }
+      final profiles = await list();
+      _ensureUniqueName(profiles, normalizedName);
+      final existingPath = profiles.any((profile) => profile.collectionPath == path);
+      if (existingPath) {
+        throw ArgumentError.value(
+          collectionPath,
+          'collectionPath',
+          'This collection is already registered.',
+        );
+      }
+      final separatorIndex = path.lastIndexOf(pathSeparator);
+      final profile = AnkiProfile(
+        id: 'external-${_timestampMicros()}',
+        name: normalizedName,
+        collectionPath: path,
+        profileDirectory:
+            separatorIndex <= 0 ? '' : path.substring(0, separatorIndex),
+        isManaged: false,
       );
-    }
-    final profiles = await list();
-    _ensureUniqueName(profiles, normalizedName);
-    final existingPath = profiles.any((profile) => profile.collectionPath == path);
-    if (existingPath) {
-      throw ArgumentError.value(
-        collectionPath,
-        'collectionPath',
-        'This collection is already registered.',
+      await _write([...profiles, profile]);
+      return profile;
+    });
+  }
+  @override
+  Future<AnkiProfile> rename(String id, String name) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final profiles = await list();
+      final index = profiles.indexWhere((profile) => profile.id == id);
+      if (index < 0) {
+        throw StateError('Profile not found: $id');
+      }
+      _ensureUniqueName(profiles, normalizedName, exceptId: id);
+      final current = profiles[index];
+      final renamed = AnkiProfile(
+        id: current.id,
+        name: normalizedName,
+        collectionPath: current.collectionPath,
+        profileDirectory: current.profileDirectory,
+        isManaged: current.isManaged,
       );
-    }
-    final separatorIndex = path.lastIndexOf(pathSeparator);
-    final profile = AnkiProfile(
-      id: 'external-${_timestampMicros()}',
-      name: normalizedName,
-      collectionPath: path,
-      profileDirectory:
-          separatorIndex <= 0 ? '' : path.substring(0, separatorIndex),
-      isManaged: false,
-    );
-    await _write([...profiles, profile]);
-    return profile;
+      final updated = [...profiles];
+      updated[index] = renamed;
+      await _write(updated);
+      return renamed;
+    });
   }
-
   @override
-  Future<AnkiProfile> rename(String id, String name) async {
-    final normalizedName = _validateName(name);
-    final profiles = await list();
-    final index = profiles.indexWhere((profile) => profile.id == id);
-    if (index < 0) {
-      throw StateError('Profile not found: $id');
-    }
-    _ensureUniqueName(profiles, normalizedName, exceptId: id);
-    final current = profiles[index];
-    final renamed = AnkiProfile(
-      id: current.id,
-      name: normalizedName,
-      collectionPath: current.collectionPath,
-      profileDirectory: current.profileDirectory,
-      isManaged: current.isManaged,
-    );
-    final updated = [...profiles];
-    updated[index] = renamed;
-    await _write(updated);
-    return renamed;
+  Future<void> remove(String id) {
+    return runSerializedStateMutation(registryFile, () async {
+      final profiles = await list();
+      await _write(profiles.where((profile) => profile.id != id));
+    });
   }
-
-  @override
-  Future<void> remove(String id) async {
-    final profiles = await list();
-    await _write(profiles.where((profile) => profile.id != id));
-  }
-
   Future<void> _write(Iterable<AnkiProfile> profiles) async {
     await registryFile.parent.create(recursive: true);
     final payload = <String, Object>{
