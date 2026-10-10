@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:anki_flutter/core/storage/atomic_state_file.dart';
+
 class AnkiProfile {
   const AnkiProfile({
     required this.id,
@@ -84,96 +86,115 @@ class FileProfileRepository implements ProfileRepository {
   }
 
   @override
-  Future<AnkiProfile> create(String name) async {
-    final normalizedName = _validateName(name);
-    final profiles = await list();
-    _ensureUniqueName(profiles, normalizedName);
+  Future<AnkiProfile> create(String name) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final profiles = await list();
+      _ensureUniqueName(profiles, normalizedName);
 
-    final id = '${_slug(normalizedName)}-${_timestampMicros()}';
-    final profileDirectory = Directory(
-      '${profilesDirectory.path}$pathSeparator$id',
-    );
-    await profileDirectory.create(recursive: true);
-    final profile = AnkiProfile(
-      id: id,
-      name: normalizedName,
-      collectionPath:
-          '${profileDirectory.path}${pathSeparator}collection.anki2',
-      profileDirectory: profileDirectory.path,
-      isManaged: true,
-    );
-    await _write([...profiles, profile]);
-    return profile;
+      // A damaged or future-version registry must not be replaced.
+      await _ensureRegistryCanBeReplaced();
+      final id = await _availableManagedId(
+        '${_slug(normalizedName)}-${_timestampMicros()}',
+        profiles,
+      );
+      final profileDirectory = Directory(
+        '${profilesDirectory.path}$pathSeparator$id',
+      );
+      await profileDirectory.create(recursive: true);
+      try {
+        final profile = AnkiProfile(
+          id: id,
+          name: normalizedName,
+          collectionPath:
+              '${profileDirectory.path}${pathSeparator}collection.anki2',
+          profileDirectory: profileDirectory.path,
+          isManaged: true,
+        );
+        await _write([...profiles, profile]);
+        return profile;
+      } catch (_) {
+        // Only the new directory is rolled back; never delete an existing
+        // profile folder or its collection.
+        if (await profileDirectory.exists()) {
+          await profileDirectory.delete(recursive: true);
+        }
+        rethrow;
+      }
+    });
   }
-
   @override
   Future<AnkiProfile> registerExternal({
     required String name,
     required String collectionPath,
-  }) async {
-    final normalizedName = _validateName(name);
-    final path = collectionPath.trim();
-    if (path.isEmpty || !RegExp(r'\.anki2$', caseSensitive: false).hasMatch(path)) {
-      throw ArgumentError.value(
-        collectionPath,
-        'collectionPath',
-        'Select an Anki .anki2 collection.',
+  }) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final path = collectionPath.trim();
+      if (path.isEmpty || !RegExp(r'\.anki2$', caseSensitive: false).hasMatch(path)) {
+        throw ArgumentError.value(
+          collectionPath,
+          'collectionPath',
+          'Select an Anki .anki2 collection.',
+        );
+      }
+      final profiles = await list();
+      _ensureUniqueName(profiles, normalizedName);
+      final existingPath = profiles.any((profile) => profile.collectionPath == path);
+      if (existingPath) {
+        throw ArgumentError.value(
+          collectionPath,
+          'collectionPath',
+          'This collection is already registered.',
+        );
+      }
+      final separatorIndex = path.lastIndexOf(pathSeparator);
+      final profile = AnkiProfile(
+        id: _availableExternalId('external-${_timestampMicros()}', profiles),
+        name: normalizedName,
+        collectionPath: path,
+        profileDirectory:
+            separatorIndex <= 0 ? '' : path.substring(0, separatorIndex),
+        isManaged: false,
       );
-    }
-    final profiles = await list();
-    _ensureUniqueName(profiles, normalizedName);
-    final existingPath = profiles.any((profile) => profile.collectionPath == path);
-    if (existingPath) {
-      throw ArgumentError.value(
-        collectionPath,
-        'collectionPath',
-        'This collection is already registered.',
+      await _write([...profiles, profile]);
+      return profile;
+    });
+  }
+  @override
+  Future<AnkiProfile> rename(String id, String name) {
+    return runSerializedStateMutation(registryFile, () async {
+      final normalizedName = _validateName(name);
+      final profiles = await list();
+      final index = profiles.indexWhere((profile) => profile.id == id);
+      if (index < 0) {
+        throw StateError('Profile not found: $id');
+      }
+      _ensureUniqueName(profiles, normalizedName, exceptId: id);
+      final current = profiles[index];
+      final renamed = AnkiProfile(
+        id: current.id,
+        name: normalizedName,
+        collectionPath: current.collectionPath,
+        profileDirectory: current.profileDirectory,
+        isManaged: current.isManaged,
       );
-    }
-    final separatorIndex = path.lastIndexOf(pathSeparator);
-    final profile = AnkiProfile(
-      id: 'external-${_timestampMicros()}',
-      name: normalizedName,
-      collectionPath: path,
-      profileDirectory:
-          separatorIndex <= 0 ? '' : path.substring(0, separatorIndex),
-      isManaged: false,
-    );
-    await _write([...profiles, profile]);
-    return profile;
+      final updated = [...profiles];
+      updated[index] = renamed;
+      await _write(updated);
+      return renamed;
+    });
   }
-
   @override
-  Future<AnkiProfile> rename(String id, String name) async {
-    final normalizedName = _validateName(name);
-    final profiles = await list();
-    final index = profiles.indexWhere((profile) => profile.id == id);
-    if (index < 0) {
-      throw StateError('Profile not found: $id');
-    }
-    _ensureUniqueName(profiles, normalizedName, exceptId: id);
-    final current = profiles[index];
-    final renamed = AnkiProfile(
-      id: current.id,
-      name: normalizedName,
-      collectionPath: current.collectionPath,
-      profileDirectory: current.profileDirectory,
-      isManaged: current.isManaged,
-    );
-    final updated = [...profiles];
-    updated[index] = renamed;
-    await _write(updated);
-    return renamed;
+  Future<void> remove(String id) {
+    return runSerializedStateMutation(registryFile, () async {
+      final profiles = await list();
+      await _write(profiles.where((profile) => profile.id != id));
+    });
   }
-
-  @override
-  Future<void> remove(String id) async {
-    final profiles = await list();
-    await _write(profiles.where((profile) => profile.id != id));
-  }
-
   Future<void> _write(Iterable<AnkiProfile> profiles) async {
     await registryFile.parent.create(recursive: true);
+    await _ensureRegistryCanBeReplaced();
     final payload = <String, Object>{
       'version': 1,
       'profiles': profiles
@@ -188,22 +209,60 @@ class FileProfileRepository implements ProfileRepository {
           )
           .toList(growable: false),
     };
-    // Keep the previous registry readable until the replacement has been
-    // completely written and flushed. Stage on the same filesystem to allow
-    // the final rename to replace the file rather than writing in place.
-    final stagingDirectory =
-        await registryFile.parent.createTemp('.anki-profile-write-');
+    await writeAtomicState(registryFile, jsonEncode(payload));
+  }
+
+  /// Display reads can fall back to an empty list; mutations must not
+  /// overwrite a damaged registry, an unknown version or malformed entries.
+  Future<void> _ensureRegistryCanBeReplaced() async {
+    if (!await registryFile.exists()) return;
+    final Object? data;
     try {
-      final staged = File(
-        '${stagingDirectory.path}${Platform.pathSeparator}registry.json',
+      data = jsonDecode(await registryFile.readAsString());
+    } on FormatException {
+      throw const FormatException(
+        'The profile registry is damaged. Back it up before repairing.',
       );
-      await staged.writeAsString(jsonEncode(payload), flush: true);
-      await staged.rename(registryFile.path);
-    } finally {
-      if (await stagingDirectory.exists()) {
-        await stagingDirectory.delete(recursive: true);
+    }
+    if (data is! Map<String, dynamic> ||
+        data['version'] != 1 ||
+        data['profiles'] is! List) {
+      throw const FormatException(
+        'Unsupported profile registry format; existing profiles were preserved.',
+      );
+    }
+    for (final record in data['profiles'] as List) {
+      if (record is! Map ||
+          !record.keys.every((key) => key is String) ||
+          _decodeProfile(Map<String, dynamic>.from(record)) == null) {
+        throw const FormatException(
+          'Profile registry has invalid entries; existing data was preserved.',
+        );
       }
     }
+  }
+
+  Future<String> _availableManagedId(
+    String base,
+    List<AnkiProfile> registered,
+  ) async {
+    for (var suffix = 0; suffix < 1000; suffix++) {
+      final id = suffix == 0 ? base : '$base-$suffix';
+      if (registered.any((profile) => profile.id == id)) continue;
+      final path = '${profilesDirectory.path}$pathSeparator$id';
+      if (!await Directory(path).exists() && !await File(path).exists()) {
+        return id;
+      }
+    }
+    throw StateError('Could not allocate an unused profile directory.');
+  }
+
+  String _availableExternalId(String base, List<AnkiProfile> registered) {
+    for (var suffix = 0; suffix < 1000; suffix++) {
+      final id = suffix == 0 ? base : '$base-$suffix';
+      if (registered.every((profile) => profile.id != id)) return id;
+    }
+    throw StateError('Could not allocate an unused external profile ID.');
   }
 
   AnkiProfile? _decodeProfile(Map<String, dynamic> json) {

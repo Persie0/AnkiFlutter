@@ -121,4 +121,125 @@ void main() {
 
     expect(await repository.list(), isEmpty);
   });
+  test('concurrent profile mutations do not discard registry entries', () async {
+    final other = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+    );
+    await Future.wait([
+      repository.create('First'),
+      other.create('Second'),
+      repository.create('Third'),
+    ]);
+    expect((await repository.list()).map((profile) => profile.name).toSet(),
+        {'First', 'Second', 'Third'});
+
+    final results = await Future.wait<Object>([
+      repository.create('Duplicate').then<Object>((profile) => profile,
+          onError: (Object error) => error),
+      other.create('Duplicate').then<Object>((profile) => profile,
+          onError: (Object error) => error),
+    ]);
+    expect(results.whereType<ArgumentError>(), hasLength(1));
+    expect((await repository.list()).where((p) => p.name == 'Duplicate'),
+        hasLength(1));
+  });
+
+  test('same-timestamp profile slugs cannot overwrite another folder', () async {
+    final fixed = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 321,
+    );
+    final first = await fixed.create('My Course!');
+    final marker = File('${first.profileDirectory}/important.txt');
+    await marker.writeAsString('keep');
+    final second = await fixed.create('My Course?');
+    expect(first.id, isNot(second.id));
+    expect(second.id, startsWith('my-course-321'));
+    expect(await marker.readAsString(), 'keep');
+
+    final occupied = Directory('${repository.profilesDirectory.path}/other-321');
+    await occupied.create();
+    final existing = File('${occupied.path}/dont-delete.txt');
+    await existing.writeAsString('original');
+    final third = await fixed.create('Other');
+    expect(third.id, isNot('other-321'));
+    expect(await existing.readAsString(), 'original');
+  });
+
+  test('external profile IDs remain unique for identical timestamps', () async {
+    final fixed = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 4242,
+    );
+    final first = await fixed.registerExternal(
+      name: 'External 1',
+      collectionPath: '${tempDirectory.path}/one.anki2',
+    );
+    final second = await fixed.registerExternal(
+      name: 'External 2',
+      collectionPath: '${tempDirectory.path}/two.anki2',
+    );
+    expect(first.id, isNot(second.id));
+    expect((await fixed.list()).map((entry) => entry.id).toSet(), hasLength(2));
+  });
+
+  test('failed registry commit removes only newly created folder', () async {
+    final registryDirectory = Directory(repository.registryFile.path);
+    await registryDirectory.create();
+    final fixed = FileProfileRepository(
+      profilesDirectory: repository.profilesDirectory,
+      registryFile: repository.registryFile,
+      pathSeparator: Platform.pathSeparator,
+      timestampMicros: () => 987,
+    );
+    await expectLater(fixed.create('Cleanup'), throwsA(isA<FileSystemException>()));
+    expect(
+      Directory('${repository.profilesDirectory.path}/cleanup-987').existsSync(),
+      isFalse,
+    );
+    expect(await registryDirectory.exists(), isTrue);
+  });
+
+  test('corrupt, future-version and partially malformed registries survive edits',
+      () async {
+    final file = repository.registryFile;
+    await file.writeAsString('{broken json');
+    await expectLater(repository.create('New'), throwsFormatException);
+    expect(await file.readAsString(), '{broken json');
+
+    const future = '{"version":2,"profiles":[]}';
+    await file.writeAsString(future);
+    await expectLater(repository.registerExternal(
+      name: 'External',
+      collectionPath: '/missing.anki2',
+    ), throwsFormatException);
+    expect(await file.readAsString(), future);
+
+    final malformed = jsonEncode({
+      'version': 1,
+      'profiles': [
+        {
+          'id': 'valid',
+          'name': 'Valid',
+          'collectionPath': '/collection.anki2',
+          'profileDirectory': '/profiles/valid',
+          'isManaged': true,
+        },
+        {'id': 'incomplete', 'name': 'Lost fields'}
+      ],
+    });
+    await file.writeAsString(malformed);
+    await expectLater(repository.rename('valid', 'Renamed'), throwsFormatException);
+    await expectLater(repository.remove('valid'), throwsFormatException);
+    expect(await file.readAsString(), malformed);
+    expect(!await repository.profilesDirectory.exists() ||
+        repository.profilesDirectory.listSync().isEmpty, isTrue);
+  });
+
 }
